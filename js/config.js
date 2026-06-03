@@ -6,9 +6,7 @@
  */
 
 const FG_CONFIG = {
-  // GASデプロイ後にここを書き換える
-  API_BASE_URL: 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec',
-
-  // 現在のイベントID (管理画面から自動セットすることも可能)
+  API_BASE_URL: 'https://script.google.com/macros/s/AKfycbyMZDTIHPr8UwfQx-F6rELoFkbggjszO1oo--xarweni8tOAgTpc38j8VC6LCld3MMOhA/exec',
   EVENT_ID: '2026_rd2',
 };
+
