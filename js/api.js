@@ -1,17 +1,19 @@
 /**
- * FG Event Platform — フロントエンドAPIモジュール
+ * FG Event Platform — GAS通信モジュール
  *
- * 使い方:
- *   const student = await FG_API.getStudent(token);
- *   if (!student.ok) { alert(student.message); return; }
- *   console.log(student.data.name);
+ * GASのAPIを叩く関数をまとめたモジュール。
+ * FG_API.getStudent(token) のように使う。
+ * config.jsより後に読み込むこと。
  */
 
 const FG_API = (() => {
 
+  // ── 内部共通関数 ──────────────────────────────
+
   /**
-   * GAS APIを呼ぶ共通関数
-   * GASはリダイレクト(302)を返すため redirect:'follow' が必須
+   * GAS APIを呼び出す共通関数。
+   * GASはリダイレクト(302)を返すため redirect:'follow' が必要。
+   * 15秒応答がなければタイムアウトとして処理する。
    */
   async function call_(action, params = {}) {
     const url = new URL(FG_CONFIG.API_BASE_URL);
@@ -22,71 +24,54 @@ const FG_API = (() => {
     });
 
     try {
-      const res  = await fetch(url.toString(), { redirect: 'follow' });
-      const json = await res.json();
-      return json;
+      // 15秒タイムアウト
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+
+      const res = await fetch(url.toString(), {
+        redirect: 'follow',
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      return await res.json();
     } catch (e) {
-      console.error('API call failed:', e);
+      if (e.name === 'AbortError') {
+        return { ok: false, error: 'timeout', message: 'タイムアウトしました。再度お試しください。' };
+      }
       return { ok: false, error: 'network_error', message: '通信エラーが発生しました' };
     }
   }
 
-  // ----------------------------------------------------------------
+  // ── 公開API ───────────────────────────────────
 
-  /**
-   * 学生情報を取得する (QRカード表示用)
-   * @param {string} token - 学生トークン
-   */
+  /** 学生トークンで学生情報を取得(QRカード表示用) */
   function getStudent(token) {
     return call_('getStudent', { token });
   }
 
-  /**
-   * 企業閲覧ログを記録する
-   * @param {string} token     - 学生トークン
-   * @param {string} companyId - 企業ID
-   * @param {string} [email]   - 企業メール(後日再閲覧登録時)
-   */
+  /** 企業が学生QRを閲覧したログを記録 */
   function saveViewLog(token, companyId, email) {
     return call_('saveViewLog', { token, company: companyId, email });
   }
 
-  /**
-   * NFCスタンプを記録する
-   * @param {string} studentToken  - 学生トークン(cookieから取得)
-   * @param {string} companyToken  - 企業スタンプキー(NFCタグURLから取得)
-   * @param {string} [nfcCounter]  - NFCカウンター値(NTAG213 nc パラメータ)
-   */
+  /** NFCスタンプを記録(st=学生トークン, ct=企業キー, nc=NFCカウンター) */
   function saveStamp(studentToken, companyToken, nfcCounter) {
-    return call_('saveStamp', {
-      st: studentToken,
-      ct: companyToken,
-      nc: nfcCounter,
-    });
+    return call_('saveStamp', { st: studentToken, ct: companyToken, nc: nfcCounter });
   }
 
-  /**
-   * スタンプ進捗を取得する
-   * @param {string} token - 学生トークン
-   */
+  /** 学生のスタンプ取得状況を取得 */
   function getStampProgress(token) {
     return call_('getStampProgress', { token });
   }
 
-  /**
-   * 企業向け訪問学生一覧を取得する
-   * @param {string} viewKey - 企業閲覧キー
-   */
+  /** 企業が訪問学生一覧を閲覧(viewKeyで認証) */
   function getCompanyView(viewKey) {
     return call_('getCompanyView', { key: viewKey });
   }
 
-  // ----------------------------------------------------------------
+  // ── クッキー操作 ──────────────────────────────
 
-  /**
-   * 学生トークンをcookieに保存する
-   * card.html を開いたときに自動的に呼ばれる
-   */
+  /** 学生トークンをcookieに保存(スタンプラリーで他ページから参照するため) */
   function saveTokenToCookie(token, days = 60) {
     const expires = new Date();
     expires.setDate(expires.getDate() + days);
@@ -99,10 +84,7 @@ const FG_API = (() => {
     ].filter(Boolean).join('; ');
   }
 
-  /**
-   * cookieから学生トークンを取得する
-   * stamp.html / progress.html で使用する
-   */
+  /** cookieから学生トークンを取得(stamp.html / progress.htmlで使用) */
   function getTokenFromCookie() {
     const match = document.cookie
       .split('; ')
@@ -110,15 +92,12 @@ const FG_API = (() => {
     return match ? match.split('=')[1] : null;
   }
 
-  /**
-   * URLパラメータから値を取得する
-   */
+  /** URLクエリパラメータから値を取得 */
   function getParam(name) {
     return new URLSearchParams(location.search).get(name);
   }
 
-  // ----------------------------------------------------------------
-
+  // ── エクスポート ──────────────────────────────
   return {
     getStudent,
     saveViewLog,
