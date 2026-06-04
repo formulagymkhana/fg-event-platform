@@ -14,13 +14,30 @@ const FG_API = (() => {
    * GASはリダイレクト(302)を返すため redirect:'follow' が必須
    */
   async function call_(action, params = {}) {
-    const url = new URL(FG_CONFIG.API_BASE_URL);
-    url.searchParams.set('action', action);
-    url.searchParams.set('event', FG_CONFIG.EVENT_ID);
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null) url.searchParams.set(k, v);
-    });
+  const url = new URL(FG_CONFIG.API_BASE_URL);
+  url.searchParams.set('action', action);
+  url.searchParams.set('event', FG_CONFIG.EVENT_ID);
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) url.searchParams.set(k, v);
+  });
 
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+
+    const res = await fetch(url.toString(), {
+      redirect: 'follow',
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    return await res.json();
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      return { ok: false, error: 'timeout', message: 'タイムアウトしました。再度お試しください。' };
+    }
+    return { ok: false, error: 'network_error', message: '通信エラーが発生しました' };
+  }
+}
     try {
       const res  = await fetch(url.toString(), { redirect: 'follow' });
       const json = await res.json();
