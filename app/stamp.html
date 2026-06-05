@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+  <!-- セキュリティポリシー -->
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self';
+             script-src 'self';
+             connect-src https://script.google.com
+                         https://script.googleusercontent.com;
+             style-src 'self' 'unsafe-inline';">
+
+  <title>FORMULA GYMKHANA — スタンプ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+      background: #F0F3F7;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    /* 全状態共通のカード */
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 360px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(11,37,69,0.10);
+    }
+
+    /* ヘッダー */
+    .fg-header {
+      background: #0B2545;
+      padding: 13px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .fg-logo { font-size: 11px; font-weight: 700; letter-spacing: 0.15em; color: #fff; }
+    .fg-logo span { background: #fff; color: #0B2545; padding: 1px 6px; border-radius: 2px; margin-left: 2px; }
+
+    .card-body { padding: 32px 24px 28px; text-align: center; }
+
+    /* ── ローディング ── */
+    #state-loading .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid #D4DBE6; border-top-color: #0B2545;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── スタンプ成功 ── */
+    .stamp-icon {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      background: #0B2545;
+      color: #fff;
+      font-size: 36px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      animation: stampIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+    @keyframes stampIn {
+      0%   { transform: scale(2.5) rotate(-15deg); opacity: 0; }
+      60%  { transform: scale(0.9) rotate(5deg); opacity: 1; }
+      80%  { transform: scale(1.05) rotate(-2deg); }
+      100% { transform: scale(1) rotate(0deg); }
+    }
+
+    .stamp-company {
+      font-size: 13px; color: #6B7A8D; margin-bottom: 6px;
+    }
+    .stamp-title {
+      font-size: 20px; font-weight: 700; color: #0B2545;
+      margin-bottom: 24px;
+    }
+
+    /* スタンプ進捗ドット */
+    .stamp-dots {
+      display: flex; gap: 8px; justify-content: center; margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .dot {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 2px solid #D4DBE6;
+      background: #F0F3F7;
+      transition: all 0.3s;
+    }
+    .dot.filled { background: #0B2545; border-color: #0B2545; }
+    .dot.new {
+      animation: dotPop 0.4s 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+    }
+    @keyframes dotPop {
+      0%   { transform: scale(0); }
+      80%  { transform: scale(1.15); }
+      100% { transform: scale(1); }
+    }
+
+    .stamp-count { font-size: 13px; color: #6B7A8D; margin-bottom: 20px; }
+
+    /* クリア時のバナー */
+    .cleared-banner {
+      background: linear-gradient(135deg, #0B2545, #1A4A80);
+      color: #fff;
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 14px;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+    .cleared-banner .cleared-sub {
+      font-size: 12px; font-weight: 400; opacity: 0.8; margin-top: 4px;
+    }
+
+    /* ── QRカード未読み込み ── */
+    .notoken-icon { font-size: 48px; margin-bottom: 16px; }
+    .state-title { font-size: 16px; font-weight: 600; color: #1A2733; margin-bottom: 8px; }
+    .state-msg   { font-size: 13px; color: #6B7A8D; line-height: 1.7; }
+
+    /* ── 取得済み ── */
+    .already-icon { font-size: 48px; margin-bottom: 16px; }
+
+    /* ── エラー ── */
+    .error-icon { font-size: 48px; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+
+  <!-- ローディング -->
+  <div class="card" id="state-loading">
+    <div class="fg-header">
+      <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
+    </div>
+    <div class="card-body">
+      <div class="spinner"></div>
+      <p style="font-size:13px;color:#6B7A8D;">スタンプを記録中...</p>
+    </div>
+  </div>
+
+  <!-- QRカード未読み込み -->
+  <div class="card" id="state-no-token" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
+    </div>
+    <div class="card-body">
+      <div class="notoken-icon">📱</div>
+      <p class="state-title">QRカードを先に読み込んでください</p>
+      <p class="state-msg">
+        スタンプを受け取るには、まず企業担当者に自分のQRコードをスキャンしてもらってください。
+      </p>
+    </div>
+  </div>
+
+  <!-- スタンプ成功 -->
+  <div class="card" id="state-success" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
+    </div>
+    <div class="card-body">
+      <div class="stamp-icon">✓</div>
+      <p class="stamp-company" id="success-company"></p>
+      <p class="stamp-title">スタンプ獲得！</p>
+      <div class="stamp-dots" id="stamp-dots"></div>
+      <p class="stamp-count" id="stamp-count"></p>
+      <div class="cleared-banner" id="cleared-banner" style="display:none">
+        🎉 スタンプコンプリート！
+        <div class="cleared-sub">景品交換所でスタンプ画面を見せてください</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 取得済み -->
+  <div class="card" id="state-already" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
+    </div>
+    <div class="card-body">
+      <div class="already-icon">🔖</div>
+      <p class="state-title">このブースのスタンプは取得済みです</p>
+      <p class="state-msg">別のブースでスタンプを集めましょう</p>
+    </div>
+  </div>
+
+  <!-- エラー -->
+  <div class="card" id="state-error" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
+    </div>
+    <div class="card-body">
+      <div class="error-icon">⚠</div>
+      <p class="state-title" id="error-title">エラー</p>
+      <p class="state-msg" id="error-msg"></p>
+    </div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/stamp.js"></script>
+</body>
+</html>
