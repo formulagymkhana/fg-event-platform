@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self';
+             script-src 'self';
+             connect-src https://script.google.com
+                         https://script.googleusercontent.com;
+             style-src 'self' 'unsafe-inline';">
+  <title>FORMULA GYMKHANA — スタンプ進捗</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+      background: #F0F3F7;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 24px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 420px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(11,37,69,0.10);
+    }
+
+    /* ヘッダー */
+    .fg-header {
+      background: #0B2545;
+      padding: 13px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .fg-logo { font-size: 11px; font-weight: 700; letter-spacing: 0.15em; color: #fff; }
+    .fg-logo span { background: #fff; color: #0B2545; padding: 1px 6px; border-radius: 2px; margin-left: 2px; }
+    .fg-page-name { margin-left: auto; font-size: 11px; color: #8BA3C4; }
+
+    /* ローディング */
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid #D4DBE6; border-top-color: #0B2545;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+      margin: 32px auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* 共通テキスト */
+    .card-body { padding: 28px 24px; }
+    .state-icon  { font-size: 40px; text-align: center; margin-bottom: 12px; }
+    .state-title { font-size: 16px; font-weight: 600; color: #1A2733; text-align: center; margin-bottom: 8px; }
+    .state-msg   { font-size: 13px; color: #6B7A8D; text-align: center; line-height: 1.7; }
+
+    /* 進捗サマリー */
+    .progress-summary { text-align: center; padding: 24px 24px 0; }
+
+    .progress-label { font-size: 12px; color: #8BA3C4; margin-bottom: 16px; }
+
+    /* 進捗ドット */
+    .progress-dots {
+      display: flex; gap: 10px; justify-content: center;
+      flex-wrap: wrap; margin-bottom: 14px;
+    }
+    .pdot {
+      width: 36px; height: 36px; border-radius: 50%;
+      border: 2px solid #D4DBE6; background: #F0F3F7;
+    }
+    .pdot.filled { background: #0B2545; border-color: #0B2545; }
+
+    .progress-count {
+      font-size: 28px; font-weight: 700; color: #0B2545; margin-bottom: 6px;
+    }
+    .progress-count span { font-size: 16px; font-weight: 400; color: #6B7A8D; }
+
+    /* ステータスメッセージ */
+    .status-msg {
+      margin: 12px 24px 0;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      text-align: center;
+    }
+    .status-msg.cleared {
+      background: linear-gradient(135deg, #0B2545, #1A4A80);
+      color: #fff;
+      font-weight: 600;
+    }
+    .status-msg.cleared .status-sub {
+      font-size: 11px; font-weight: 400; opacity: 0.8; margin-top: 4px;
+    }
+    .status-msg.in-progress {
+      background: #F0F3F7;
+      color: #6B7A8D;
+    }
+
+    /* スタンプ履歴リスト */
+    .stamp-list-section { padding: 20px 24px 0; }
+    .section-label {
+      font-size: 11px; font-weight: 600; color: #8BA3C4;
+      letter-spacing: 0.08em; margin-bottom: 12px;
+    }
+
+    .stamp-list { border-top: 0.5px solid #E8ECF0; }
+    .stamp-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 0; border-bottom: 0.5px solid #E8ECF0;
+    }
+    .stamp-check {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: #0B2545; color: #fff; font-size: 12px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .stamp-company { flex: 1; font-size: 14px; font-weight: 500; color: #1A2733; }
+    .stamp-time    { font-size: 11px; color: #8BA3C4; white-space: nowrap; }
+
+    .no-stamps {
+      padding: 24px 0; text-align: center;
+      font-size: 13px; color: #A0AEBB;
+    }
+
+    /* 更新・フッター */
+    .card-footer {
+      padding: 16px 24px 24px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .reload-btn {
+      width: 100%; padding: 12px;
+      background: #F0F3F7; color: #6B7A8D;
+      border: 0.5px solid #D4DBE6; border-radius: 8px;
+      font-size: 13px; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .reload-btn:active { background: #D4DBE6; }
+  </style>
+</head>
+<body>
+
+  <!-- ローディング -->
+  <div class="card" id="state-loading">
+    <div class="fg-header">
+      <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
+      <div class="fg-page-name">スタンプ進捗</div>
+    </div>
+    <div class="spinner"></div>
+    <p style="font-size:13px;color:#6B7A8D;text-align:center;padding-bottom:28px;">読み込み中...</p>
+  </div>
+
+  <!-- トークンなし -->
+  <div class="card" id="state-no-token" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
+      <div class="fg-page-name">スタンプ進捗</div>
+    </div>
+    <div class="card-body">
+      <div class="state-icon">📱</div>
+      <p class="state-title">QRカードを先に読み込んでください</p>
+      <p class="state-msg">スタンプ進捗を確認するには、まず企業担当者に自分のQRコードをスキャンしてもらってください。</p>
+    </div>
+  </div>
+
+  <!-- 進捗メイン -->
+  <div class="card" id="state-progress" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
+      <div class="fg-page-name">スタンプ進捗</div>
+    </div>
+
+    <!-- サマリー -->
+    <div class="progress-summary">
+      <p class="progress-label">取得スタンプ数</p>
+      <div class="progress-dots" id="progress-dots"></div>
+      <div class="progress-count">
+        <span id="count-num">0</span>
+        <span> / <span id="count-total">5</span> スタンプ</span>
+      </div>
+    </div>
+
+    <!-- ステータスメッセージ -->
+    <div class="status-msg cleared" id="status-cleared" style="display:none">
+      🎉 スタンプコンプリート！
+      <div class="status-sub">景品交換所でこの画面を見せてください</div>
+    </div>
+    <div class="status-msg in-progress" id="status-progress" style="display:none"></div>
+
+    <!-- スタンプ履歴 -->
+    <div class="stamp-list-section">
+      <p class="section-label">取得済みスタンプ</p>
+      <div class="stamp-list" id="stamp-list"></div>
+    </div>
+
+    <!-- フッター -->
+    <div class="card-footer">
+      <button class="reload-btn" onclick="loadProgress()">↺ 更新</button>
+    </div>
+  </div>
+
+  <!-- エラー -->
+  <div class="card" id="state-error" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
+      <div class="fg-page-name">スタンプ進捗</div>
+    </div>
+    <div class="card-body">
+      <div class="state-icon">⚠</div>
+      <p class="state-title" id="error-title">エラー</p>
+      <p class="state-msg"   id="error-msg"></p>
+    </div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/progress.js"></script>
+</body>
+</html>
