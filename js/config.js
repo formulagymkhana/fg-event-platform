@@ -7,7 +7,7 @@
 
 const FG_CONFIG = {
   // GASデプロイURL(変更時はここだけ書き換える)
-  API_BASE_URL: 'https://script.google.com/macros/s/AKfycbyMZDTIHPr8UwfQx-F6rELoFkbggjszO1oo--xarweni8tOAgTpc38j8VC6LCld3MMOhA/exec',
+  API_BASE_URL: 'https://script.google.com/macros/s/AKfycbwdXCvSIcv9n9LtwqqDHSTV1bYY_JqscGzZu1bjBkoPD2b8gHkEVt54flboJuJYpSVNrg/exec',
 
   // 現在のイベントID(設定シートのeventIdと一致させる)
   EVENT_ID: '2026_rd2',
