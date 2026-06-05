@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <!-- jsdelivr を script-src に追加、inline handler を排除したので unsafe-inline 不要 -->
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'self';
-             script-src 'self' https://cdnjs.cloudflare.com;
+             script-src 'self' https://cdn.jsdelivr.net;
              connect-src https://script.google.com
                          https://script.googleusercontent.com;
              style-src 'self' 'unsafe-inline';
@@ -23,52 +24,35 @@
     .state-icon  { font-size: 52px; margin-bottom: 16px; }
     .state-title { font-size: 18px; font-weight: 700; color: #0B2545; margin-bottom: 8px; }
     .state-msg   { font-size: 13px; color: #6B7A8D; line-height: 1.75; margin-bottom: 24px; }
-
-    /* 開始ボタン */
     .start-btn { width: 100%; padding: 16px; background: #0B2545; color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; letter-spacing: 0.04em; transition: background 0.2s; }
     .start-btn:active { background: #1A4A80; }
-
-    /* スキャン画面 */
-    #scan-wrapper { position: relative; width: 100%; aspect-ratio: 1 / 1; background: #000; overflow: hidden; }
+    .start-btn.gray { background: #6B7A8D; margin-top: 12px; }
+    #scan-wrapper { position: relative; width: 100%; aspect-ratio: 1/1; background: #000; overflow: hidden; }
     #scan-video { width: 100%; height: 100%; object-fit: cover; }
-    /* スキャンガイド枠 */
     .scan-guide { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
     .scan-frame { width: 60%; aspect-ratio: 1/1; position: relative; }
-    .scan-frame::before, .scan-frame::after,
-    .scan-frame-inner::before, .scan-frame-inner::after {
-      content: ''; position: absolute; width: 20px; height: 20px; border-color: #fff; border-style: solid;
-    }
-    .scan-frame::before  { top: 0;    left: 0;  border-width: 3px 0 0 3px; }
-    .scan-frame::after   { top: 0;    right: 0; border-width: 3px 3px 0 0; }
-    .scan-frame-inner::before { bottom: 0; left: 0;  border-width: 0 0 3px 3px; }
-    .scan-frame-inner::after  { bottom: 0; right: 0; border-width: 0 3px 3px 0; }
-    /* スキャンライン */
-    .scan-line { position: absolute; left: 5%; right: 5%; height: 2px; background: rgba(255,255,255,0.7); animation: scanMove 2s ease-in-out infinite; top: 10%; }
-    @keyframes scanMove { 0%,100% { top: 10%; } 50% { top: 85%; } }
-    .scan-label { position: absolute; bottom: 12px; left: 0; right: 0; text-align: center; font-size: 13px; color: rgba(255,255,255,0.8); }
-
-    .cancel-btn { width: 100%; padding: 13px; margin-top: 0; background: #F0F3F7; color: #6B7A8D; border: none; font-size: 13px; cursor: pointer; }
-    .cancel-btn:active { background: #D4DBE6; }
-
-    /* ローディング */
-    .spinner { width: 36px; height: 36px; border: 3px solid #D4DBE6; border-top-color: #0B2545; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* 成功 */
-    .success-icon { width: 72px; height: 72px; border-radius: 50%; background: #0B2545; color: #fff; font-size: 32px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-    @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-
-    .result-dots { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 16px 0 8px; }
-    .rdot { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #D4DBE6; background: #F0F3F7; }
-    .rdot.filled { background: #0B2545; border-color: #0B2545; }
-    .result-count { font-size: 13px; color: #6B7A8D; margin-bottom: 20px; }
-
-    .action-link { display: block; margin-top: 12px; padding: 12px; border-radius: 8px; font-size: 13px; text-decoration: none; text-align: center; }
-    .action-link.primary   { background: #0B2545; color: #fff; }
-    .action-link.secondary { background: #F0F3F7; color: #0B2545; }
-
-    /* 既存トークン(開始済み) */
-    .already-sub { font-size: 12px; color: #8BA3C4; margin-top: 4px; }
+    .scan-frame::before,.scan-frame::after,.scan-frame-inner::before,.scan-frame-inner::after { content:''; position:absolute; width:20px; height:20px; border-color:#fff; border-style:solid; }
+    .scan-frame::before  { top:0;    left:0;  border-width:3px 0 0 3px; }
+    .scan-frame::after   { top:0;    right:0; border-width:3px 3px 0 0; }
+    .scan-frame-inner::before { bottom:0; left:0;  border-width:0 0 3px 3px; }
+    .scan-frame-inner::after  { bottom:0; right:0; border-width:0 3px 3px 0; }
+    .scan-line { position:absolute; left:5%; right:5%; height:2px; background:rgba(255,255,255,0.7); animation:scanMove 2s ease-in-out infinite; top:10%; }
+    @keyframes scanMove { 0%,100%{top:10%} 50%{top:85%} }
+    .scan-label { position:absolute; bottom:12px; left:0; right:0; text-align:center; font-size:13px; color:rgba(255,255,255,0.8); }
+    .cancel-btn { width:100%; padding:13px; background:#F0F3F7; color:#6B7A8D; border:none; font-size:13px; cursor:pointer; }
+    .cancel-btn:active { background:#D4DBE6; }
+    .spinner { width:36px; height:36px; border:3px solid #D4DBE6; border-top-color:#0B2545; border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 16px; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    .success-icon { width:72px; height:72px; border-radius:50%; background:#0B2545; color:#fff; font-size:32px; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; animation:popIn 0.4s cubic-bezier(0.175,0.885,0.32,1.275); }
+    @keyframes popIn { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+    .result-dots { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin:16px 0 8px; }
+    .rdot { width:28px; height:28px; border-radius:50%; border:2px solid #D4DBE6; background:#F0F3F7; }
+    .rdot.filled { background:#0B2545; border-color:#0B2545; }
+    .result-count { font-size:13px; color:#6B7A8D; margin-bottom:20px; }
+    .action-link { display:block; margin-top:12px; padding:12px; border-radius:8px; font-size:13px; text-decoration:none; text-align:center; }
+    .action-link.primary   { background:#0B2545; color:#fff; }
+    .action-link.secondary { background:#F0F3F7; color:#0B2545; }
+    .already-sub { font-size:12px; color:#8BA3C4; margin-top:12px; }
   </style>
 </head>
 <body>
@@ -83,7 +67,8 @@
       <div class="state-icon">🎫</div>
       <p class="state-title">スタンプラリーを<br>始めましょう！</p>
       <p class="state-msg">自分の学生QR名刺をカメラで<br>読み取って登録します。</p>
-      <button class="start-btn" onclick="startScan()">📷 QRコードを読み取る</button>
+      <!-- onclick は使わず start.js で addEventListener -->
+      <button class="start-btn" id="btn-start">📷 QRコードを読み取る</button>
     </div>
   </div>
 
@@ -103,7 +88,7 @@
       </div>
       <div class="scan-label">自分のQR名刺を枠内に合わせてください</div>
     </div>
-    <button class="cancel-btn" onclick="cancelScan()">キャンセル</button>
+    <button class="cancel-btn" id="btn-cancel">キャンセル</button>
   </div>
 
   <!-- API呼び出し中 -->
@@ -146,8 +131,8 @@
       <div class="result-dots" id="already-dots"></div>
       <p class="result-count" id="already-count"></p>
       <a href="progress.html" class="action-link primary">スタンプ進捗を確認する →</a>
-      <p class="already-sub" style="margin-top:12px">再登録が必要な場合はQRを読み取ってください</p>
-      <button class="start-btn" onclick="startScan()" style="margin-top:12px;background:#6B7A8D;">QRを再読み取り</button>
+      <p class="already-sub">再登録が必要な場合はQRを読み取ってください</p>
+      <button class="start-btn gray" id="btn-rescan">QRを再読み取り</button>
     </div>
   </div>
 
@@ -161,11 +146,12 @@
       <div class="state-icon">⚠</div>
       <p class="state-title" id="error-title">エラー</p>
       <p class="state-msg"   id="error-msg"></p>
-      <button class="start-btn" onclick="showState('ready')" style="margin-top:8px;">もう一度試す</button>
+      <button class="start-btn" id="btn-retry">もう一度試す</button>
     </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
+  <!-- jsQR: jsdelivr CDN(cdnjs より安定) -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="../js/config.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/start.js"></script>
