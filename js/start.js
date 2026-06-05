@@ -4,19 +4,26 @@
  * 学生が自分のQR名刺を読み取り、stampTokenを発行する。
  * cardToken → activateStamp API → stampToken → cookie保存
  *
- * 依存ライブラリ: jsQR (start.htmlで読み込み済み)
- * config.js と api.js より後に読み込むこと。
+ * 依存: jsQR(start.htmlで読み込み済み), config.js, api.js
+ *
+ * ⚠ CSP対応のためonclick属性は使わず、ここでeventListenerを設定する。
  */
 
-let _stream   = null;  // カメラストリーム
-let _rafId    = null;  // requestAnimationFrameのID
-let _canvas   = null;  // QRスキャン用オフスクリーンキャンバス
-let _ctx      = null;
+let _stream = null;
+let _rafId  = null;
+let _canvas = null;
+let _ctx    = null;
+
+// ── イベントリスナー(onclick の代わり) ──────────────
+
+document.getElementById('btn-start')?.addEventListener('click', startScan);
+document.getElementById('btn-cancel')?.addEventListener('click', cancelScan);
+document.getElementById('btn-rescan')?.addEventListener('click', startScan);
+document.getElementById('btn-retry')?.addEventListener('click', () => showState('ready'));
 
 // ── 起動処理 ──────────────────────────────────────
 
 (function init() {
-  // 既にstampTokenを持っている場合 → 開始済み画面へ
   const existing = FG_API.getStampToken();
   if (existing) {
     loadExistingProgress(existing);
@@ -25,7 +32,6 @@ let _ctx      = null;
   }
 })();
 
-/** 既存stampTokenの進捗を読み込んで「開始済み」画面を表示 */
 async function loadExistingProgress(token) {
   const res = await FG_API.getStampProgress(token);
   if (res.ok) {
@@ -36,7 +42,6 @@ async function loadExistingProgress(token) {
 
 // ── QRスキャン ────────────────────────────────────
 
-/** カメラを起動してスキャン開始 */
 async function startScan() {
   showState('scanning');
 
@@ -61,7 +66,6 @@ async function startScan() {
   }
 }
 
-/** フレームをキャプチャしてQRを探す */
 function scanLoop(video) {
   if (!_stream) return;
 
@@ -80,17 +84,15 @@ function scanLoop(video) {
   _rafId = requestAnimationFrame(() => scanLoop(video));
 }
 
-/** QRコードが見つかったとき */
 async function onQRFound(qrData) {
   stopCamera();
 
-  // URLからcardTokenを抽出
   let cardToken = null;
   try {
     const url = new URL(qrData);
     cardToken = url.searchParams.get('token');
   } catch (e) {
-    // QRがURLでない
+    // QRがURLでない場合
   }
 
   if (!cardToken) {
@@ -100,7 +102,6 @@ async function onQRFound(qrData) {
     return;
   }
 
-  // activateStamp APIを呼び出し
   showState('loading');
   const res = await FG_API.activateStamp(cardToken);
 
@@ -111,19 +112,15 @@ async function onQRFound(qrData) {
   } else {
     showState('error');
     setText('error-title', 'QRコードが無効です');
-    setText('error-msg', '自分の学生QR名刺を読み取ってください。');
+    setText('error-msg', res.message || '自分の学生QR名刺を読み取ってください。');
   }
 }
 
-/** スキャンをキャンセル */
 function cancelScan() {
   stopCamera();
-  // 既存トークンがあれば開始済み画面、なければ開始画面
-  const existing = FG_API.getStampToken();
-  showState(existing ? 'already' : 'ready');
+  showState(FG_API.getStampToken() ? 'already' : 'ready');
 }
 
-/** カメラを停止してリソースを解放 */
 function stopCamera() {
   if (_rafId)  { cancelAnimationFrame(_rafId); _rafId = null; }
   if (_stream) { _stream.getTracks().forEach(t => t.stop()); _stream = null; }
@@ -131,7 +128,6 @@ function stopCamera() {
 
 // ── 描画 ──────────────────────────────────────────
 
-/** スタンプ進捗ドットを描画 */
 function renderDots(dotsId, countId, d) {
   const count = d.stampCount    || 0;
   const total = d.prizeCriteria || 5;
