@@ -22,7 +22,7 @@
   }
 
   // cookieから学生トークンを取得(QRカードを読んでいない場合はない)
-  104c1ba0-b23d-4ab3-999c-50c0870ab8a3	f2ebe97b-082b-477b-99fe-4c41eb18099a
+  const studentToken = FG_API.getParam('st') || FG_API.getTokenFromCookie();
   if (!studentToken) {
     showState('no-token');
     return;
