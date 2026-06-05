@@ -4,17 +4,16 @@
  * GASのAPIを叩く関数をまとめたモジュール。
  * FG_API.getStudent(token) のように使う。
  * config.jsより後に読み込むこと。
+ *
+ * トークン設計:
+ *   cardToken  … 企業が学生情報を閲覧するためのトークン(学生マスターのtoken列)
+ *   stampToken … スタンプラリー専用トークン(fg_stamp_token cookieに保存)
  */
 
 const FG_API = (() => {
 
   // ── 内部共通関数 ──────────────────────────────
 
-  /**
-   * GAS APIを呼び出す共通関数。
-   * GASはリダイレクト(302)を返すため redirect:'follow' が必要。
-   * 15秒応答がなければタイムアウトとして処理する。
-   */
   async function call_(action, params = {}) {
     const url = new URL(FG_CONFIG.API_BASE_URL);
     url.searchParams.set('action', action);
@@ -24,10 +23,8 @@ const FG_API = (() => {
     });
 
     try {
-      // 15秒タイムアウト
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 15000);
-
       const res = await fetch(url.toString(), {
         redirect: 'follow',
         signal: controller.signal,
@@ -42,41 +39,60 @@ const FG_API = (() => {
     }
   }
 
-  // ── 公開API ───────────────────────────────────
+  // ── 企業向けAPI ───────────────────────────────
 
-  /** 学生トークンで学生情報を取得(QRカード表示用) */
-  function getStudent(token) {
-    return call_('getStudent', { token });
+  /** cardTokenで学生情報を取得(企業がQR名刺を見るとき) */
+  function getStudent(cardToken) {
+    return call_('getStudent', { token: cardToken });
   }
 
   /** 企業が学生QRを閲覧したログを記録 */
-  function saveViewLog(token, companyId, email) {
-    return call_('saveViewLog', { token, company: companyId, email });
+  function saveViewLog(cardToken, companyId, email) {
+    return call_('saveViewLog', { token: cardToken, company: companyId, email });
   }
 
-  /** NFCスタンプを記録(st=学生トークン, ct=企業キー, nc=NFCカウンター) */
-  function saveStamp(studentToken, companyToken, nfcCounter) {
-    return call_('saveStamp', { st: studentToken, ct: companyToken, nc: nfcCounter });
+  // ── 学生向けAPI ───────────────────────────────
+
+  /**
+   * cardToken → stampToken を発行(スタンプラリー開始時)
+   * 学生が自分のQRをスキャンして呼ぶ。
+   * 返り値: { stampToken, stampCount, prizeCriteria, cleared }
+   */
+  function activateStamp(cardToken) {
+    return call_('activateStamp', { token: cardToken });
   }
 
-  /** 学生のスタンプ取得状況を取得 */
-  function getStampProgress(token) {
-    return call_('getStampProgress', { token });
+  /** stampTokenでNFCスタンプを記録 */
+  function saveStamp(stampToken, companyStampKey, nfcCounter) {
+    return call_('saveStamp', { st: stampToken, ct: companyStampKey, nc: nfcCounter });
   }
 
-  /** 企業が訪問学生一覧を閲覧(viewKeyで認証) */
+  /** stampTokenでスタンプ取得状況を取得(個人情報を含まない) */
+  function getStampProgress(stampToken) {
+    return call_('getStampProgress', { token: stampToken });
+  }
+
+  // ── 企業閲覧API ───────────────────────────────
+
+  /** 企業がQR閲覧学生一覧を取得(viewKeyで認証) */
   function getCompanyView(viewKey) {
     return call_('getCompanyView', { key: viewKey });
   }
 
-  // ── クッキー操作 ──────────────────────────────
+  /** 企業ブースでスタンプを取得した学生一覧を取得 */
+  function getCompanyStampVisitors(viewKey) {
+    return call_('getCompanyStampVisitors', { key: viewKey });
+  }
 
-  /** 学生トークンをcookieに保存(スタンプラリーで他ページから参照するため) */
-  function saveTokenToCookie(token, days = 60) {
+  // ── stampToken Cookie操作 ─────────────────────
+  // cookieName: fg_stamp_token (スタンプラリー専用)
+
+  /** stampTokenをcookieに保存 */
+  function saveStampToken(token, days = 60) {
     const expires = new Date();
     expires.setDate(expires.getDate() + days);
     document.cookie = [
-      `fg_student_token=${token}`,
+      `fg_stamp_token=${token}`,
       `expires=${expires.toUTCString()}`,
       'path=/',
       'SameSite=Lax',
@@ -84,13 +100,15 @@ const FG_API = (() => {
     ].filter(Boolean).join('; ');
   }
 
-  /** cookieから学生トークンを取得(stamp.html / progress.htmlで使用) */
-  function getTokenFromCookie() {
+  /** cookieからstampTokenを取得 */
+  function getStampToken() {
     const match = document.cookie
       .split('; ')
-      .find(c => c.startsWith('fg_student_token='));
+      .find(c => c.startsWith('fg_stamp_token='));
     return match ? match.split('=')[1] : null;
   }
+
+  // ── URLヘルパー ───────────────────────────────
 
   /** URLクエリパラメータから値を取得 */
   function getParam(name) {
@@ -99,13 +117,20 @@ const FG_API = (() => {
 
   // ── エクスポート ──────────────────────────────
   return {
+    // 企業向け
     getStudent,
     saveViewLog,
+    // 学生向け
+    activateStamp,
     saveStamp,
     getStampProgress,
+    // 企業閲覧
     getCompanyView,
-    saveTokenToCookie,
-    getTokenFromCookie,
+    getCompanyStampVisitors,
+    // Cookie
+    saveStampToken,
+    getStampToken,
+    // URL
     getParam,
   };
 
