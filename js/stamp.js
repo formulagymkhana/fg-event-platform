@@ -1,11 +1,8 @@
 /**
  * FG Event Platform — スタンプ画面ロジック
  *
- * NFCタグをタップした際に開くページ。
- * URLの ct(企業スタンプキー) と fg_stamp_token cookie の stampToken でスタンプを記録する。
- *
+ * 景品モデル: N個集めるとM個選べる
  * URL形式: stamp.html?ct=[企業スタンプキー]&nc=[NFCカウンター(任意)]
- * config.js と api.js より後に読み込むこと。
  */
 
 (async () => {
@@ -19,7 +16,6 @@
     return;
   }
 
-  // stampTokenをcookieまたはURLパラメータから取得
   const stampToken = FG_API.getParam('st') || FG_API.getStampToken();
   if (!stampToken) {
     showState('no-token');
@@ -55,23 +51,24 @@
 })();
 
 function renderSuccess(d) {
-  const count   = d.stampCount    || 0;
-  const total   = d.prizeCriteria || 5;
-  const cleared = d.cleared       || false;
+  const count     = d.stampCount     || 0;
+  const threshold = d.prizeThreshold || 5;
+  const prizeNum  = d.prizeCount     || 1;
+  const cleared   = d.cleared        || false;
 
   setText('success-company', d.company + ' のブース');
-  setText('stamp-count', `${count} / ${total} スタンプ`);
+  setText('stamp-count', `${count} / ${threshold} 個`);
 
-  const container = document.getElementById('stamp-dots');
-  container.innerHTML = '';
-  for (let i = 0; i < total; i++) {
-    const dot = document.createElement('div');
-    dot.className = 'dot' + (i < count ? ' filled' : '');
-    if (i === count - 1) dot.classList.add('new');
-    container.appendChild(dot);
+  // 進捗バー
+  const pct = Math.min(100, Math.round((count / threshold) * 100));
+  document.getElementById('bar-fill').style.width = pct + '%';
+
+  // 達成時バナー
+  if (cleared) {
+    const el = document.getElementById('cleared-banner');
+    el.innerHTML = `🎉 景品引換可能！<div class="cleared-sub">交換所で好きな景品を${prizeNum}個選べます</div>`;
+    el.style.display = 'block';
   }
-
-  if (cleared) document.getElementById('cleared-banner').style.display = 'block';
 }
 
 function showState(state) {
@@ -80,8 +77,4 @@ function showState(state) {
     if (el) el.style.display = s === state ? 'block' : 'none';
   });
 }
-
-function setText(id, text) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = text;
-}
+function setText(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
