@@ -111,6 +111,7 @@ async function onQRFound(qrData) {
   if (res.ok) {
     FG_API.saveStampToken(res.data.stampToken);
     renderDots('result-dots', 'result-count', res.data);
+    setText('guide-goal', String(res.data.prizeCriteria || 5));
     showState('success');
   } else {
     showState('error');
