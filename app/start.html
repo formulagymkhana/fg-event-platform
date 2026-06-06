@@ -53,6 +53,14 @@
     .action-link.primary   { background:#0B2545; color:#fff; }
     .action-link.secondary { background:#F0F3F7; color:#0B2545; }
     .already-sub { font-size:12px; color:#8BA3C4; margin-top:12px; }
+    /* 登録完了の遊び方ガイド */
+    .welcome-sub { font-size:14px; color:#6B7A8D; margin-bottom:20px; }
+    .guide-box { background:#F0F3F7; border-radius:10px; padding:16px 16px 14px; margin-bottom:20px; text-align:left; }
+    .guide-step { display:flex; align-items:flex-start; gap:10px; margin-bottom:12px; }
+    .guide-step:last-child { margin-bottom:0; }
+    .guide-num { width:22px; height:22px; border-radius:50%; background:#0B2545; color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .guide-text { font-size:13px; color:#1A2733; line-height:1.5; padding-top:1px; }
+    .guide-text b { color:#0B2545; }
   </style>
 </head>
 <body>
@@ -103,7 +111,7 @@
     </div>
   </div>
 
-  <!-- 登録成功 -->
+  <!-- 登録成功(遊び方ガイド) -->
   <div class="card" id="state-success" style="display:none">
     <div class="fg-header">
       <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
@@ -112,7 +120,24 @@
     <div class="card-body">
       <div class="success-icon">✓</div>
       <p class="state-title">登録完了！</p>
-      <p class="state-msg" style="margin-bottom:0">企業ブースのNFCタグをタップして<br>スタンプを集めましょう！</p>
+      <p class="welcome-sub">スタンプラリーへようこそ</p>
+
+      <!-- 遊び方 -->
+      <div class="guide-box">
+        <div class="guide-step">
+          <span class="guide-num">1</span>
+          <span class="guide-text">気になる企業ブースを回ろう</span>
+        </div>
+        <div class="guide-step">
+          <span class="guide-num">2</span>
+          <span class="guide-text">ブースのNFCタグにスマホをタッチすると<b>スタンプGET</b></span>
+        </div>
+        <div class="guide-step">
+          <span class="guide-num">3</span>
+          <span class="guide-text"><b id="guide-goal">5</b>個集めると<b>景品と交換</b>できます！</span>
+        </div>
+      </div>
+
       <div class="result-dots" id="result-dots"></div>
       <p class="result-count" id="result-count"></p>
       <a href="progress.html" class="action-link secondary">スタンプ進捗を確認する →</a>
