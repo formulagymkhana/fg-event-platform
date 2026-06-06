@@ -35,7 +35,7 @@ async function loadExistingProgress(token) {
   const res = await FG_API.getStampProgress(token);
   if (res.ok) {
     // 有効なトークン → 参加登録済み画面
-    renderDots('already-dots', 'already-count', res.data);
+    renderBar('already-bar', 'already-count', res.data);
     showState('already');
   } else {
     // トークンが無効(古い・リセット等) → 未登録として開始画面へ
@@ -110,8 +110,9 @@ async function onQRFound(qrData) {
 
   if (res.ok) {
     FG_API.saveStampToken(res.data.stampToken);
-    renderDots('result-dots', 'result-count', res.data);
-    setText('guide-goal', String(res.data.prizeCriteria || 5));
+    renderBar('result-bar', 'result-count', res.data);
+    setText('guide-goal', String(res.data.prizeThreshold || 15));
+    setText('guide-count', String(res.data.prizeCount || 3));
     showState('success');
   } else {
     showState('error');
@@ -132,22 +133,19 @@ function stopCamera() {
 
 // ── 描画 ──────────────────────────────────────────
 
-function renderDots(dotsId, countId, d) {
-  const count = d.stampCount    || 0;
-  const total = d.prizeCriteria || 5;
+/** 進捗バーとカウントを描画 */
+function renderBar(barId, countId, d) {
+  const count     = d.stampCount     || 0;
+  const threshold = d.prizeThreshold || 5;
 
-  const container = document.getElementById(dotsId);
-  if (container) {
-    container.innerHTML = '';
-    for (let i = 0; i < total; i++) {
-      const dot = document.createElement('div');
-      dot.className = 'rdot' + (i < count ? ' filled' : '');
-      container.appendChild(dot);
-    }
+  const bar = document.getElementById(barId);
+  if (bar) {
+    const pct = Math.min(100, Math.round((count / threshold) * 100));
+    bar.style.width = pct + '%';
   }
 
   const countEl = document.getElementById(countId);
-  if (countEl) countEl.textContent = `${count} / ${total} スタンプ`;
+  if (countEl) countEl.textContent = `${count} / ${threshold} 個`;
 }
 
 // ── ユーティリティ ────────────────────────────────
