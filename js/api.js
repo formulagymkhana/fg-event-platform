@@ -84,6 +84,18 @@ const FG_API = (() => {
     return call_('getCompanyStampVisitors', { key: viewKey });
   }
 
+  // ── 景品交換API(スタッフ用) ──────────────────
+
+  /** 学生cardTokenとスタッフキーで景品交換状況を取得 */
+  function getExchangeStatus(cardToken, staffKey) {
+    return call_('getExchangeStatus', { token: cardToken, key: staffKey });
+  }
+
+  /** 学生を景品交換済みとして記録 */
+  function markPrizeExchanged(cardToken, staffKey, staff) {
+    return call_('markPrizeExchanged', { token: cardToken, key: staffKey, staff });
+  }
+
   // ── stampToken Cookie操作 ─────────────────────
   // cookieName: fg_stamp_token (スタンプラリー専用)
 
@@ -127,6 +139,9 @@ const FG_API = (() => {
     // 企業閲覧
     getCompanyView,
     getCompanyStampVisitors,
+    // 景品交換(スタッフ)
+    getExchangeStatus,
+    markPrizeExchanged,
     // Cookie
     saveStampToken,
     getStampToken,
