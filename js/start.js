@@ -18,7 +18,6 @@ let _ctx    = null;
 
 document.getElementById('btn-start')?.addEventListener('click', startScan);
 document.getElementById('btn-cancel')?.addEventListener('click', cancelScan);
-document.getElementById('btn-rescan')?.addEventListener('click', startScan);
 document.getElementById('btn-retry')?.addEventListener('click', () => showState('ready'));
 
 // ── 起動処理 ──────────────────────────────────────
@@ -35,9 +34,13 @@ document.getElementById('btn-retry')?.addEventListener('click', () => showState(
 async function loadExistingProgress(token) {
   const res = await FG_API.getStampProgress(token);
   if (res.ok) {
+    // 有効なトークン → 参加登録済み画面
     renderDots('already-dots', 'already-count', res.data);
+    showState('already');
+  } else {
+    // トークンが無効(古い・リセット等) → 未登録として開始画面へ
+    showState('ready');
   }
-  showState('already');
 }
 
 // ── QRスキャン ────────────────────────────────────
@@ -118,7 +121,7 @@ async function onQRFound(qrData) {
 
 function cancelScan() {
   stopCamera();
-  showState(FG_API.getStampToken() ? 'already' : 'ready');
+  showState('ready');
 }
 
 function stopCamera() {
