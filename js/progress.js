@@ -1,15 +1,14 @@
 /**
  * FG Event Platform — スタンプ進捗画面ロジック
  *
- * fg_stamp_token cookie の stampToken を使ってスタンプ取得状況を表示する。
- * config.js と api.js より後に読み込むこと。
+ * 景品モデル: N個集めるとM個選べる
+ * fg_stamp_token cookie の stampToken を使って進捗を表示する。
  */
 
 loadProgress();
 
 async function loadProgress() {
   const token = FG_API.getParam('st') || FG_API.getStampToken();
-
   if (!token) {
     showState('no-token');
     return;
@@ -19,12 +18,11 @@ async function loadProgress() {
   const res = await FG_API.getStampProgress(token);
 
   if (!res.ok) {
+    showState('error');
     if (res.error === 'timeout') {
-      showState('error');
       setText('error-title', '接続がタイムアウトしました');
       setText('error-msg', '更新ボタンで再試行してください。');
     } else {
-      showState('error');
       setText('error-title', 'エラーが発生しました');
       setText('error-msg', res.message || 'もう一度お試しください。');
     }
@@ -36,42 +34,43 @@ async function loadProgress() {
 }
 
 function renderProgress(d) {
-  const count   = d.stampCount    || 0;
-  const total   = d.prizeCriteria || 5;
-  const stamps  = d.stamps        || [];
-  const cleared = d.cleared       || false;
+  const count     = d.stampCount     || 0;
+  const threshold = d.prizeThreshold || 5;
+  const prizeNum  = d.prizeCount     || 1;
+  const stamps    = d.stamps         || [];
+  const cleared   = d.cleared        || false;
+  const exchanged = d.exchanged      || false;
 
-  setText('count-num',   String(count));
-  setText('count-total', String(total));
+  // カウント
+  setText('count-num', String(count));
 
-  const dots = document.getElementById('progress-dots');
-  dots.innerHTML = '';
-  for (let i = 0; i < total; i++) {
-    const dot = document.createElement('div');
-    dot.className = 'pdot' + (i < count ? ' filled' : '');
-    dots.appendChild(dot);
-  }
+  // 進捗バー(最大100%)
+  const pct = Math.min(100, Math.round((count / threshold) * 100));
+  document.getElementById('bar-fill').style.width = pct + '%';
+  setText('bar-label', `${count} / ${threshold} 個`);
 
-  if (cleared) {
+  // ステータスメッセージ(優先度: 交換済み > 達成 > 進行中)
+  hide('status-cleared'); hide('status-exchanged'); hide('status-progress');
+
+  if (exchanged) {
+    show('status-exchanged');
+  } else if (cleared) {
+    const el = document.getElementById('status-cleared');
+    el.innerHTML = `🎉 景品引換可能！<div class="status-sub">交換所で好きな景品を${prizeNum}個選べます</div>`;
     show('status-cleared');
-    hide('status-progress');
   } else {
-    hide('status-cleared');
-    const msg = count === 0
-      ? `スタンプを集めましょう！全${total}社を目指してください`
-      : `あと ${total - count} 社でコンプリートです！`;
-    setText('status-progress', msg);
+    const remaining = threshold - count;
+    setText('status-progress', `あと ${remaining} 個で景品${prizeNum}個GET！`);
     show('status-progress');
   }
 
+  // スタンプ履歴
   const list = document.getElementById('stamp-list');
   list.innerHTML = '';
-
   if (stamps.length === 0) {
     list.innerHTML = '<p class="no-stamps">まだスタンプがありません</p>';
     return;
   }
-
   stamps.forEach(s => {
     const item = document.createElement('div');
     item.className = 'stamp-item';
@@ -90,13 +89,9 @@ function showState(state) {
     if (el) el.style.display = s === state ? 'block' : 'none';
   });
 }
-
 function setText(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
 function show(id) { const el = document.getElementById(id); if (el) el.style.display = 'block'; }
 function hide(id) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
-
 function escHtml(str) {
-  return String(str || '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
