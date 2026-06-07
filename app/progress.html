@@ -1,1 +1,593 @@
+/**
+ * FG Event Platform — スタンドアローン GAS API
+ *
+ * 1つのGASで複数イベントのスプレッドシートを管理する。
+ *
+ * 景品モデル: 「N個集めるとM個選べる」
+ *   設定シート:
+ *     prizeThreshold … 必要スタンプ数 (例: 15)
+ *     prizeCount     … 選べる景品数   (例: 3)
+ *     exchangeKey    … 景品交換画面のスタッフ認証キー (UUID)
+ */
 
+const SHEET = {
+  CONFIG:             '設定',
+  STUDENTS:           '学生マスター',
+  COMPANIES:          '企業マスター',
+  VIEW_LOG:           'QR閲覧ログ',
+  STAMP_LOG:          'スタンプログ',
+  STAMP_PARTICIPANTS: 'スタンプ参加者',
+  PRIZE_LOG:          '景品交換ログ',
+  EVENT_LIST:         'イベント一覧',
+  UNI_MASTER:         '大学マスター',
+};
+
+// ============================================================
+// エントリポイント
+// ============================================================
+
+function doGet(e) {
+  const result = dispatch_(e);
+  return ContentService
+    .createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function dispatch_(e) {
+  try {
+    const p = e.parameter || {};
+    switch (p.action) {
+      case 'getStudent':              return actionGetStudent_(p);
+      case 'saveViewLog':             return actionSaveViewLog_(p);
+      case 'activateStamp':           return actionActivateStamp_(p);
+      case 'saveStamp':               return actionSaveStamp_(p);
+      case 'getStampProgress':        return actionGetStampProgress_(p);
+      case 'getCompanyView':          return actionGetCompanyView_(p);
+      case 'getCompanyStampVisitors': return actionGetCompanyStampVisitors_(p);
+      case 'getExchangeStatus':       return actionGetExchangeStatus_(p);
+      case 'markPrizeExchanged':      return actionMarkPrizeExchanged_(p);
+      case 'getEventList':            return actionGetEventList_(p);
+      default:                        return err_('unknown_action');
+    }
+  } catch (e) {
+    console.error('dispatch error:', e);
+    return err_('server_error');
+  }
+}
+
+// ============================================================
+// アクション: getStudent (企業向け / cardToken)
+// ============================================================
+
+function actionGetStudent_(p) {
+  if (!p.token) return err_('missing_token');
+  if (!p.event) return err_('missing_event');
+
+  const cfg = getConfig_(p.event);
+  if (isPastDeadline_(cfg)) return err_('expired');
+
+  const student = findStudentByCardToken_(p.token, p.event);
+  if (!student) return err_('invalid_token');
+
+  return ok_({
+    studentId:  student.studentId,
+    name:       student.name,
+    furigana:   student.furigana,
+    school:     student.school,
+    department: student.department,
+    year:       student.year,
+    category:   student.category,
+    clubYears:  student.clubYears,
+    prefecture: student.prefecture,
+    birthday:   student.birthday,
+    email:      student.email,
+    eventName:  cfg.eventName,
+    deadline:   cfg.publicDeadline,
+  });
+}
+
+// ============================================================
+// アクション: saveViewLog (企業向け)
+// ============================================================
+
+function actionSaveViewLog_(p) {
+  if (!p.token || !p.company) return err_('missing_params');
+  if (!p.event) return err_('missing_event');
+
+  const cfg = getConfig_(p.event);
+  if (isPastDeadline_(cfg)) return err_('expired');
+
+  const student = findStudentByCardToken_(p.token, p.event);
+  if (!student) return err_('invalid_token');
+
+  eventSs_(p.event).getSheetByName(SHEET.VIEW_LOG).appendRow([
+    new Date(), p.event, student.studentId, p.company, p.email || '',
+  ]);
+
+  return ok_({ logged: true });
+}
+
+// ============================================================
+// アクション: activateStamp (cardToken → stampToken)
+// ============================================================
+
+function actionActivateStamp_(p) {
+  if (!p.token) return err_('missing_token');
+  if (!p.event) return err_('missing_event');
+
+  const student = findStudentByCardToken_(p.token, p.event);
+  if (!student) return err_('invalid_token');
+
+  const participantSheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_PARTICIPANTS);
+  if (!participantSheet) return err_('server_error');
+
+  let stampToken = null;
+  if (participantSheet.getLastRow() > 1) {
+    const data    = participantSheet.getDataRange().getValues();
+    const headers = data[0].map(String);
+    const evCol   = headers.indexOf('eventId');
+    const sidCol  = headers.indexOf('studentId');
+    const stCol   = headers.indexOf('stampToken');
+    const existing = data.slice(1).find(r =>
+      String(r[evCol]) === String(p.event) &&
+      String(r[sidCol]) === String(student.studentId)
+    );
+    if (existing) stampToken = String(existing[stCol]);
+  }
+
+  if (!stampToken) {
+    stampToken = Utilities.getUuid();
+    participantSheet.appendRow([
+      new Date(), p.event, student.studentId,
+      stampToken, new Date(), 'active',
+    ]);
+  }
+
+  const count = countStamps_(p.event, student.studentId);
+  return ok_(buildStampResult_(p.event, student.studentId, count, { stampToken }));
+}
+
+// ============================================================
+// アクション: saveStamp (stampToken)
+// ============================================================
+
+function actionSaveStamp_(p) {
+  if (!p.st || !p.ct) return err_('missing_params');
+  if (!p.event) return err_('missing_event');
+
+  const student = findStudentByStampToken_(p.st, p.event);
+  if (!student) return err_('invalid_student_token');
+
+  const company = findCompanyByStampKey_(p.ct, p.event);
+  if (!company) return err_('invalid_company_key');
+
+  const sheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_LOG);
+  const rows  = sheet.getLastRow() > 1
+    ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).getValues()
+    : [];
+
+  const dup = rows.some(r =>
+    r[1] === p.event &&
+    r[2] === student.studentId &&
+    String(r[7]) === String(company.companyId)
+  );
+  if (dup) return err_('already_stamped');
+
+  if (p.nc) {
+    const ncUsed = rows.some(r =>
+      String(r[7]) === String(company.companyId) &&
+      String(r[8]) === String(p.nc)
+    );
+    if (ncUsed) return err_('used_nfc');
+  }
+
+  sheet.appendRow([
+    new Date(), p.event, student.studentId,
+    student.name, student.school, student.category,
+    company.companyName, company.companyId, p.nc || '',
+  ]);
+
+  const prevCount = rows.filter(r =>
+    r[1] === p.event && r[2] === student.studentId
+  ).length;
+  const count = prevCount + 1;
+
+  // 今回のスタンプで景品条件を達成したか
+  const cfg       = getConfig_(p.event);
+  const threshold = Number(cfg.prizeThreshold) || Number(cfg.prizeCriteria) || 5;
+  const justCleared = prevCount < threshold && count >= threshold;
+
+  return ok_(buildStampResult_(p.event, student.studentId, count, {
+    company: company.companyName,
+    justCleared,
+  }));
+}
+
+// ============================================================
+// アクション: getStampProgress (stampToken)
+// ============================================================
+
+function actionGetStampProgress_(p) {
+  if (!p.token) return err_('missing_token');
+  if (!p.event) return err_('missing_event');
+
+  const student = findStudentByStampToken_(p.token, p.event);
+  if (!student) return err_('invalid_token');
+
+  const sheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_LOG);
+  const rows  = sheet.getLastRow() > 1
+    ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).getValues()
+    : [];
+
+  const myStamps = rows
+    .filter(r => r[1] === p.event && r[2] === student.studentId)
+    .map(r => ({
+      company: r[6],
+      time: r[0] instanceof Date
+        ? Utilities.formatDate(r[0], Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm')
+        : String(r[0]),
+    }));
+
+  return ok_(buildStampResult_(p.event, student.studentId, myStamps.length, {
+    stamps: myStamps,
+  }));
+}
+
+// ============================================================
+// アクション: getExchangeStatus (景品交換画面 / スタッフ)
+// 学生のcardTokenとスタッフキーで達成・交換状況を返す
+// ============================================================
+
+function actionGetExchangeStatus_(p) {
+  if (!p.key)   return err_('missing_key');
+  if (!p.token) return err_('missing_token');
+  if (!p.event) return err_('missing_event');
+
+  const cfg = getConfig_(p.event);
+  if (!cfg.exchangeKey || String(cfg.exchangeKey) !== String(p.key)) {
+    return err_('invalid_staff_key');
+  }
+
+  const student = findStudentByCardToken_(p.token, p.event);
+  if (!student) return err_('invalid_token');
+
+  const count  = countStamps_(p.event, student.studentId);
+  const result = buildStampResult_(p.event, student.studentId, count, {});
+
+  return ok_({
+    studentId:      student.studentId,
+    name:           student.name,
+    school:         student.school,
+    category:       student.category,
+    stampCount:     count,
+    prizeThreshold: result.prizeThreshold,
+    prizeCount:     result.prizeCount,
+    cleared:        result.cleared,
+    exchanged:      result.exchanged,
+  });
+}
+
+// ============================================================
+// アクション: markPrizeExchanged (景品交換画面 / スタッフ)
+// 学生を景品交換済みとして記録(1人1回のみ)
+// ============================================================
+
+function actionMarkPrizeExchanged_(p) {
+  if (!p.key)   return err_('missing_key');
+  if (!p.token) return err_('missing_token');
+  if (!p.event) return err_('missing_event');
+
+  const cfg = getConfig_(p.event);
+  if (!cfg.exchangeKey || String(cfg.exchangeKey) !== String(p.key)) {
+    return err_('invalid_staff_key');
+  }
+
+  const student = findStudentByCardToken_(p.token, p.event);
+  if (!student) return err_('invalid_token');
+
+  const count     = countStamps_(p.event, student.studentId);
+  const threshold = Number(cfg.prizeThreshold) || Number(cfg.prizeCriteria) || 5;
+
+  if (count < threshold) return err_('not_cleared');
+  if (isExchanged_(p.event, student.studentId)) return err_('already_exchanged');
+
+  eventSs_(p.event).getSheetByName(SHEET.PRIZE_LOG).appendRow([
+    new Date(), p.event, student.studentId, student.name,
+    count, p.staff || '',
+  ]);
+
+  return ok_({
+    studentId:  student.studentId,
+    name:       student.name,
+    stampCount: count,
+    exchanged:  true,
+  });
+}
+
+// ============================================================
+// アクション: getCompanyView / getCompanyStampVisitors
+// ============================================================
+
+function actionGetCompanyView_(p) {
+  if (!p.key)   return err_('missing_key');
+  if (!p.event) return err_('missing_event');
+
+  const company = findCompanyByViewKey_(p.key, p.event);
+  if (!company) return err_('invalid_key');
+
+  const cfg = getConfig_(p.event);
+  if (isPastDeadline_(cfg)) return err_('expired');
+
+  const sheet = eventSs_(p.event).getSheetByName(SHEET.VIEW_LOG);
+  const rows  = sheet.getLastRow() > 1
+    ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues()
+    : [];
+
+  const visitors = rows
+    .filter(r => r[1] === p.event && r[3] === company.companyId)
+    .map(r => {
+      const s = findStudentById_(r[2], p.event);
+      if (!s) return null;
+      return {
+        name: s.name, furigana: s.furigana, school: s.school,
+        department: s.department, year: s.year,
+        category: s.category, email: s.email,
+        time: r[0] instanceof Date
+          ? Utilities.formatDate(r[0], Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm')
+          : String(r[0]),
+      };
+    })
+    .filter(Boolean);
+
+  return ok_({ companyName: company.companyName, visitors, total: visitors.length });
+}
+
+function actionGetCompanyStampVisitors_(p) {
+  if (!p.key)   return err_('missing_key');
+  if (!p.event) return err_('missing_event');
+
+  const company = findCompanyByViewKey_(p.key, p.event);
+  if (!company) return err_('invalid_key');
+
+  const sheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_LOG);
+  const rows  = sheet.getLastRow() > 1
+    ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).getValues()
+    : [];
+
+  const visitors = rows
+    .filter(r => r[1] === p.event && String(r[7]) === String(company.companyId))
+    .map(r => ({
+      studentId: r[2], name: r[3], school: r[4], category: r[5],
+      time: r[0] instanceof Date
+        ? Utilities.formatDate(r[0], Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm')
+        : String(r[0]),
+    }));
+
+  return ok_({ companyName: company.companyName, visitors, total: visitors.length });
+}
+
+// ============================================================
+// アクション: getEventList
+// ============================================================
+
+function actionGetEventList_(p) {
+  const sheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+  if (!sheet || sheet.getLastRow() < 2) return ok_({ events: [] });
+
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+
+  const events = data.slice(1).map(row => {
+    const g = name => { const i = headers.indexOf(name); return i >= 0 ? row[i] : ''; };
+    return {
+      eventId:   String(g('eventId')),
+      name:      g('イベント名'),
+      startDate: g('開始日'),
+      endDate:   g('終了日'),
+      status:    g('状態'),
+    };
+  });
+
+  return ok_({ events });
+}
+
+// ============================================================
+// 景品ヘルパー
+// ============================================================
+
+/** 学生が景品交換済みか */
+function isExchanged_(eventId, studentId) {
+  const sheet = eventSs_(eventId).getSheetByName(SHEET.PRIZE_LOG);
+  if (!sheet || sheet.getLastRow() < 2) return false;
+
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const evCol   = headers.indexOf('eventId');
+  const sidCol  = headers.indexOf('studentId');
+
+  return data.slice(1).some(r =>
+    String(r[evCol]) === String(eventId) &&
+    String(r[sidCol]) === String(studentId)
+  );
+}
+
+/** スタンプ数を数える */
+function countStamps_(eventId, studentId) {
+  const sheet = eventSs_(eventId).getSheetByName(SHEET.STAMP_LOG);
+  const rows  = sheet.getLastRow() > 1
+    ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).getValues()
+    : [];
+  return rows.filter(r => r[1] === eventId && r[2] === studentId).length;
+}
+
+/**
+ * スタンプ結果の共通レスポンスを組み立てる
+ * stampCount, prizeThreshold, prizeCount, cleared, exchanged を含む。
+ * extra で stampToken / company / stamps / justCleared などを追加可能。
+ */
+function buildStampResult_(eventId, studentId, stampCount, extra) {
+  const cfg        = getConfig_(eventId);
+  const threshold  = Number(cfg.prizeThreshold) || Number(cfg.prizeCriteria) || 5;
+  const prizeCount = Number(cfg.prizeCount) || 1;
+  const exchanged  = isExchanged_(eventId, studentId);
+
+  return Object.assign({
+    stampCount,
+    prizeThreshold: threshold,
+    prizeCount,
+    cleared:        stampCount >= threshold,
+    exchanged,
+  }, extra || {});
+}
+
+// ============================================================
+// スプレッドシートアクセス
+// ============================================================
+
+function masterSs_() {
+  const id = PropertiesService.getScriptProperties()
+    .getProperty('MASTER_SPREADSHEET_ID');
+  if (!id) throw new Error('MASTER_SPREADSHEET_IDが未設定です。initializeMaster()を実行してください。');
+  return SpreadsheetApp.openById(id);
+}
+
+function eventSs_(eventId) {
+  const sheet   = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const idCol   = headers.indexOf('eventId');
+  const ssIdCol = headers.indexOf('スプレッドシートID');
+  const row     = data.slice(1).find(r => String(r[idCol]) === String(eventId));
+  if (!row) throw new Error('イベントが見つかりません: ' + eventId);
+  return SpreadsheetApp.openById(row[ssIdCol]);
+}
+
+// ============================================================
+// 設定ヘルパー
+// ============================================================
+
+function getConfig_(eventId) {
+  const cache = CacheService.getScriptCache();
+  const key   = 'cfg_' + eventId;
+  const hit   = cache.get(key);
+  if (hit) return JSON.parse(hit);
+
+  const data   = eventSs_(eventId).getSheetByName(SHEET.CONFIG).getDataRange().getValues();
+  const config = {};
+  data.forEach(([k, v]) => { if (k) config[String(k)] = v; });
+  cache.put(key, JSON.stringify(config), 300);
+  return config;
+}
+
+function isPastDeadline_(cfg) {
+  if (!cfg.publicDeadline) return false;
+  return new Date() > new Date(cfg.publicDeadline);
+}
+
+// ============================================================
+// 学生検索
+// ============================================================
+
+function findStudentByCardToken_(token, eventId) {
+  return findStudent_('token', token, eventId);
+}
+
+function findStudentByStampToken_(stampToken, eventId) {
+  const sheet = eventSs_(eventId).getSheetByName(SHEET.STAMP_PARTICIPANTS);
+  if (!sheet || sheet.getLastRow() < 2) return null;
+
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const stCol   = headers.indexOf('stampToken');
+  const sidCol  = headers.indexOf('studentId');
+
+  const row = data.slice(1).find(r => String(r[stCol]) === String(stampToken));
+  if (!row) return null;
+
+  return findStudentById_(String(row[sidCol]), eventId);
+}
+
+function findStudentById_(id, eventId) {
+  return findStudent_('studentId', id, eventId);
+}
+
+function findStudent_(keyCol, value, eventId) {
+  const sheet   = eventSs_(eventId).getSheetByName(SHEET.STUDENTS);
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const col     = headers.indexOf(keyCol);
+  if (col < 0) return null;
+
+  const row = data.slice(1).find(r => String(r[col]) === String(value));
+  if (!row) return null;
+  return mapStudent_(headers, row);
+}
+
+function mapStudent_(headers, row) {
+  const g = name => { const i = headers.indexOf(name); return i >= 0 ? row[i] : ''; };
+  return {
+    studentId:  g('studentId'),
+    token:      g('token'),
+    name:       g('氏名'),
+    furigana:   g('ふりがな'),
+    school:     g('大学名'),
+    department: g('学部学科'),
+    year:       g('学年'),
+    category:   g('属性'),
+    clubYears:  g('自動車部在籍年数'),
+    prefecture: g('住所(都道府県)'),
+    birthday:   g('生年月日') instanceof Date
+      ? Utilities.formatDate(g('生年月日'), Session.getScriptTimeZone(), 'yyyy/MM/dd')
+      : String(g('生年月日') || ''),
+    email:      g('メールアドレス'),
+    regType:    g('登録種別'),
+  };
+}
+
+// ============================================================
+// 企業検索
+// ============================================================
+
+function findCompanyByStampKey_(key, eventId) { return findCompany_('stampKey', key, eventId); }
+function findCompanyByViewKey_(key, eventId)  { return findCompany_('viewKey',  key, eventId); }
+
+function findCompany_(keyCol, value, eventId) {
+  const sheet   = eventSs_(eventId).getSheetByName(SHEET.COMPANIES);
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const col     = headers.indexOf(keyCol);
+  if (col < 0) return null;
+
+  const row = data.slice(1).find(r => String(r[col]) === String(value));
+  if (!row) return null;
+
+  const g = name => { const i = headers.indexOf(name); return i >= 0 ? row[i] : ''; };
+  return { companyId: String(g('companyId')), companyName: g('企業名') };
+}
+
+// ============================================================
+// レスポンスヘルパー
+// ============================================================
+
+function ok_(data)  { return { ok: true, data }; }
+function err_(code) {
+  const MSG = {
+    unknown_action:        '不明なアクションです',
+    missing_token:         'tokenが必要です',
+    missing_event:         'eventパラメータが必要です',
+    missing_params:        '必須パラメータが不足しています',
+    missing_key:           'keyが必要です',
+    invalid_token:         'トークンが無効です',
+    invalid_student_token: '学生トークンが無効です',
+    invalid_company_key:   '企業スタンプキーが無効です',
+    invalid_key:           '企業閲覧キーが無効です',
+    invalid_staff_key:     'スタッフキーが無効です',
+    not_cleared:           'まだ景品の獲得条件を満たしていません',
+    already_exchanged:     'この学生は景品交換済みです',
+    expired:               '公開期限が終了しました',
+    already_stamped:       'このブースのスタンプは取得済みです',
+    used_nfc:              'このNFCタグは使用済みです',
+    server_error:          'サーバーエラーが発生しました',
+  };
+  return { ok: false, error: code, message: MSG[code] || code };
+}
