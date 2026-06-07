@@ -72,6 +72,11 @@ const FG_API = (() => {
     return call_('getStampProgress', { token: stampToken });
   }
 
+  /** 学生が自分で景品交換を確定する(スタッフ指示に従って操作) */
+  function exchangePrize(stampToken) {
+    return call_('exchangePrize', { token: stampToken });
+  }
+
   // ── 企業閲覧API ───────────────────────────────
 
   /** 企業がQR閲覧学生一覧を取得(viewKeyで認証) */
@@ -136,6 +141,7 @@ const FG_API = (() => {
     activateStamp,
     saveStamp,
     getStampProgress,
+    exchangePrize,
     // 企業閲覧
     getCompanyView,
     getCompanyStampVisitors,
