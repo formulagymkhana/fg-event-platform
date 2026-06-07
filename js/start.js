@@ -1,12 +1,12 @@
 /**
  * FG Event Platform — スタンプラリー開始画面ロジック
  *
- * 学生が自分のQR名刺を読み取り、stampTokenを発行する。
- * cardToken → activateStamp API → stampToken → cookie保存
+ * 起動パターン:
+ *   A) Cookie有効 → 参加登録済み / 進行中 画面
+ *   B) Cookie無効 → QRスキャン画面
  *
- * 依存: jsQR(start.htmlで読み込み済み), config.js, api.js
- *
- * ⚠ CSP対応のためonclick属性は使わず、ここでeventListenerを設定する。
+ * activateStamp の isNew フラグで初回登録(遊び方ガイド)と
+ * 復帰(継続画面)を区別する。
  */
 
 let _stream = null;
@@ -14,31 +14,34 @@ let _rafId  = null;
 let _canvas = null;
 let _ctx    = null;
 
-// ── イベントリスナー(onclick の代わり) ──────────────
+// ── イベントリスナー ──────────────────────────────
 
 document.getElementById('btn-start')?.addEventListener('click', startScan);
 document.getElementById('btn-cancel')?.addEventListener('click', cancelScan);
 document.getElementById('btn-retry')?.addEventListener('click', () => showState('ready'));
 
-// ── 起動処理 ──────────────────────────────────────
+// ── 起動 ──────────────────────────────────────────
 
 (function init() {
-  const existing = FG_API.getStampToken();
-  if (existing) {
-    loadExistingProgress(existing);
-  } else {
-    showState('ready');
+  // Cookie にstampTokenがある → 既存進捗を表示
+  const existingStamp = FG_API.getStampToken();
+  if (existingStamp) {
+    loadExistingProgress(existingStamp);
+    return;
   }
+  // なければ QRスキャン待機
+  showState('ready');
 })();
+
+// ── Cookie有効: 既存進捗を読み込む ─────────────────
 
 async function loadExistingProgress(token) {
   const res = await FG_API.getStampProgress(token);
   if (res.ok) {
-    // 有効なトークン → 参加登録済み画面
     renderBar('already-bar', 'already-count', res.data);
     showState('already');
   } else {
-    // トークンが無効(古い・リセット等) → 未登録として開始画面へ
+    // トークン無効(古いCookie等) → スキャン画面に倒す
     showState('ready');
   }
 }
@@ -47,7 +50,6 @@ async function loadExistingProgress(token) {
 
 async function startScan() {
   showState('scanning');
-
   _canvas = document.createElement('canvas');
   _ctx    = _canvas.getContext('2d');
 
@@ -65,25 +67,18 @@ async function startScan() {
     stopCamera();
     showState('error');
     setText('error-title', 'カメラを起動できませんでした');
-    setText('error-msg', 'カメラのアクセスを許可してから、もう一度お試しください。');
+    setText('error-msg', 'カメラのアクセスを許可してください。');
   }
 }
 
 function scanLoop(video) {
   if (!_stream) return;
-
   if (video.readyState === video.HAVE_ENOUGH_DATA) {
     _ctx.drawImage(video, 0, 0, _canvas.width, _canvas.height);
-    const imageData = _ctx.getImageData(0, 0, _canvas.width, _canvas.height);
-    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: 'dontInvert',
-    });
-    if (code) {
-      onQRFound(code.data);
-      return;
-    }
+    const img  = _ctx.getImageData(0, 0, _canvas.width, _canvas.height);
+    const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+    if (code) { onQRFound(code.data); return; }
   }
-
   _rafId = requestAnimationFrame(() => scanLoop(video));
 }
 
@@ -91,12 +86,7 @@ async function onQRFound(qrData) {
   stopCamera();
 
   let cardToken = null;
-  try {
-    const url = new URL(qrData);
-    cardToken = url.searchParams.get('token');
-  } catch (e) {
-    // QRがURLでない場合
-  }
+  try { cardToken = new URL(qrData).searchParams.get('token'); } catch (e) {}
 
   if (!cardToken) {
     showState('error');
@@ -110,14 +100,21 @@ async function onQRFound(qrData) {
 
   if (res.ok) {
     FG_API.saveStampToken(res.data.stampToken);
-    renderBar('result-bar', 'result-count', res.data);
-    setText('guide-goal', String(res.data.prizeThreshold || 15));
-    setText('guide-count', String(res.data.prizeCount || 3));
-    showState('success');
+    if (res.data.isNew) {
+      // 初回登録 → 遊び方ガイドを表示
+      renderBar('result-bar', 'result-count', res.data);
+      setText('guide-goal',  String(res.data.prizeThreshold || 15));
+      setText('guide-count', String(res.data.prizeCount     || 3));
+      showState('success');
+    } else {
+      // 復帰(Cookie消失後の再スキャン) → 継続画面
+      renderBar('continuing-bar', 'continuing-count', res.data);
+      showState('continuing');
+    }
   } else {
     showState('error');
     setText('error-title', 'QRコードが無効です');
-    setText('error-msg', res.message || '自分の学生QR名刺を読み取ってください。');
+    setText('error-msg', '自分の学生QR名刺を読み取ってください。');
   }
 }
 
@@ -133,25 +130,19 @@ function stopCamera() {
 
 // ── 描画 ──────────────────────────────────────────
 
-/** 進捗バーとカウントを描画 */
 function renderBar(barId, countId, d) {
   const count     = d.stampCount     || 0;
   const threshold = d.prizeThreshold || 5;
-
   const bar = document.getElementById(barId);
-  if (bar) {
-    const pct = Math.min(100, Math.round((count / threshold) * 100));
-    bar.style.width = pct + '%';
-  }
-
-  const countEl = document.getElementById(countId);
-  if (countEl) countEl.textContent = `${count} / ${threshold} 個`;
+  if (bar) bar.style.width = Math.min(100, Math.round((count / threshold) * 100)) + '%';
+  const el = document.getElementById(countId);
+  if (el) el.textContent = `${count} / ${threshold} 個`;
 }
 
 // ── ユーティリティ ────────────────────────────────
 
 function showState(state) {
-  ['ready', 'scanning', 'loading', 'success', 'already', 'error'].forEach(s => {
+  ['ready','scanning','loading','success','continuing','already','error'].forEach(s => {
     const el = document.getElementById('state-' + s);
     if (el) el.style.display = s === state ? 'block' : 'none';
   });
