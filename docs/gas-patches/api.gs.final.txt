@@ -53,6 +53,18 @@ function dispatch_(e) {
       case 'getEventList':            return actionGetEventList_(p);
       case 'getCurrentEvent':         return actionGetCurrentEvent_(p);   // T6 追加
       case 'registerWalkIn':          return actionRegisterWalkIn_(p);    // T6 追加
+      // ── admin (T12) ───────────────────────────────────────────────────
+      case 'adminGetEvents':    return actionAdminGetEvents_(p);
+      case 'adminGetConfig':    return actionAdminGetConfig_(p);
+      case 'adminUpdateConfig': return actionAdminUpdateConfig_(p);
+      case 'adminCreateEvent':  return actionAdminCreateEvent_(p);
+      case 'adminGetStats':     return actionAdminGetStats_(p);
+      case 'adminGetStampLog':  return actionAdminGetStampLog_(p);
+      case 'adminGetWalkIns':   return actionAdminGetWalkIns_(p);
+      case 'adminGetPrizeLog':  return actionAdminGetPrizeLog_(p);
+      case 'adminClearCache':   return actionAdminClearCache_(p);
+      case 'adminGetCompanies': return actionAdminGetCompanies_(p);
+      case 'adminGenerateKeys': return actionAdminGenerateKeys_(p);
       default:                        return err_('unknown_action');
     }
   } catch (e) {
@@ -644,6 +656,10 @@ function err_(code) {
     no_active_event:       '本日開催のイベントが見つかりません', // T6 追加
     invalid_code:          '登録コードが無効です',               // T6 追加
     already_registered:    'すでに本日のイベントに登録済みです', // T6 追加
+    // T12 admin
+    admin_key_not_configured: 'ADMIN_KEYがGASスクリプトプロパティに未設定です',
+    invalid_admin_key:        '管理者キーが正しくありません',
+    event_already_exists:     '同じイベントIDが既に存在します',
     server_error:          'サーバーエラーが発生しました',
   };
   return { ok: false, error: code, message: MSG[code] || code };
@@ -775,4 +791,239 @@ function actionRegisterWalkIn_(p) {
   ]);
 
   return ok_(buildStampResult_(p.event, studentId, 0, { stampToken, isNew: true }));
+}
+
+// ============================================================
+// T12: 管理者APIアクション
+// 全アクションで adminKey パラメータを検証する。
+// GASスクリプトプロパティ ADMIN_KEY に設定した値と照合。
+// ============================================================
+
+function validateAdmin_(p) {
+  const valid = PropertiesService.getScriptProperties().getProperty('ADMIN_KEY');
+  if (!valid) return err_('admin_key_not_configured');
+  if (String(p.adminKey || '') !== String(valid)) return err_('invalid_admin_key');
+  return null;
+}
+
+// イベント一覧取得 + WALK_IN_CODE を返す
+function actionAdminGetEvents_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+
+  const sheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+  const events = [];
+  if (sheet && sheet.getLastRow() > 1) {
+    const data    = sheet.getDataRange().getValues();
+    const headers = data[0].map(String);
+    const tz      = Session.getScriptTimeZone();
+    data.slice(1).forEach(row => {
+      const g = name => { const i = headers.indexOf(name); return i >= 0 ? row[i] : ''; };
+      const fmtD = v => v instanceof Date ? Utilities.formatDate(v, tz, 'yyyy/MM/dd') : String(v);
+      events.push({
+        eventId:   String(g('eventId')),
+        name:      g('イベント名'),
+        startDate: fmtD(g('開始日')),
+        endDate:   fmtD(g('終了日')),
+        status:    g('状態'),
+      });
+    });
+  }
+  const walkInCode = PropertiesService.getScriptProperties().getProperty('WALK_IN_CODE') || '';
+  return ok_({ events, walkInCode });
+}
+
+// イベント設定シートの全キーを取得
+function actionAdminGetConfig_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.event) return err_('missing_event');
+
+  const tz   = Session.getScriptTimeZone();
+  const data = eventSs_(p.event).getSheetByName(SHEET.CONFIG).getDataRange().getValues();
+  const config = {};
+  data.forEach(([k, v]) => {
+    if (!k) return;
+    config[String(k)] = v instanceof Date
+      ? Utilities.formatDate(v, tz, 'yyyy/MM/dd HH:mm')
+      : v;
+  });
+  return ok_({ config });
+}
+
+// 設定シートの1キーを更新
+function actionAdminUpdateConfig_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.event || !p.key) return err_('missing_params');
+
+  const sheet  = eventSs_(p.event).getSheetByName(SHEET.CONFIG);
+  const data   = sheet.getDataRange().getValues();
+  const rowIdx = data.findIndex(row => String(row[0]) === String(p.key));
+  if (rowIdx >= 0) {
+    sheet.getRange(rowIdx + 1, 2).setValue(p.value || '');
+  } else {
+    sheet.appendRow([p.key, p.value || '']);
+  }
+  CacheService.getScriptCache().remove('cfg_' + p.event);
+  return ok_({ updated: true });
+}
+
+// 新規イベントスプレッドシートを作成
+function actionAdminCreateEvent_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.eventId || !p.eventName || !p.startDate || !p.endDate) return err_('missing_params');
+
+  // 重複チェック
+  const sheet   = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const idCol   = headers.indexOf('eventId');
+  if (data.slice(1).some(r => String(r[idCol]) === String(p.eventId))) {
+    return err_('event_already_exists');
+  }
+  createEvent_(p.eventId, p.eventName, p.startDate, p.endDate);
+  return ok_({ created: true, eventId: p.eventId });
+}
+
+// 統計（学生数・スタンプ数・参加者数・景品交換数）
+function actionAdminGetStats_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.event) return err_('missing_event');
+
+  const ss = eventSs_(p.event);
+
+  const studentSheet = ss.getSheetByName(SHEET.STUDENTS);
+  let studentCount = 0, walkInCount = 0;
+  if (studentSheet && studentSheet.getLastRow() > 1) {
+    const sData    = studentSheet.getDataRange().getValues();
+    const sHeaders = sData[0].map(String);
+    const regCol   = sHeaders.indexOf('登録種別');
+    studentCount = sData.length - 1;
+    walkInCount  = regCol >= 0
+      ? sData.slice(1).filter(r => String(r[regCol]) === '当日').length
+      : 0;
+  }
+
+  const stampSheet       = ss.getSheetByName(SHEET.STAMP_LOG);
+  const participantSheet = ss.getSheetByName(SHEET.STAMP_PARTICIPANTS);
+  const prizeSheet       = ss.getSheetByName(SHEET.PRIZE_LOG);
+
+  return ok_({
+    studentCount,
+    walkInCount,
+    stampCount:       stampSheet       ? Math.max(0, stampSheet.getLastRow()       - 1) : 0,
+    participantCount: participantSheet ? Math.max(0, participantSheet.getLastRow() - 1) : 0,
+    prizeCount:       prizeSheet       ? Math.max(0, prizeSheet.getLastRow()       - 1) : 0,
+  });
+}
+
+// スタンプログ（最新100件）
+function actionAdminGetStampLog_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.event) return err_('missing_event');
+
+  const sheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_LOG);
+  if (!sheet || sheet.getLastRow() < 2) return ok_({ log: [], total: 0 });
+
+  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).getValues();
+  const tz   = Session.getScriptTimeZone();
+  const log  = data.slice(-100).reverse().map(r => ({
+    time:    r[0] instanceof Date ? Utilities.formatDate(r[0], tz, 'MM/dd HH:mm') : String(r[0]),
+    name:    r[3],
+    school:  r[4],
+    company: r[6],
+  }));
+  return ok_({ log, total: data.length });
+}
+
+// 当日参加者一覧
+function actionAdminGetWalkIns_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.event) return err_('missing_event');
+
+  const sheet = eventSs_(p.event).getSheetByName(SHEET.STUDENTS);
+  if (!sheet || sheet.getLastRow() < 2) return ok_({ walkins: [], total: 0 });
+
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const g       = (row, name) => { const i = headers.indexOf(name); return i >= 0 ? row[i] : ''; };
+  const regCol  = headers.indexOf('登録種別');
+
+  const walkins = data.slice(1)
+    .filter(r => String(r[regCol]) === '当日')
+    .map(r => ({
+      studentId: String(g(r, 'studentId')),
+      name:      g(r, '氏名'),
+      furigana:  g(r, 'ふりがな'),
+      school:    g(r, '大学名'),
+      year:      g(r, '学年'),
+      email:     g(r, 'メールアドレス'),
+    }));
+  return ok_({ walkins, total: walkins.length });
+}
+
+// 景品交換ログ
+function actionAdminGetPrizeLog_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.event) return err_('missing_event');
+
+  const sheet = eventSs_(p.event).getSheetByName(SHEET.PRIZE_LOG);
+  if (!sheet || sheet.getLastRow() < 2) return ok_({ log: [], total: 0 });
+
+  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).getValues();
+  const tz   = Session.getScriptTimeZone();
+  const log  = data.map(r => ({
+    time:       r[0] instanceof Date ? Utilities.formatDate(r[0], tz, 'MM/dd HH:mm') : String(r[0]),
+    studentId:  r[2],
+    name:       r[3],
+    stampCount: r[4],
+    staff:      r[5],
+  }));
+  return ok_({ log, total: log.length });
+}
+
+// キャッシュクリア（全イベント対象）
+function actionAdminClearCache_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  clearCache(p.event || null);
+  return ok_({ cleared: true });
+}
+
+// 企業マスター一覧
+function actionAdminGetCompanies_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.event) return err_('missing_event');
+
+  const sheet = eventSs_(p.event).getSheetByName(SHEET.COMPANIES);
+  if (!sheet || sheet.getLastRow() < 2) return ok_({ companies: [] });
+
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const g       = (row, name) => { const i = headers.indexOf(name); return i >= 0 ? row[i] : ''; };
+
+  const companies = data.slice(1).map(row => ({
+    companyId: String(g(row, 'companyId')),
+    name:      g(row, '企業名'),
+    stampKey:  g(row, 'stampKey'),
+    viewKey:   g(row, 'viewKey'),
+    hasNfc:    g(row, 'hasNfc'),
+  }));
+  return ok_({ companies });
+}
+
+// 未発行キーを一括発行
+function actionAdminGenerateKeys_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.event) return err_('missing_event');
+  generateCompanyKeys(p.event);
+  return ok_({ generated: true });
 }

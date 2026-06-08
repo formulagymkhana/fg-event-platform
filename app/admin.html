@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self';
+             script-src 'self';
+             connect-src https://script.google.com
+                         https://script.googleusercontent.com;
+             style-src 'self' 'unsafe-inline';">
+  <title>FG 管理パネル</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --navy:#0B2545;--navy-mid:#1A4A80;--navy-light:#EBF0F8;
+      --gray:#6B7A8D;--gray-light:#F0F3F7;--border:#D4DBE6;
+      --red:#C0392B;--green:#27AE60;
+    }
+    body{font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;
+      background:var(--gray-light);min-height:100vh;color:#1A2733;font-size:14px}
+
+    /* LOGIN */
+    .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+    .login-card{background:#fff;border-radius:16px;width:100%;max-width:380px;
+      box-shadow:0 4px 24px rgba(11,37,69,.12);overflow:hidden}
+    .login-hd{background:var(--navy);padding:20px 24px}
+    .fg-logo{font-size:11px;font-weight:700;letter-spacing:.15em;color:#fff}
+    .fg-logo span{background:#fff;color:var(--navy);padding:1px 6px;border-radius:2px;margin-left:2px}
+    .login-sub{font-size:12px;color:#8BA3C4;margin-top:4px}
+    .login-bd{padding:28px 24px 32px}
+    .login-icon{font-size:40px;text-align:center;margin-bottom:16px}
+    .login-desc{font-size:13px;color:var(--gray);text-align:center;margin-bottom:24px;line-height:1.7}
+    .f-label{font-size:12px;font-weight:600;color:#1A2733;margin-bottom:6px;display:block}
+    .f-input{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:8px;
+      font-size:15px;color:#1A2733;margin-bottom:16px;transition:border-color .15s}
+    .f-input:focus{outline:none;border-color:var(--navy)}
+    .f-input.error{border-color:var(--red)}
+    .f-err{font-size:12px;color:var(--red);margin-bottom:12px;display:none}
+    .f-err.show{display:block}
+    .primary-btn{width:100%;padding:14px;background:var(--navy);color:#fff;border:none;
+      border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s}
+    .primary-btn:active{background:var(--navy-mid)}
+    .primary-btn:disabled{background:#B0BAC8;cursor:not-allowed}
+
+    /* APP */
+    .app-hd{background:var(--navy);padding:0 20px;display:flex;align-items:center;
+      height:52px;position:sticky;top:0;z-index:100}
+    .app-logo{font-size:11px;font-weight:700;letter-spacing:.15em;color:#fff}
+    .app-logo span{background:#fff;color:var(--navy);padding:1px 6px;border-radius:2px;margin-left:2px}
+    .app-logo-sub{font-size:10px;color:#8BA3C4;margin-left:10px}
+    .logout-btn{margin-left:auto;background:none;border:1px solid rgba(255,255,255,.3);
+      color:#8BA3C4;font-size:11px;padding:5px 10px;border-radius:5px;cursor:pointer}
+    .app-body{max-width:800px;margin:0 auto;padding:20px 16px 60px}
+
+    /* Event bar */
+    .event-bar{background:#fff;border-radius:12px;padding:14px 16px;display:flex;
+      align-items:center;gap:10px;margin-bottom:16px;box-shadow:0 1px 4px rgba(11,37,69,.08);
+      flex-wrap:wrap}
+    .event-bar label{font-size:11px;font-weight:700;color:#8BA3C4;white-space:nowrap}
+    .event-sel{flex:1;min-width:160px;padding:8px 10px;border:1.5px solid var(--border);
+      border-radius:8px;font-size:13px;color:#1A2733;background:#fff;
+      appearance:none;-webkit-appearance:none}
+    .event-sel:focus{outline:none;border-color:var(--navy)}
+    .icon-btn{padding:8px 14px;border:1.5px solid var(--border);border-radius:8px;
+      font-size:12px;font-weight:600;color:var(--navy);background:#fff;cursor:pointer;
+      white-space:nowrap;transition:background .15s}
+    .icon-btn:hover{background:var(--navy-light)}
+
+    /* Tabs */
+    .tab-nav{display:flex;gap:4px;background:#fff;border-radius:12px;padding:4px;
+      margin-bottom:16px;box-shadow:0 1px 4px rgba(11,37,69,.08);overflow-x:auto;
+      scrollbar-width:none}
+    .tab-nav::-webkit-scrollbar{display:none}
+    .tab-btn{flex:1;padding:9px 8px;border:none;border-radius:9px;font-size:12px;font-weight:600;
+      color:var(--gray);background:none;cursor:pointer;white-space:nowrap;transition:all .15s;
+      min-width:fit-content}
+    .tab-btn.active{background:var(--navy);color:#fff}
+    .tab-pane{display:none}
+    .tab-pane.active{display:block}
+
+    /* Cards */
+    .card{background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;
+      box-shadow:0 1px 4px rgba(11,37,69,.08)}
+    .card-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:16px;
+      padding-bottom:10px;border-bottom:1px solid var(--border)}
+
+    /* Stats */
+    .stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px}
+    .stat-card{background:var(--gray-light);border-radius:10px;padding:14px;text-align:center}
+    .stat-val{font-size:28px;font-weight:700;color:var(--navy);line-height:1;margin-bottom:4px}
+    .stat-lbl{font-size:11px;color:var(--gray);font-weight:600}
+
+    /* Config */
+    .cfg-row{margin-bottom:14px}
+    .cfg-row label{display:block;font-size:12px;font-weight:600;color:#1A2733;margin-bottom:5px}
+    .cfg-hint{font-size:11px;color:var(--gray);margin-bottom:5px}
+    .cfg-input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;
+      font-size:14px;color:#1A2733;background:#fff}
+    .cfg-input:focus{outline:none;border-color:var(--navy)}
+    .cfg-row-half{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+    .cfg-row-half .cfg-row{margin-bottom:0}
+    .save-btn{padding:12px 24px;background:var(--navy);color:#fff;border:none;
+      border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
+    .save-btn:disabled{background:#B0BAC8;cursor:not-allowed}
+    .save-fb{font-size:12px;margin-left:10px;display:none}
+    .save-fb.ok{color:var(--green);display:inline}
+    .save-fb.err{color:var(--red);display:inline}
+
+    /* Tables */
+    .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .data-tbl{width:100%;border-collapse:collapse;font-size:12px}
+    .data-tbl th{background:var(--navy);color:#fff;padding:8px 10px;text-align:left;
+      font-weight:600;white-space:nowrap}
+    .data-tbl td{padding:8px 10px;border-bottom:1px solid var(--border);
+      color:#1A2733;white-space:nowrap}
+    .data-tbl tr:last-child td{border-bottom:none}
+    .data-tbl tr:hover td{background:var(--gray-light)}
+    .empty-msg{text-align:center;color:var(--gray);padding:24px;font-size:13px}
+
+    /* Company */
+    .company-list{display:flex;flex-direction:column;gap:10px}
+    .company-item{background:var(--gray-light);border-radius:10px;padding:14px}
+    .company-name{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:8px}
+    .key-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+    .key-lbl{font-size:11px;color:var(--gray);width:70px;flex-shrink:0}
+    .key-val{font-size:11px;font-family:monospace;color:#1A2733;background:#fff;
+      padding:3px 8px;border-radius:5px;flex:1;overflow:hidden;text-overflow:ellipsis}
+    .copy-btn{padding:3px 8px;border:1px solid var(--border);border-radius:5px;
+      font-size:10px;cursor:pointer;background:#fff;color:var(--navy);flex-shrink:0}
+
+    /* URL box */
+    .url-box{background:var(--gray-light);border-radius:10px;padding:14px;margin-bottom:14px}
+    .url-lbl{font-size:11px;font-weight:700;color:#8BA3C4;margin-bottom:8px}
+    .url-val{font-size:12px;font-family:monospace;color:var(--navy);word-break:break-all;
+      background:#fff;padding:10px 12px;border-radius:7px;margin-bottom:8px;
+      border:1px solid var(--border)}
+
+    /* Modal */
+    .modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;
+      display:flex;align-items:center;justify-content:center;padding:16px}
+    .modal-card{background:#fff;border-radius:16px;width:100%;max-width:420px;
+      overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.2)}
+    .modal-hd{background:var(--navy);padding:16px 20px;display:flex;
+      align-items:center;justify-content:space-between}
+    .modal-title{font-size:14px;font-weight:700;color:#fff}
+    .modal-close{background:none;border:none;color:#8BA3C4;font-size:20px;
+      cursor:pointer;line-height:1}
+    .modal-bd{padding:24px 20px 28px}
+
+    /* Spinner */
+    .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--navy);
+      border-radius:50%;animation:spin .8s linear infinite;margin:16px auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .loading-msg{text-align:center;color:var(--gray);font-size:13px;padding:32px}
+
+    /* Toast */
+    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+      background:var(--navy);color:#fff;padding:10px 20px;border-radius:20px;
+      font-size:13px;font-weight:600;z-index:300;opacity:0;transition:opacity .2s;
+      pointer-events:none;white-space:nowrap}
+    .toast.show{opacity:1}
+
+    /* Misc */
+    .section-sub{font-size:12px;color:var(--gray);margin-bottom:14px;line-height:1.6}
+    .badge{display:inline-block;padding:2px 8px;border-radius:100px;font-size:10px;font-weight:700}
+    .badge-active{background:#E8F8EF;color:var(--green)}
+    .badge-prep{background:var(--navy-light);color:var(--navy)}
+    .badge-done{background:var(--gray-light);color:#8BA3C4}
+    .danger-btn{padding:10px 16px;background:#fff;border:1.5px solid var(--red);
+      color:var(--red);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+    @media(max-width:480px){
+      .cfg-row-half{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Login ── -->
+<div id="view-login">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-hd">
+        <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
+        <div class="login-sub">管理パネル</div>
+      </div>
+      <div class="login-bd">
+        <div class="login-icon">🔐</div>
+        <p class="login-desc">管理者キーを入力してください。<br>GASスクリプトプロパティの<br><strong>ADMIN_KEY</strong> を使用します。</p>
+        <label class="f-label" for="login-key">ADMIN KEY</label>
+        <input type="password" class="f-input" id="login-key" placeholder="管理者キーを入力" autocomplete="current-password">
+        <p class="f-err" id="login-err"></p>
+        <button class="primary-btn" id="btn-login">ログイン</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── App ── -->
+<div id="view-app" style="display:none">
+  <header class="app-hd">
+    <div class="app-logo">FORMULA <span>GYMKHANA</span><span class="app-logo-sub">管理パネル</span></div>
+    <button class="logout-btn" id="btn-logout">ログアウト</button>
+  </header>
+
+  <div class="app-body">
+    <!-- Event selector -->
+    <div class="event-bar">
+      <label>イベント</label>
+      <select class="event-sel" id="event-select">
+        <option value="">イベントを選択...</option>
+      </select>
+      <button class="icon-btn" id="btn-new-event">＋ 新規作成</button>
+    </div>
+
+    <!-- Tab nav -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="overview">概要</button>
+      <button class="tab-btn" data-tab="config">設定編集</button>
+      <button class="tab-btn" data-tab="data">データ</button>
+      <button class="tab-btn" data-tab="keys">企業・キー</button>
+    </nav>
+
+    <!-- Tab: 概要 -->
+    <div class="tab-pane active" id="tab-overview">
+      <div class="loading-msg" id="overview-loading"><div class="spinner"></div>イベントを選択してください</div>
+      <div id="overview-content" style="display:none">
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-val" id="stat-students">—</div><div class="stat-lbl">登録学生数</div></div>
+          <div class="stat-card"><div class="stat-val" id="stat-participants">—</div><div class="stat-lbl">スタンプ参加者</div></div>
+          <div class="stat-card"><div class="stat-val" id="stat-stamps">—</div><div class="stat-lbl">スタンプ総数</div></div>
+          <div class="stat-card"><div class="stat-val" id="stat-prizes">—</div><div class="stat-lbl">景品交換済</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">イベント情報</div>
+          <div id="event-info-body"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">キャッシュ管理</div>
+          <p class="section-sub">GASのキャッシュをクリアします。設定変更後や動作がおかしい場合に使用してください。（全イベント対象）</p>
+          <button class="danger-btn" id="btn-clear-cache">キャッシュをクリア</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: 設定 -->
+    <div class="tab-pane" id="tab-config">
+      <div class="loading-msg" id="config-loading"><div class="spinner"></div>イベントを選択してください</div>
+      <div id="config-content" style="display:none">
+        <div class="card">
+          <div class="card-title">景品設定</div>
+          <div class="cfg-row-half">
+            <div class="cfg-row">
+              <label>必要スタンプ数</label>
+              <div class="cfg-hint">景品獲得に必要なスタンプ数</div>
+              <input type="number" class="cfg-input" id="cfg-prizeThreshold" min="1" max="100">
+            </div>
+            <div class="cfg-row">
+              <label>景品数</label>
+              <div class="cfg-hint">交換できる景品の個数</div>
+              <input type="number" class="cfg-input" id="cfg-prizeCount" min="1" max="20">
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">期間設定</div>
+          <div class="cfg-row">
+            <label>スタンプ取得 開始日時</label>
+            <div class="cfg-hint">未設定の場合は制限なし</div>
+            <input type="datetime-local" class="cfg-input" id="cfg-stampStartAt">
+          </div>
+          <div class="cfg-row">
+            <label>スタンプ取得 終了日時</label>
+            <div class="cfg-hint">未設定の場合は制限なし</div>
+            <input type="datetime-local" class="cfg-input" id="cfg-stampEndAt">
+          </div>
+          <div class="cfg-row">
+            <label>景品交換 期限</label>
+            <div class="cfg-hint">未設定の場合は制限なし</div>
+            <input type="datetime-local" class="cfg-input" id="cfg-exchangeDeadline">
+          </div>
+          <div class="cfg-row">
+            <label>QR閲覧 公開期限</label>
+            <div class="cfg-hint">企業からの学生QR閲覧期限</div>
+            <input type="datetime-local" class="cfg-input" id="cfg-publicDeadline">
+          </div>
+        </div>
+        <button class="save-btn" id="btn-save-config">設定を保存</button>
+        <span class="save-fb" id="save-feedback"></span>
+      </div>
+    </div>
+
+    <!-- Tab: データ -->
+    <div class="tab-pane" id="tab-data">
+      <div class="loading-msg" id="data-loading"><div class="spinner"></div>イベントを選択してください</div>
+      <div id="data-content" style="display:none">
+        <div class="tab-nav" id="data-sub-nav">
+          <button class="tab-btn active" data-subtab="stamps">スタンプログ</button>
+          <button class="tab-btn" data-subtab="walkins">当日参加者</button>
+          <button class="tab-btn" data-subtab="prizes">景品交換</button>
+        </div>
+        <div class="tab-pane active" id="subtab-stamps">
+          <div class="card">
+            <div class="card-title">スタンプログ <span id="stamp-log-count" style="font-size:11px;color:var(--gray)"></span></div>
+            <div class="tbl-wrap">
+              <table class="data-tbl">
+                <thead><tr><th>時刻</th><th>氏名</th><th>大学</th><th>企業</th></tr></thead>
+                <tbody id="stamp-log-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="tab-pane" id="subtab-walkins">
+          <div class="card">
+            <div class="card-title">当日参加者 <span id="walkin-count" style="font-size:11px;color:var(--gray)"></span></div>
+            <div class="tbl-wrap">
+              <table class="data-tbl">
+                <thead><tr><th>氏名</th><th>大学</th><th>学年</th><th>メール</th></tr></thead>
+                <tbody id="walkin-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="tab-pane" id="subtab-prizes">
+          <div class="card">
+            <div class="card-title">景品交換ログ <span id="prize-log-count" style="font-size:11px;color:var(--gray)"></span></div>
+            <div class="tbl-wrap">
+              <table class="data-tbl">
+                <thead><tr><th>時刻</th><th>氏名</th><th>スタンプ数</th><th>対応者</th></tr></thead>
+                <tbody id="prize-log-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: 企業・キー -->
+    <div class="tab-pane" id="tab-keys">
+      <div class="loading-msg" id="keys-loading"><div class="spinner"></div>イベントを選択してください</div>
+      <div id="keys-content" style="display:none">
+        <div class="card">
+          <div class="card-title">当日参加登録URL</div>
+          <p class="section-sub">会場に掲示するQRコードのURL。このURLをQRコード作成サービスに貼り付けてQR画像を作成してください。</p>
+          <div class="url-box">
+            <div class="url-lbl">登録URL（WALK_IN_CODE埋め込み済み）</div>
+            <div class="url-val" id="walkin-url">—</div>
+            <button class="icon-btn" id="btn-copy-url">URLをコピー</button>
+          </div>
+          <p style="font-size:11px;color:var(--gray)">WALK_IN_CODEがGASスクリプトプロパティに未設定の場合は「—」と表示されます。</p>
+        </div>
+        <div class="card">
+          <div class="card-title">企業キー一覧</div>
+          <div style="margin-bottom:16px">
+            <button class="save-btn" id="btn-gen-keys">未発行キーを一括発行</button>
+          </div>
+          <div id="company-list"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /app-body -->
+</div><!-- /view-app -->
+
+<!-- Modal: 新規イベント作成 -->
+<div class="modal-ov" id="modal-create" style="display:none">
+  <div class="modal-card">
+    <div class="modal-hd">
+      <span class="modal-title">新規イベント作成</span>
+      <button class="modal-close" id="modal-close">✕</button>
+    </div>
+    <div class="modal-bd">
+      <p style="font-size:12px;color:var(--gray);margin-bottom:20px;line-height:1.6">
+        Googleドライブに新しいイベント用スプレッドシートを自動作成します。<br>
+        作成後、企業マスターに企業を追加してキーを発行してください。
+      </p>
+      <div class="cfg-row">
+        <label>イベントID <span style="color:var(--red)">*</span></label>
+        <div class="cfg-hint">例: 2026_rd3（小文字英数字とアンダースコアのみ）</div>
+        <input type="text" class="cfg-input" id="new-event-id" placeholder="2026_rd3">
+      </div>
+      <div class="cfg-row">
+        <label>イベント名 <span style="color:var(--red)">*</span></label>
+        <input type="text" class="cfg-input" id="new-event-name" placeholder="FORMULA GYMKHANA 2026 予選会 Rd.3">
+      </div>
+      <div class="cfg-row-half">
+        <div class="cfg-row">
+          <label>開始日 <span style="color:var(--red)">*</span></label>
+          <input type="date" class="cfg-input" id="new-start-date">
+        </div>
+        <div class="cfg-row">
+          <label>終了日 <span style="color:var(--red)">*</span></label>
+          <input type="date" class="cfg-input" id="new-end-date">
+        </div>
+      </div>
+      <p class="f-err" id="create-err"></p>
+      <button class="primary-btn" id="btn-create-event" style="margin-top:4px">作成する</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="../js/config.js"></script>
+<script src="../js/admin.js"></script>
+</body>
+</html>
