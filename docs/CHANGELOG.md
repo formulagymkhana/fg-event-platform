@@ -16,6 +16,19 @@
 
 ---
 
+## 2026-06-09 デザイン統一: card.html + start.html
+- 変更ファイル:
+  - `app/card.html`
+  - `app/start.html`
+- 変更内容:
+  - `../js/style.css` を読み込むよう `<link>` を追加。
+  - ヘッダーを dark navy → 白 (`.fg-header`) に変更。ロゴの span を `--fg-blue` バッジへ統一。
+  - `card.html`: CSS変数 (`--fg-blue`/`--fg-navy`/`--fg-bg`/`--fg-line`/`--fg-muted`/`--fg-success` 等) を参照するように inline スタイルを整理。
+  - `start.html`: `.state-icon` を style.css の淡い青カードに統一。`.start-btn` → `.btn-primary`。成功アイコン `.success-icon` も `--fg-blue-soft/--fg-blue` カラーに統一。進捗バーを `--fg-blue` グラデーションへ変更。`.guide-num` を `--fg-blue` に変更。
+  - JS・ID・データ属性・ロジック系は一切変更なし。
+- 理由/背景: デザイン統一タスク（commit 2/5）。
+- 申し送り/注意点: なし
+
 ## 2026-06-09 registerExistingEvent の STATUS を 準備中 に修正
 - 変更ファイル:
   - `docs/gas-patches/admin.gs.final.txt`

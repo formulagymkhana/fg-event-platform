@@ -3,130 +3,117 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-
-  <!-- セキュリティポリシー: スクリプトは同一オリジンのみ、通信先はGASのドメインのみ許可 -->
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'self';
              script-src 'self';
              connect-src https://script.google.com
                          https://script.googleusercontent.com;
              style-src 'self' 'unsafe-inline';">
-
   <title>FORMULA GYMKHANA — 学生情報</title>
+  <link rel="stylesheet" href="../js/style.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { display: flex; flex-direction: column; align-items: center; padding: 24px 16px 48px; }
 
-    /* ベース */
-    body {
-      font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
-      background: #F0F3F7;
-      min-height: 100vh;
-    }
-
-    /* PC表示: カードを中央寄せ */
     @media (min-width: 680px) {
-      body { background: #D4DBE6; display: flex; justify-content: center; align-items: flex-start; padding: 48px 20px; }
-      #card-wrapper { width: 420px; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 40px rgba(11,37,69,0.18); }
+      body { background: #D4DBE6; justify-content: flex-start; padding: 48px 20px; }
+      #card-wrapper { width: 420px; border-radius: var(--radius-card); overflow: hidden; box-shadow: var(--shadow-card); }
     }
 
-    /* ローディング画面 */
     #state-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 16px; }
-    .spinner { width: 32px; height: 32px; border: 3px solid #D4DBE6; border-top-color: #0B2545; border-radius: 50%; animation: spin 0.8s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    #state-error   { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 40px 24px; text-align: center; }
+    .error-title   { font-size: 17px; font-weight: 600; color: var(--fg-text); margin-bottom: 8px; }
+    .error-msg     { font-size: 13px; color: var(--fg-muted); line-height: 1.7; }
 
-    /* エラー画面 */
-    #state-error { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 40px 24px; text-align: center; }
-    .error-title { font-size: 17px; font-weight: 600; color: #1A2733; margin-bottom: 8px; }
-    .error-msg   { font-size: 13px; color: #6B7A8D; line-height: 1.7; }
+    #state-card    { display: none; }
+    #card-wrapper  { background: var(--fg-bg); width: 100%; max-width: 420px; }
 
-    /* カード本体 */
-    #state-card  { display: none; }
-    #card-wrapper { background: #F0F3F7; }
+    /* ヘッダー（card は logo + イベント名横並び） */
+    .fg-header {
+      background: #fff;
+      padding: 16px 20px 12px;
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid var(--fg-line);
+    }
+    .fg-logo { font-size: 13px; font-weight: 800; letter-spacing: 0.04em; color: #111827; }
+    .fg-logo span { background: var(--fg-blue); color: #fff; padding: 2px 7px; border-radius: 3px; margin-left: 4px; }
+    .fg-event-name { margin-left: auto; font-size: 11px; color: var(--fg-muted); }
 
-    /* ヘッダーバー */
-    .fg-header { background: #0B2545; padding: 13px 20px; display: flex; align-items: center; gap: 10px; }
-    .fg-logo { font-size: 11px; font-weight: 700; letter-spacing: 0.15em; color: #fff; }
-    .fg-logo span { background: #fff; color: #0B2545; padding: 1px 6px; border-radius: 2px; margin-left: 2px; }
-    .fg-event-name { margin-left: auto; font-size: 11px; color: #8BA3C4; }
-
-    /* カテゴリバナー(背景色は属性によって変わる) */
+    /* カテゴリバナー */
     .category-banner { padding: 20px 20px 18px; display: flex; align-items: flex-end; justify-content: space-between; }
     .sid-label { font-size: 10px; opacity: 0.55; letter-spacing: 0.1em; margin-bottom: 4px; }
     .sid-value { font-size: 20px; font-weight: 700; letter-spacing: 0.1em; }
-    .cat-badge { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; padding: 6px 14px; font-size: 13px; font-weight: 500; letter-spacing: 0.04em; }
+    .cat-badge { background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.35); border-radius: 5px; padding: 6px 14px; font-size: 13px; font-weight: 500; letter-spacing: 0.04em; }
 
     /* 氏名ブロック */
-    .name-block { background: #fff; padding: 20px 20px 16px; border-bottom: 0.5px solid #E0E6ED; }
-    .furigana    { font-size: 12px; color: #8BA3C4; margin-bottom: 4px; }
-    .name-main   { font-size: 28px; font-weight: 700; color: #0B2545; letter-spacing: 0.04em; }
+    .name-block  { background: #fff; padding: 20px 20px 16px; border-bottom: 1px solid var(--fg-line); }
+    .furigana    { font-size: 12px; color: var(--fg-muted); margin-bottom: 4px; }
+    .name-main   { font-size: 28px; font-weight: 700; color: var(--fg-navy); letter-spacing: 0.04em; }
     .school-main { margin-top: 10px; font-size: 14px; color: #2D4A6A; font-weight: 500; }
-    .school-sub  { font-size: 12px; color: #6B7A8D; margin-top: 2px; }
+    .school-sub  { font-size: 12px; color: var(--fg-muted); margin-top: 2px; }
 
-    /* 詳細情報行 */
+    /* 詳細情報 */
     .info-section { background: #fff; margin-top: 8px; padding: 4px 20px 8px; }
-    .info-row { display: flex; padding: 9px 0; border-bottom: 0.5px solid #E8ECF0; }
-    .info-label { font-size: 12px; color: #6B7A8D; min-width: 130px; flex-shrink: 0; line-height: 1.6; }
-    .info-value { font-size: 13px; color: #1A2733; line-height: 1.6; word-break: break-all; }
+    .info-row     { display: flex; padding: 9px 0; border-bottom: 1px solid var(--fg-line); }
+    .info-label   { font-size: 12px; color: var(--fg-muted); min-width: 130px; flex-shrink: 0; line-height: 1.6; }
+    .info-value   { font-size: 13px; color: var(--fg-text); line-height: 1.6; word-break: break-all; }
 
-    /* メールアドレス行(タップでコピー) */
-    .email-row { display: flex; align-items: center; padding: 11px 12px; margin: 4px -12px 0; border-bottom: 0.5px solid #E8ECF0; border-radius: 6px; cursor: pointer; transition: background 0.15s; }
-    .email-row:active { background: #F0FFF6; }
-    .email-label  { font-size: 12px; color: #6B7A8D; min-width: 130px; flex-shrink: 0; }
-    .email-value  { font-size: 13px; color: #0B4E8C; font-weight: 500; text-decoration: underline; text-decoration-color: #B8D0EC; word-break: break-all; flex: 1; }
-    .email-copied { font-size: 13px; color: #1A6640; font-weight: 500; flex: 1; }
-    .copy-badge   { font-size: 11px; color: #fff; background: #0B2545; padding: 2px 8px; border-radius: 100px; flex-shrink: 0; margin-left: 8px; white-space: nowrap; }
+    /* メールアドレス行 */
+    .email-row    { display: flex; align-items: center; padding: 11px 12px; margin: 4px -12px 0; border-bottom: 1px solid var(--fg-line); border-radius: 8px; cursor: pointer; transition: background 0.15s; }
+    .email-row:active { background: var(--fg-success-bg); }
+    .email-label  { font-size: 12px; color: var(--fg-muted); min-width: 130px; flex-shrink: 0; }
+    .email-value  { font-size: 13px; color: var(--fg-blue); font-weight: 500; text-decoration: underline; text-decoration-color: var(--fg-blue-border); word-break: break-all; flex: 1; }
+    .email-copied { font-size: 13px; color: var(--fg-success); font-weight: 500; flex: 1; }
+    .copy-badge   { font-size: 11px; color: #fff; background: var(--fg-blue); padding: 2px 8px; border-radius: 100px; flex-shrink: 0; margin-left: 8px; white-space: nowrap; }
 
-    /* 全項目コピーボタン */
-    .action-section { padding: 14px 16px 0; }
-    .copy-all-btn { width: 100%; padding: 14px; background: #0B2545; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; letter-spacing: 0.04em; transition: background 0.2s; }
-    .copy-all-btn.copied { background: #1A6640; }
-    .copy-preview { display: none; margin-top: 8px; padding: 12px 14px; background: #F8FAFB; border: 0.5px solid #D8E2EC; border-radius: 6px; font-size: 11px; color: #6B7A8D; font-family: monospace; white-space: pre-line; line-height: 1.9; }
+    /* コピーボタン */
+    .action-section { padding: 16px 16px 0; }
+    .copy-all-btn   { width: 100%; padding: 15px; background: var(--fg-blue); color: #fff; border: none; border-radius: var(--radius-ui); font-size: 15px; font-weight: 600; cursor: pointer; letter-spacing: 0.03em; transition: background 0.15s; }
+    .copy-all-btn:active { background: #0047A0; }
+    .copy-all-btn.copied { background: var(--fg-success); }
+    .copy-preview { display: none; margin-top: 8px; padding: 12px 14px; background: var(--fg-bg); border: 1px solid var(--fg-line); border-radius: 8px; font-size: 11px; color: var(--fg-muted); font-family: monospace; white-space: pre-line; line-height: 1.9; }
+    .copy-note    { font-size: 12px; color: var(--fg-muted); text-align: center; margin-top: 10px; line-height: 1.6; }
 
-    /* 後日再閲覧アコーディオン */
+    /* 後日再閲覧 */
     .view-section { padding: 12px 16px 0; }
-    .accordion { background: #fff; border-radius: 8px; border: 0.5px solid #E0E6ED; overflow: hidden; }
-    .acc-toggle { width: 100%; padding: 14px 16px; background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; text-align: left; }
-    .acc-title { font-size: 13px; font-weight: 500; color: #1A2733; }
-    .acc-sub   { font-size: 11px; color: #8BA3C4; margin-top: 2px; }
-    .acc-arrow { font-size: 16px; color: #8BA3C4; transition: transform 0.2s; }
+    .accordion    { background: #fff; border-radius: 10px; border: 1px solid var(--fg-line); overflow: hidden; }
+    .acc-toggle   { width: 100%; padding: 14px 16px; background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; text-align: left; }
+    .acc-title    { font-size: 13px; font-weight: 500; color: var(--fg-text); }
+    .acc-sub      { font-size: 11px; color: var(--fg-muted); margin-top: 2px; }
+    .acc-arrow    { font-size: 16px; color: var(--fg-muted); transition: transform 0.2s; }
     .acc-arrow.open { transform: rotate(180deg); }
-    .acc-body  { display: none; padding: 0 16px 16px; border-top: 0.5px solid #E8ECF0; }
+    .acc-body     { display: none; padding: 0 16px 16px; border-top: 1px solid var(--fg-line); }
     .acc-body.open { display: block; }
-    .view-input { width: 100%; padding: 10px 12px; border: 0.5px solid #C8D4E0; border-radius: 6px; font-size: 13px; margin: 12px 0 8px; }
-    .view-btn { width: 100%; padding: 11px; background: #C8D4E0; color: #8BA3C4; border: none; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.2s, color 0.2s; }
-    .view-btn.active { background: #0B2545; color: #fff; }
-    .view-deadline { font-size: 11px; color: #8BA3C4; margin-top: 8px; text-align: center; }
-    .view-saved    { display: none; padding-top: 12px; text-align: center; font-size: 13px; color: #1A6640; }
+    .view-input   { width: 100%; padding: 10px 12px; border: 1px solid var(--fg-line); border-radius: 8px; font-size: 13px; margin: 12px 0 8px; }
+    .view-btn     { width: 100%; padding: 11px; background: var(--fg-line); color: var(--fg-muted); border: none; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.2s, color 0.2s; }
+    .view-btn.active { background: var(--fg-blue); color: #fff; }
+    .view-deadline { font-size: 11px; color: var(--fg-muted); margin-top: 8px; text-align: center; }
+    .view-saved    { display: none; padding-top: 12px; text-align: center; font-size: 13px; color: var(--fg-success); }
 
     .privacy-note { padding: 20px 20px 32px; font-size: 11px; color: #A0AEBB; text-align: center; line-height: 1.8; }
   </style>
 </head>
 <body>
 
-  <!-- API呼び出し中に表示するローディング画面 -->
   <div id="state-loading">
     <div class="spinner"></div>
-    <p style="font-size:13px;color:#6B7A8D;">読み込み中...</p>
+    <p style="font-size:13px;color:var(--fg-muted);">読み込み中...</p>
   </div>
 
-  <!-- トークン無効・期限切れ等のエラー時に表示 -->
   <div id="state-error">
     <p style="font-size:36px;margin-bottom:16px;">⚠</p>
     <p class="error-title" id="error-title">エラー</p>
     <p class="error-msg"   id="error-msg"></p>
   </div>
 
-  <!-- 学生情報カード本体(データ取得後に表示) -->
   <div id="state-card">
     <div id="card-wrapper">
 
-      <!-- ロゴ・イベント名ヘッダー -->
       <div class="fg-header">
         <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
         <div class="fg-event-name" id="event-name"></div>
       </div>
 
-      <!-- 属性バナー(背景色はcard.jsで動的に設定) -->
       <div class="category-banner" id="cat-banner">
         <div>
           <div class="sid-label" id="sid-label">STUDENT ID</div>
@@ -135,7 +122,6 @@
         <div class="cat-badge" id="cat-badge"></div>
       </div>
 
-      <!-- 氏名・大学情報 -->
       <div class="name-block">
         <div class="furigana"    id="furigana"></div>
         <div class="name-main"   id="name"></div>
@@ -143,7 +129,6 @@
         <div class="school-sub"  id="school-sub"></div>
       </div>
 
-      <!-- 詳細情報(在籍年数・住所・生年月日・メール) -->
       <div class="info-section">
         <div class="info-row">
           <span class="info-label">自動車部の在籍年数</span>
@@ -157,7 +142,6 @@
           <span class="info-label">生年月日</span>
           <span class="info-value" id="birthday"></span>
         </div>
-        <!-- タップするとメールアドレスをコピー -->
         <div class="email-row" id="email-row" onclick="copyEmail()">
           <span class="email-label">メールアドレス</span>
           <span class="email-value" id="email"></span>
@@ -165,15 +149,12 @@
         </div>
       </div>
 
-      <!-- 全項目をタブ区切りでコピー(Excelに貼り付け対応) -->
       <div class="action-section">
-        <button class="copy-all-btn" id="copy-all-btn" onclick="copyAll()">
-          一覧をコピー（全項目）
-        </button>
+        <button class="copy-all-btn" id="copy-all-btn" onclick="copyAll()">一覧をコピー（全項目）</button>
         <pre class="copy-preview" id="copy-preview"></pre>
+        <p class="copy-note">閲覧ログは自動保存されます。<br>後日、企業別リストとして出力できます。</p>
       </div>
 
-      <!-- 後日再閲覧用メール登録フォーム(折りたたみ) -->
       <div class="view-section">
         <div class="accordion">
           <button class="acc-toggle" onclick="toggleAcc()">
@@ -205,7 +186,6 @@
     </div>
   </div>
 
-  <!-- 設定・API・カードロジックの順に読み込む -->
   <script src="../js/config.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/card.js"></script>

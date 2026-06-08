@@ -11,54 +11,56 @@
              style-src 'self' 'unsafe-inline';
              media-src blob:;">
   <title>FORMULA GYMKHANA — スタンプラリー開始</title>
+  <link rel="stylesheet" href="../js/style.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif; background: #F0F3F7; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
-    .card { background: #fff; border-radius: 16px; width: 100%; max-width: 360px; overflow: hidden; box-shadow: 0 4px 24px rgba(11,37,69,0.10); }
-    .fg-header { background: #0B2545; padding: 13px 20px; display: flex; align-items: center; gap: 10px; }
-    .fg-logo { font-size: 11px; font-weight: 700; letter-spacing: 0.15em; color: #fff; }
-    .fg-logo span { background: #fff; color: #0B2545; padding: 1px 6px; border-radius: 2px; margin-left: 2px; }
-    .fg-page-name { margin-left: auto; font-size: 11px; color: #8BA3C4; }
-    .card-body { padding: 32px 24px 28px; text-align: center; }
-    .state-icon  { font-size: 52px; margin-bottom: 16px; }
-    .state-title { font-size: 18px; font-weight: 700; color: #0B2545; margin-bottom: 8px; }
-    .state-msg   { font-size: 13px; color: #6B7A8D; line-height: 1.75; margin-bottom: 24px; }
-    .start-btn { width: 100%; padding: 16px; background: #0B2545; color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; letter-spacing: 0.04em; transition: background 0.2s; }
-    .start-btn:active { background: #1A4A80; }
-    .start-btn.gray { background: #6B7A8D; margin-top: 12px; }
+    body { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+
+    .card { width: 100%; max-width: 360px; }
+
+    /* QRスキャン */
     #scan-wrapper { position: relative; width: 100%; aspect-ratio: 1/1; background: #000; overflow: hidden; }
-    #scan-video { width: 100%; height: 100%; object-fit: cover; }
-    .scan-guide { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-    .scan-frame { width: 60%; aspect-ratio: 1/1; position: relative; }
-    .scan-frame::before,.scan-frame::after,.scan-frame-inner::before,.scan-frame-inner::after { content:''; position:absolute; width:20px; height:20px; border-color:#fff; border-style:solid; }
-    .scan-frame::before  { top:0;    left:0;  border-width:3px 0 0 3px; }
-    .scan-frame::after   { top:0;    right:0; border-width:3px 3px 0 0; }
-    .scan-frame-inner::before { bottom:0; left:0;  border-width:0 0 3px 3px; }
-    .scan-frame-inner::after  { bottom:0; right:0; border-width:0 3px 3px 0; }
-    .scan-line { position:absolute; left:5%; right:5%; height:2px; background:rgba(255,255,255,0.7); animation:scanMove 2s ease-in-out infinite; top:10%; }
-    @keyframes scanMove { 0%,100%{top:10%} 50%{top:85%} }
-    .scan-label { position:absolute; bottom:12px; left:0; right:0; text-align:center; font-size:13px; color:rgba(255,255,255,0.8); }
-    .cancel-btn { width:100%; padding:13px; background:#F0F3F7; color:#6B7A8D; border:none; font-size:13px; cursor:pointer; }
-    .cancel-btn:active { background:#D4DBE6; }
-    .spinner { width:36px; height:36px; border:3px solid #D4DBE6; border-top-color:#0B2545; border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 16px; }
-    @keyframes spin { to{transform:rotate(360deg)} }
-    .success-icon { width:72px; height:72px; border-radius:50%; background:#0B2545; color:#fff; font-size:32px; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; animation:popIn 0.4s cubic-bezier(0.175,0.885,0.32,1.275); }
-    @keyframes popIn { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
-    .result-count { font-size:13px; color:#6B7A8D; margin:10px 0 20px; }
-    .bar-track { width:100%; height:14px; background:#E8ECF0; border-radius:100px; overflow:hidden; margin-top:16px; }
-    .bar-fill { height:100%; background:linear-gradient(90deg,#0B2545,#1A4A80); border-radius:100px; width:0; transition:width 0.6s ease 0.2s; }
-    .action-link { display:block; margin-top:12px; padding:12px; border-radius:8px; font-size:13px; text-decoration:none; text-align:center; }
-    .action-link.primary   { background:#0B2545; color:#fff; }
-    .action-link.secondary { background:#F0F3F7; color:#0B2545; }
-    .already-sub { font-size:12px; color:#8BA3C4; margin-top:12px; }
-    /* 登録完了の遊び方ガイド */
-    .welcome-sub { font-size:14px; color:#6B7A8D; margin-bottom:20px; }
-    .guide-box { background:#F0F3F7; border-radius:10px; padding:16px 16px 14px; margin-bottom:20px; text-align:left; }
-    .guide-step { display:flex; align-items:flex-start; gap:10px; margin-bottom:12px; }
-    .guide-step:last-child { margin-bottom:0; }
-    .guide-num { width:22px; height:22px; border-radius:50%; background:#0B2545; color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-    .guide-text { font-size:13px; color:#1A2733; line-height:1.5; padding-top:1px; }
-    .guide-text b { color:#0B2545; }
+    #scan-video   { width: 100%; height: 100%; object-fit: cover; }
+    .scan-guide   { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+    .scan-frame   { width: 60%; aspect-ratio: 1/1; position: relative; }
+    .scan-frame::before, .scan-frame::after, .scan-frame-inner::before, .scan-frame-inner::after {
+      content: ''; position: absolute; width: 20px; height: 20px; border-color: #fff; border-style: solid;
+    }
+    .scan-frame::before         { top: 0;    left: 0;  border-width: 3px 0 0 3px; }
+    .scan-frame::after          { top: 0;    right: 0; border-width: 3px 3px 0 0; }
+    .scan-frame-inner::before   { bottom: 0; left: 0;  border-width: 0 0 3px 3px; }
+    .scan-frame-inner::after    { bottom: 0; right: 0; border-width: 0 3px 3px 0; }
+    .scan-line  { position: absolute; left: 5%; right: 5%; height: 2px; background: rgba(255,255,255,0.7); animation: scanMove 2s ease-in-out infinite; top: 10%; }
+    @keyframes scanMove { 0%, 100% { top: 10%; } 50% { top: 85%; } }
+    .scan-label { position: absolute; bottom: 12px; left: 0; right: 0; text-align: center; font-size: 13px; color: rgba(255,255,255,0.8); }
+    .cancel-btn { width: 100%; padding: 13px; background: var(--fg-bg); color: var(--fg-muted); border: none; font-size: 13px; cursor: pointer; border-top: 1px solid var(--fg-line); }
+    .cancel-btn:active { background: #D4DBE6; }
+
+    /* 成功アイコン（ポップイン） */
+    .success-icon {
+      width: 72px; height: 72px; border-radius: 20px;
+      background: var(--fg-blue-soft); color: var(--fg-blue);
+      font-size: 32px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+    /* 進捗バー（start.html / stamp.html 共通） */
+    .bar-track { width: 100%; height: 10px; background: var(--fg-line); border-radius: 100px; overflow: hidden; margin-top: 16px; }
+    .bar-fill  { height: 100%; background: linear-gradient(90deg, var(--fg-blue), #4A9BE8); border-radius: 100px; width: 0; transition: width 0.6s ease 0.2s; }
+
+    .result-count { font-size: 13px; color: var(--fg-muted); margin: 8px 0 16px; }
+    .already-sub  { font-size: 12px; color: var(--fg-muted); margin-top: 12px; }
+
+    /* 遊び方ガイド */
+    .welcome-sub { font-size: 14px; color: var(--fg-muted); margin-bottom: 20px; }
+    .guide-box   { background: var(--fg-bg); border-radius: 12px; padding: 16px 16px 14px; margin-bottom: 20px; text-align: left; }
+    .guide-step  { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+    .guide-step:last-child { margin-bottom: 0; }
+    .guide-num  { width: 22px; height: 22px; border-radius: 50%; background: var(--fg-blue); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .guide-text { font-size: 13px; color: var(--fg-text); line-height: 1.5; padding-top: 1px; }
+    .guide-text b { color: var(--fg-navy); }
   </style>
 </head>
 <body>
@@ -74,7 +76,7 @@
       <p class="state-title">スタンプラリーを<br>始めましょう！</p>
       <p class="state-msg">自分の学生QR名刺をカメラで<br>読み取って登録します。</p>
       <!-- onclick は使わず start.js で addEventListener -->
-      <button class="start-btn" id="btn-start">📷 QRコードを読み取る</button>
+      <button class="btn-primary" id="btn-start">📷 QRコードを読み取る</button>
     </div>
   </div>
 
@@ -105,7 +107,7 @@
     </div>
     <div class="card-body">
       <div class="spinner"></div>
-      <p style="font-size:13px;color:#6B7A8D;">登録中...</p>
+      <p style="font-size:13px;color:var(--fg-muted);">登録中...</p>
     </div>
   </div>
 
@@ -184,7 +186,7 @@
       <div class="state-icon">⚠</div>
       <p class="state-title" id="error-title">エラー</p>
       <p class="state-msg"   id="error-msg"></p>
-      <button class="start-btn" id="btn-retry">もう一度試す</button>
+      <button class="btn-primary" id="btn-retry">もう一度試す</button>
     </div>
   </div>
 
