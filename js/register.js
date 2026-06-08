@@ -54,6 +54,9 @@ async function handleSubmit() {
     email:      val_('f-email'),
     phone:      val_('f-phone'),
     prefecture: val_('f-prefecture'),
+    // 同意記録（送信時点で両方チェック必須なので通常 'true'）
+    snsConsent:     document.getElementById('cb-media').checked   ? 'true' : 'false',
+    privacyConsent: document.getElementById('cb-privacy').checked ? 'true' : 'false',
   };
 
   const res = await FG_API.registerWalkIn(params);

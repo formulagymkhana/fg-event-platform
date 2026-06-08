@@ -12,7 +12,8 @@
 const STUDENT_COLS = [
   'studentId', 'cardToken', '氏名', 'ふりがな', '大学名',  // T11: token → cardToken
   '学部学科', '学年', '属性', '自動車部在籍年数',
-  '住所(都道府県)', '生年月日', 'メールアドレス', '電話番号', '登録種別', // T6: 電話番号追加
+  '住所(都道府県)', '生年月日', 'メールアドレス', '電話番号',
+  'SNS同意', '個人情報同意', '登録種別', // T6:電話番号 / 同意記録2列を追加
 ];
 
 const CLASS_CODES = {
@@ -230,7 +231,7 @@ function importStudents(eventId) {
     existing.forEach(row => {
       const n = row[STUDENT_COLS.indexOf('氏名')];
       const s = row[STUDENT_COLS.indexOf('大学名')];
-      const t = row[STUDENT_COLS.indexOf('token')];
+      const t = row[STUDENT_COLS.indexOf('cardToken')]; // T11修正: token→cardToken（再生成防止）
       if (n && s && t) existingTokens.set(n + '|' + s, t);
     });
   }
@@ -283,8 +284,11 @@ function importStudents(eventId) {
         school, get(row, '学部学科'), get(row, '学年'), category,
         get(row, '自動車部所属何年目ですか？'), get(row, '住所(都道府県)'),
         birthday instanceof Date ? Utilities.formatDate(birthday, Session.getScriptTimeZone(), 'yyyy/MM/dd') : String(birthday || ''),
-        get(row, 'メールアドレス'), '事前',
-      ]);
+        get(row, 'メールアドレス'),
+        get(row, '電話番号') || '',  // 電話番号（事前申込フォームにあれば取得）
+        'true', 'true',              // SNS同意 / 個人情報同意（事前申込フォーム送信時に同意済み）
+        '事前',                      // 登録種別
+      ]); // ↑ STUDENT_COLS(16列)と完全一致させ列ズレ/列数不一致を修正
     });
   });
 
