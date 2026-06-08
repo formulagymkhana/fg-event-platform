@@ -44,16 +44,18 @@ async function handleSubmit() {
 
   const params = {
     code,
-    name:       val_('f-name'),
-    furigana:   val_('f-furigana'),
-    school:     val_('f-school'),
-    department: val_('f-department'),
+    name:       val_('f-name').trim(),
+    furigana:   val_('f-furigana').trim(),
+    school:     val_('f-school').trim(),
+    department: val_('f-department').trim(),
     year:       val_('f-year'),
+    gender:     radioVal_('gender'),       // 性別（フォーム準拠で追加）
     clubYears:  val_('f-club-years'),
     birthday:   val_('f-birthday'),
-    email:      val_('f-email'),
-    phone:      val_('f-phone'),
+    email:      val_('f-email').trim(),
+    phone:      val_('f-phone').trim(),
     prefecture: val_('f-prefecture'),
+    competing:  radioVal_('competing'),    // 所属校が出場するか（記録対象に）
     // 同意記録（送信時点で両方チェック必須なので通常 'true'）
     snsConsent:     document.getElementById('cb-media').checked   ? 'true' : 'false',
     privacyConsent: document.getElementById('cb-privacy').checked ? 'true' : 'false',
@@ -87,17 +89,35 @@ async function handleSubmit() {
 function validateForm_() {
   let ok = true;
 
-  if (!val_('f-name').trim()) {
+  // 氏名: 入力必須 + 姓名の間に半角スペース（フォーム規則）
+  const name = val_('f-name').trim();
+  if (!name) {
+    setErrText_('err-name', '氏名を入力してください');
+    showErr_('err-name', 'f-name'); ok = false;
+  } else if (!/ /.test(name)) {
+    setErrText_('err-name', '姓と名の間に半角スペースを入れてください');
     showErr_('err-name', 'f-name'); ok = false;
   }
-  if (!val_('f-furigana').trim()) {
+
+  // ふりがな: 必須 + ひらがな＋半角スペースのみ + スペース区切り
+  const furigana = val_('f-furigana').trim();
+  if (!furigana) {
+    setErrText_('err-furigana', 'ふりがなを入力してください');
+    showErr_('err-furigana', 'f-furigana'); ok = false;
+  } else if (!/^[ぁ-んー]+ [ぁ-んー]+$/.test(furigana)) {
+    setErrText_('err-furigana', 'ひらがなで「せい めい」のように半角スペース区切りで入力してください');
     showErr_('err-furigana', 'f-furigana'); ok = false;
   }
+
   if (!val_('f-school').trim()) {
     showErr_('err-school', 'f-school'); ok = false;
   }
   if (!val_('f-year')) {
     showErr_('err-year', 'f-year'); ok = false;
+  }
+  // 性別: 必須（フォーム準拠で追加）
+  if (!radioVal_('gender')) {
+    showErr_('err-gender'); ok = false;
   }
   if (!val_('f-birthday')) {
     showErr_('err-birthday', 'f-birthday'); ok = false;
@@ -106,7 +126,13 @@ function validateForm_() {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     showErr_('err-email', 'f-email'); ok = false;
   }
-  if (!val_('f-phone').trim()) {
+  // 電話番号: 必須 + ハイフン無し半角数字のみ（フォーム規則）
+  const phone = val_('f-phone').trim();
+  if (!phone) {
+    setErrText_('err-phone', '電話番号を入力してください');
+    showErr_('err-phone', 'f-phone'); ok = false;
+  } else if (!/^[0-9]{10,11}$/.test(phone)) {
+    setErrText_('err-phone', 'ハイフン無しの半角数字で入力してください（10〜11桁）');
     showErr_('err-phone', 'f-phone'); ok = false;
   }
   if (!document.getElementById('cb-media').checked) {
@@ -134,6 +160,18 @@ function showErr_(errId, inputId) {
     const inp = document.getElementById(inputId);
     if (inp) inp.classList.add('error');
   }
+}
+
+/** エラーメッセージ文言を動的に差し替える */
+function setErrText_(errId, text) {
+  const el = document.getElementById(errId);
+  if (el) el.textContent = text;
+}
+
+/** name属性で指定したラジオボタンの選択値を返す（未選択は ''） */
+function radioVal_(name) {
+  const el = document.querySelector(`input[name="${name}"]:checked`);
+  return el ? el.value : '';
 }
 
 function clearErrors_() {
