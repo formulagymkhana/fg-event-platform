@@ -57,6 +57,7 @@ function renderProgress(d) {
 
   const pct = Math.min(100, Math.round((count / threshold) * 100));
   document.getElementById('bar-fill').style.width = pct + '%';
+  document.querySelector('.progress-ring')?.style.setProperty('--pct', pct);
   setText('bar-label', `${count} / ${threshold} 個`);
 
   // ステータス(優先度: 交換済み > 達成 > 進行中)

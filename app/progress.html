@@ -10,53 +10,49 @@
                          https://script.googleusercontent.com;
              style-src 'self' 'unsafe-inline';">
   <title>FORMULA GYMKHANA — スタンプ進捗</title>
+  <link rel="stylesheet" href="../js/style.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif; background: #F0F3F7; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 24px; }
-    .card { background: #fff; border-radius: 16px; width: 100%; max-width: 420px; overflow: hidden; box-shadow: 0 4px 24px rgba(11,37,69,0.10); }
-    .fg-header { background: #0B2545; padding: 13px 20px; display: flex; align-items: center; gap: 10px; }
-    .fg-logo { font-size: 11px; font-weight: 700; letter-spacing: 0.15em; color: #fff; }
-    .fg-logo span { background: #fff; color: #0B2545; padding: 1px 6px; border-radius: 2px; margin-left: 2px; }
-    .fg-page-name { margin-left: auto; font-size: 11px; color: #8BA3C4; }
-    .spinner { width: 36px; height: 36px; border: 3px solid #D4DBE6; border-top-color: #0B2545; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 32px auto 16px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .card-body { padding: 28px 24px; }
-    .state-icon  { font-size: 40px; text-align: center; margin-bottom: 12px; }
-    .state-title { font-size: 16px; font-weight: 600; color: #1A2733; text-align: center; margin-bottom: 8px; }
-    .state-msg   { font-size: 13px; color: #6B7A8D; text-align: center; line-height: 1.7; }
-    .progress-summary { text-align: center; padding: 28px 24px 0; }
-    .progress-label { font-size: 12px; color: #8BA3C4; margin-bottom: 6px; }
-    .big-count { font-size: 44px; font-weight: 700; color: #0B2545; line-height: 1; }
-    .big-count .unit { font-size: 18px; font-weight: 500; color: #6B7A8D; margin-left: 4px; }
-    .bar-wrap { padding: 0 24px; margin-top: 20px; }
-    .bar-track { width: 100%; height: 14px; background: #E8ECF0; border-radius: 100px; overflow: hidden; }
-    .bar-fill { height: 100%; background: linear-gradient(90deg, #0B2545, #1A4A80); border-radius: 100px; width: 0; transition: width 0.6s ease; }
-    .bar-label { font-size: 12px; color: #6B7A8D; text-align: center; margin-top: 8px; }
-    .status-msg { margin: 18px 24px 0; padding: 14px 16px; border-radius: 10px; font-size: 14px; text-align: center; }
-    .status-msg.cleared { background: linear-gradient(135deg, #0B2545, #1A4A80); color: #fff; font-weight: 600; }
-    .status-msg.cleared .status-sub { font-size: 12px; font-weight: 400; opacity: 0.85; margin-top: 4px; }
-    .status-msg.exchanged { background: #EAF3EC; color: #1A6640; font-weight: 600; }
-    .status-msg.in-progress { background: #F0F3F7; color: #6B7A8D; }
+    body { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; padding: 24px; }
 
-    /* 景品引換アクション(学生側) */
+    .card { width: 100%; max-width: 420px; }
+
+    .card-body { padding: 28px 24px; }
+
+    /* ローディングスピナー位置 */
+    .spinner { margin: 32px auto 16px; }
+
+    /* ステータスメッセージ */
+    .status-msg { margin: 18px 24px 0; padding: 14px 16px; border-radius: 10px; font-size: 14px; text-align: center; }
+    .status-msg.cleared {
+      background: linear-gradient(135deg, var(--fg-blue), #2E7DD1);
+      color: #fff; font-weight: 600;
+    }
+    .status-msg.cleared .status-sub { font-size: 12px; font-weight: 400; opacity: 0.85; margin-top: 4px; }
+    .status-msg.exchanged  { background: var(--fg-success-bg); color: var(--fg-success); font-weight: 600; border: 1px solid var(--fg-success-border); }
+    .status-msg.in-progress { background: var(--fg-bg); color: var(--fg-muted); border: 1px solid var(--fg-line); }
+
+    /* 景品引換アクション */
     .exchange-action { padding: 14px 24px 0; }
-    .exchange-btn { width: 100%; padding: 15px; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; background: #1A6640; color: #fff; }
+    .exchange-btn { width: 100%; padding: 15px; border: none; border-radius: var(--radius-ui); font-size: 15px; font-weight: 700; cursor: pointer; background: var(--fg-success); color: #fff; }
     .exchange-btn:active { background: #248052; }
     .exchange-btn.confirm { background: #C0392B; }
     .exchange-note { font-size: 11px; color: #9A2A2A; text-align: center; margin-top: 8px; line-height: 1.6; }
-    .confirm-text { font-size: 14px; color: #1A2733; text-align: center; margin-bottom: 12px; font-weight: 600; line-height: 1.6; }
-    .cancel-link { display: block; width: 100%; padding: 10px; margin-top: 8px; background: none; border: none; color: #8BA3C4; font-size: 13px; cursor: pointer; text-decoration: underline; }
+    .confirm-text { font-size: 14px; color: var(--fg-text); text-align: center; margin-bottom: 12px; font-weight: 600; line-height: 1.6; }
+    .cancel-link  { display: block; width: 100%; padding: 10px; margin-top: 8px; background: none; border: none; color: var(--fg-muted); font-size: 13px; cursor: pointer; text-decoration: underline; }
 
+    /* スタンプ履歴 */
     .stamp-list-section { padding: 22px 24px 0; }
-    .section-label { font-size: 11px; font-weight: 600; color: #8BA3C4; letter-spacing: 0.08em; margin-bottom: 12px; }
-    .stamp-list { border-top: 0.5px solid #E8ECF0; }
-    .stamp-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 0.5px solid #E8ECF0; }
-    .stamp-check { width: 26px; height: 26px; border-radius: 50%; background: #0B2545; color: #fff; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .stamp-company { flex: 1; font-size: 14px; font-weight: 500; color: #1A2733; }
-    .stamp-time    { font-size: 11px; color: #8BA3C4; white-space: nowrap; }
-    .no-stamps { padding: 24px 0; text-align: center; font-size: 13px; color: #A0AEBB; }
+    .section-label { font-size: 11px; font-weight: 600; color: var(--fg-muted); letter-spacing: 0.08em; margin-bottom: 12px; }
+    .stamp-list    { border-top: 1px solid var(--fg-line); }
+    .stamp-item    { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--fg-line); }
+    .stamp-check   { width: 26px; height: 26px; border-radius: 50%; background: var(--fg-blue); color: #fff; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .stamp-company { flex: 1; font-size: 14px; font-weight: 500; color: var(--fg-text); }
+    .stamp-time    { font-size: 11px; color: var(--fg-muted); white-space: nowrap; }
+    .no-stamps     { padding: 24px 0; text-align: center; font-size: 13px; color: #A0AEBB; }
+
+    /* フッター */
     .card-footer { padding: 18px 24px 24px; }
-    .reload-btn { width: 100%; padding: 12px; background: #F0F3F7; color: #6B7A8D; border: 0.5px solid #D4DBE6; border-radius: 8px; font-size: 13px; cursor: pointer; }
+    .reload-btn  { width: 100%; padding: 12px; background: var(--fg-bg); color: var(--fg-muted); border: 1px solid var(--fg-line); border-radius: 8px; font-size: 13px; cursor: pointer; }
     .reload-btn:active { background: #D4DBE6; }
   </style>
 </head>
@@ -69,7 +65,7 @@
       <div class="fg-page-name">スタンプ進捗</div>
     </div>
     <div class="spinner"></div>
-    <p style="font-size:13px;color:#6B7A8D;text-align:center;padding-bottom:28px;">読み込み中...</p>
+    <p style="font-size:13px;color:var(--fg-muted);text-align:center;padding-bottom:28px;">読み込み中...</p>
   </div>
 
   <!-- トークンなし -->
@@ -92,15 +88,15 @@
       <div class="fg-page-name">スタンプ進捗</div>
     </div>
 
-    <div class="progress-summary">
-      <p class="progress-label">取得スタンプ数</p>
-      <div class="big-count"><span id="count-num">0</span><span class="unit">個</span></div>
+    <!-- 円形ゲージ（--pct は progress.js が setProperty で注入） -->
+    <div class="progress-ring">
+      <div class="ring-inner">
+        <div class="ring-count" id="count-num">0</div>
+        <div class="ring-label" id="bar-label"></div>
+      </div>
     </div>
-
-    <div class="bar-wrap">
-      <div class="bar-track"><div class="bar-fill" id="bar-fill"></div></div>
-      <p class="bar-label" id="bar-label"></p>
-    </div>
+    <!-- bar-fill は JS 参照を壊さないよう非表示で保持 -->
+    <div id="bar-fill" style="display:none"></div>
 
     <!-- ステータス -->
     <div class="status-msg cleared"     id="status-cleared"   style="display:none"></div>

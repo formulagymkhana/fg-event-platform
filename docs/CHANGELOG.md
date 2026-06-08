@@ -16,6 +16,18 @@
 
 ---
 
+## 2026-06-09 デザイン統一: stamp.html + progress.html（円形ゲージ）
+- 変更ファイル:
+  - `app/stamp.html`
+  - `app/progress.html`
+  - `js/progress.js`
+- 変更内容:
+  - stamp.html: ヘッダー白化、`.stamp-icon` を `--fg-blue-soft/--fg-blue` カードに変更。`.cleared-banner` を `--fg-blue` グラデーションへ統一。
+  - progress.html: ヘッダー白化、水平バー (`.bar-wrap`) を 円形ゲージ (`.progress-ring` + `.ring-inner`) に置換。`#bar-fill` は JS 参照保持のため非表示 div で残存。`.stamp-check` を `--fg-blue`、ステータス色を CSS 変数で統一。
+  - progress.js: `document.querySelector('.progress-ring')?.style.setProperty('--pct', pct)` を1行追加（円形ゲージへ進捗率を注入）。それ以外のロジックは無変更。
+- 理由/背景: デザイン統一タスク（commit 3/5）。円形ゲージは conic-gradient + CSS変数 `--pct` で実装（style.css 定義済み）。
+- 申し送り/注意点: なし
+
 ## 2026-06-09 デザイン統一: card.html + start.html
 - 変更ファイル:
   - `app/card.html`
