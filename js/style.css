@@ -1,0 +1,267 @@
+/**
+ * FG Event Platform — 共通デザイン体系
+ * 大会カラー / CSS変数 / 共通コンポーネント
+ */
+
+/* ── CSS変数 ────────────────────────────────────── */
+:root {
+  --fg-blue:         #0057B8;
+  --fg-navy:         #0B2545;
+  --fg-bg:           #EEF2F7;
+  --fg-card:         #ffffff;
+  --fg-text:         #1A2733;
+  --fg-muted:        #6B7280;
+  --fg-line:         #E2E8F0;
+  --fg-blue-soft:    #EEF7FF;
+  --fg-blue-border:  #D8EAFB;
+  --fg-success-bg:   #EAF8F0;
+  --fg-success:      #1A6640;
+  --fg-success-border:#CDEEDC;
+  --fg-staff:        #5C1A1A;
+  --radius-card:     20px;
+  --radius-ui:       12px;
+  --shadow-card:     0 8px 32px rgba(11,37,69,0.12);
+}
+
+/* ── ベース ─────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+  background: var(--fg-bg);
+  color: var(--fg-text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── カード ─────────────────────────────────────── */
+.card {
+  background: var(--fg-card);
+  border-radius: var(--radius-card);
+  width: 100%;
+  max-width: 390px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+/* ── 学生向けヘッダー（白背景・モック風） ─────────── */
+.fg-header {
+  background: #fff;
+  padding: 24px 26px 8px;
+  display: block;
+  border-bottom: 1px solid var(--fg-line);
+}
+
+.fg-logo {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #111827;
+}
+
+.fg-logo span {
+  background: var(--fg-blue);
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 3px;
+  margin-left: 4px;
+}
+
+.fg-page-name {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+
+/* ── スタッフヘッダー（赤茶・exchange.html専用） ───── */
+.fg-header-staff {
+  background: var(--fg-staff);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: none;
+}
+
+.fg-header-staff .fg-logo {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #fff;
+}
+
+.fg-header-staff .fg-logo span {
+  background: #fff;
+  color: var(--fg-staff);
+  padding: 1px 6px;
+  border-radius: 2px;
+  margin-left: 2px;
+}
+
+.fg-header-staff .fg-page-name {
+  margin-top: 0;
+  margin-left: auto;
+  font-size: 11px;
+  color: #E0B0B0;
+}
+
+/* ── カードボディ ────────────────────────────────── */
+.card-body {
+  padding: 28px 26px 32px;
+  text-align: center;
+}
+
+/* ── state-icon（淡い青カード） ─────────────────── */
+.state-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: var(--fg-blue-soft);
+  color: var(--fg-blue);
+  font-size: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 18px;
+}
+
+.state-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--fg-navy);
+  margin-bottom: 8px;
+}
+
+.state-msg {
+  font-size: 13px;
+  color: var(--fg-muted);
+  line-height: 1.75;
+  margin-bottom: 24px;
+}
+
+/* ── ボタン ─────────────────────────────────────── */
+.btn-primary {
+  display: block;
+  width: 100%;
+  padding: 15px;
+  background: var(--fg-blue);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-ui);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  transition: background 0.15s;
+  text-decoration: none;
+  text-align: center;
+}
+
+.btn-primary:active {
+  background: #0047A0;
+}
+
+.btn-primary:disabled {
+  background: #B0BAC8;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  background: #fff;
+  color: var(--fg-blue);
+  border: 1.5px solid var(--fg-blue-border);
+  border-radius: var(--radius-ui);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: center;
+  transition: background 0.15s;
+}
+
+.btn-secondary:active {
+  background: var(--fg-blue-soft);
+}
+
+/* ── スピナー ────────────────────────────────────── */
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--fg-line);
+  border-top-color: var(--fg-blue);
+  border-radius: 50%;
+  animation: fg-spin 0.8s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes fg-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── アクションリンク ─────────────────────────────── */
+.action-link {
+  display: block;
+  margin-top: 12px;
+  padding: 13px;
+  border-radius: var(--radius-ui);
+  font-size: 14px;
+  text-decoration: none;
+  text-align: center;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+
+.action-link.primary {
+  background: var(--fg-blue);
+  color: #fff;
+}
+
+.action-link.secondary {
+  background: var(--fg-blue-soft);
+  color: var(--fg-blue);
+  border: 1px solid var(--fg-blue-border);
+}
+
+/* ── 進捗円形ゲージ ─────────────────────────────── */
+.progress-ring {
+  --pct: 0;
+  width: 156px;
+  height: 156px;
+  border-radius: 50%;
+  background: conic-gradient(var(--fg-blue) calc(var(--pct) * 1%), var(--fg-line) 0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 20px auto 28px;
+}
+
+.ring-inner {
+  width: 116px;
+  height: 116px;
+  border-radius: 50%;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.ring-count {
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--fg-navy);
+  line-height: 1;
+}
+
+.ring-label {
+  font-size: 12px;
+  color: var(--fg-muted);
+  margin-top: 4px;
+}
