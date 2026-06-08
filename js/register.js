@@ -56,7 +56,8 @@ async function handleSubmit() {
     phone:      val_('f-phone').trim(),
     prefecture: val_('f-prefecture'),
     competing:  radioVal_('competing'),    // 所属校が出場するか（記録対象に）
-    // 同意記録（送信時点で両方チェック必須なので通常 'true'）
+    // 同意記録（送信時点で全てチェック必須なので通常 'true'）
+    rulesConsent:   document.getElementById('cb-rules').checked   ? 'true' : 'false',
     snsConsent:     document.getElementById('cb-media').checked   ? 'true' : 'false',
     privacyConsent: document.getElementById('cb-privacy').checked ? 'true' : 'false',
   };
@@ -89,31 +90,49 @@ async function handleSubmit() {
 function validateForm_() {
   let ok = true;
 
-  // 氏名: 入力必須 + 姓名の間に半角スペース（フォーム規則）
+  // 氏名: 入力必須 + 姓名の間にスペース（フォーム規則: 半角/全角どちらも可）
   const name = val_('f-name').trim();
   if (!name) {
     setErrText_('err-name', '氏名を入力してください');
     showErr_('err-name', 'f-name'); ok = false;
-  } else if (!/ /.test(name)) {
-    setErrText_('err-name', '姓と名の間に半角スペースを入れてください');
+  } else if (!/.+[ 　].+/.test(name)) {
+    setErrText_('err-name', '姓と名の間にスペースを入力してください');
     showErr_('err-name', 'f-name'); ok = false;
   }
 
-  // ふりがな: 必須 + ひらがな＋半角スペースのみ + スペース区切り
+  // ふりがな: 必須 + ひらがな + 姓名の間にスペース（半角/全角どちらも可）
   const furigana = val_('f-furigana').trim();
   if (!furigana) {
     setErrText_('err-furigana', 'ふりがなを入力してください');
     showErr_('err-furigana', 'f-furigana'); ok = false;
-  } else if (!/^[ぁ-んー]+ [ぁ-んー]+$/.test(furigana)) {
-    setErrText_('err-furigana', 'ひらがなで「せい めい」のように半角スペース区切りで入力してください');
+  } else if (!/^[ぁ-んー]+[ 　][ぁ-んー]+$/.test(furigana)) {
+    setErrText_('err-furigana', 'ひらがなで「せい めい」のようにスペース区切りで入力してください');
     showErr_('err-furigana', 'f-furigana'); ok = false;
   }
 
-  if (!val_('f-school').trim()) {
+  // 大学名: 必須 + 「大学」を含む + 100文字以内（フォーム規則）
+  const school = val_('f-school').trim();
+  if (!school) {
+    setErrText_('err-school', '大学名を入力してください');
     showErr_('err-school', 'f-school'); ok = false;
+  } else if (school.length > 100) {
+    setErrText_('err-school', '大学名は100文字以内で入力してください');
+    showErr_('err-school', 'f-school'); ok = false;
+  } else if (!school.includes('大学')) {
+    setErrText_('err-school', '大学名または大学校名を正しく入力してください');
+    showErr_('err-school', 'f-school'); ok = false;
+  }
+
+  // 学部学科: 必須（フォーム規則）
+  if (!val_('f-department').trim()) {
+    showErr_('err-department', 'f-department'); ok = false;
   }
   if (!val_('f-year')) {
     showErr_('err-year', 'f-year'); ok = false;
+  }
+  // 自動車部所属年数: 必須（フォーム規則。非所属者は「その他・自動車部所属ではない」を選択）
+  if (!val_('f-club-years')) {
+    showErr_('err-club-years', 'f-club-years'); ok = false;
   }
   // 性別: 必須（フォーム準拠で追加）
   if (!radioVal_('gender')) {
@@ -134,6 +153,15 @@ function validateForm_() {
   } else if (!/^[0-9]{10,11}$/.test(phone)) {
     setErrText_('err-phone', 'ハイフン無しの半角数字で入力してください（10〜11桁）');
     showErr_('err-phone', 'f-phone'); ok = false;
+  }
+  // 住所(都道府県): 必須（フォーム規則）
+  if (!val_('f-prefecture')) {
+    showErr_('err-prefecture', 'f-prefecture'); ok = false;
+  }
+  // 大会規則書・誓約書同意: 必須（フォーム規則）
+  if (!document.getElementById('cb-rules').checked) {
+    showErr_('err-rules');
+    document.getElementById('cb-wrap-rules').classList.add('error'); ok = false;
   }
   if (!document.getElementById('cb-media').checked) {
     showErr_('err-media');

@@ -148,7 +148,7 @@
         </div>
         <div class="form-row">
           <label>大学名<span class="req">*</span></label>
-          <input type="text" id="f-school" placeholder="入力すると候補が表示されます" autocomplete="organization" list="dl-universities">
+          <input type="text" id="f-school" placeholder="入力すると候補が表示されます" autocomplete="organization" list="dl-universities" maxlength="100">
           <datalist id="dl-universities">
             <option value="早稲田大学"></option><option value="青山学院大学"></option><option value="茨城大学"></option>
             <option value="大分大学"></option><option value="大阪大学"></option><option value="大阪経済大学"></option>
@@ -177,34 +177,46 @@
         </div>
         <div class="form-row-half">
           <div class="form-row">
-            <label>学部・学科</label>
+            <label>学部・学科<span class="req">*</span></label>
             <input type="text" id="f-department" placeholder="例：工学部">
+            <p class="field-err" id="err-department">学部・学科を入力してください</p>
           </div>
           <div class="form-row">
             <label>学年<span class="req">*</span></label>
             <select id="f-year">
               <option value="">選択</option>
-              <option>1年</option><option>2年</option><option>3年</option>
-              <option>4年</option><option>5年</option><option>6年</option>
-              <option>院1年</option><option>院2年</option><option>その他</option>
+              <optgroup label="大学学部">
+                <option>大学学部1年生</option><option>大学学部2年生</option>
+                <option>大学学部3年生</option><option>大学学部4年生</option>
+              </optgroup>
+              <optgroup label="短期大学">
+                <option>短期大学1年生</option><option>短期大学2年生</option>
+                <option>短期大学3年生</option>
+              </optgroup>
+              <optgroup label="自動車大学校">
+                <option>自動車大学校1年生</option><option>自動車大学校2年生</option>
+                <option>自動車大学校3年生</option><option>自動車大学校4年生</option>
+              </optgroup>
             </select>
             <p class="field-err" id="err-year">学年を選択してください</p>
           </div>
         </div>
         <div class="form-row">
-          <label>自動車部所属年数</label>
+          <label>自動車部所属年数<span class="req">*</span></label>
           <select id="f-club-years">
-            <option value="">選択（未所属の場合は空欄）</option>
+            <option value="">選択</option>
             <option>1年目</option><option>2年目</option><option>3年目</option>
-            <option>4年目</option><option>5年目以上</option><option>未所属</option>
+            <option>4年目</option><option>5年目</option>
+            <option>その他・自動車部所属ではない</option>
           </select>
+          <p class="field-err" id="err-club-years">選択してください</p>
         </div>
         <div class="form-row">
           <label>性別<span class="req">*</span></label>
           <div class="radio-group" style="margin-top:8px;">
-            <label><input type="radio" name="gender" value="男性"> 男性</label>
-            <label><input type="radio" name="gender" value="女性"> 女性</label>
-            <label><input type="radio" name="gender" value="その他"> その他</label>
+            <label><input type="radio" name="gender" value="男"> 男</label>
+            <label><input type="radio" name="gender" value="女"> 女</label>
+            <label><input type="radio" name="gender" value="回答しない"> 回答しない</label>
           </div>
           <p class="field-err" id="err-gender">性別を選択してください</p>
         </div>
@@ -230,7 +242,7 @@
           <p class="field-err" id="err-phone">電話番号を入力してください</p>
         </div>
         <div class="form-row">
-          <label>住所（都道府県）</label>
+          <label>住所（都道府県）<span class="req">*</span></label>
           <select id="f-prefecture">
             <option value="">選択</option>
             <option>北海道</option><option>青森県</option><option>岩手県</option><option>宮城県</option>
@@ -246,6 +258,7 @@
             <option>佐賀県</option><option>長崎県</option><option>熊本県</option><option>大分県</option>
             <option>宮崎県</option><option>鹿児島県</option><option>沖縄県</option>
           </select>
+          <p class="field-err" id="err-prefecture">都道府県を選択してください</p>
         </div>
       </div>
 
@@ -265,6 +278,14 @@
       <!-- 同意 -->
       <div class="form-section">
         <p class="section-label">同意事項</p>
+        <div class="consent-box" id="cb-wrap-rules">
+          <label>
+            <input type="checkbox" id="cb-rules">
+            大会規則書および誓約書をよく読み、理解し、同意した上で参加します
+          </label>
+        </div>
+        <p class="field-err" id="err-rules">同意が必要です</p>
+
         <div class="consent-box" id="cb-wrap-media">
           <label>
             <input type="checkbox" id="cb-media">
