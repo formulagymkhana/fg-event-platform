@@ -14,5 +14,5 @@ const FG_CONFIG = {
   API_BASE_URL: 'https://script.google.com/macros/s/AKfycbwdXCvSIcv9n9LtwqqDHSTV1bYY_JqscGzZu1bjBkoPD2b8gHkEVt54flboJuJYpSVNrg/exec',
 
   // フォールバック用イベントID(GAS側でイベントが見つからない場合のみ使用)
-  EVENT_ID: '2026_rd2',
+  EVENT_ID: '2026_test',
 };
