@@ -1,0 +1,441 @@
+/**
+ * FG Event Platform — 管理用スクリプト(スタンドアローン版)
+ *
+ * 初回セットアップ手順:
+ *   1. initializeMaster()           → マスタースプレッドシートを作成
+ *   2. initializeUniversityMaster() → 大学コードを投入
+ *   3. registerExistingEvent()      → 既存イベントを登録
+ *   4. addStampParticipantsSheet()  → スタンプ参加者シートを追加(既存SSのみ)
+ *   5. importStudents()             → 学生マスターを生成
+ */
+
+const STUDENT_COLS = [
+  'studentId', 'token', '氏名', 'ふりがな', '大学名',
+  '学部学科', '学年', '属性', '自動車部在籍年数',
+  '住所(都道府県)', '生年月日', 'メールアドレス', '登録種別',
+];
+
+const CLASS_CODES = {
+  'Aドライバー':'A','Bドライバー':'B','Cドライバー':'C',
+  '女子クラスドライバー':'W','ドライバー登録メカニック':'R',
+  'メカニック':'M','応援学生':'S','一般参加学生':'V',
+};
+
+const POKEBELL = {
+  'ア':'11','イ':'12','ウ':'13','エ':'14','オ':'15',
+  'カ':'21','キ':'22','ク':'23','ケ':'24','コ':'25',
+  'ガ':'21','ギ':'22','グ':'23','ゲ':'24','ゴ':'25',
+  'サ':'31','シ':'32','ス':'33','セ':'34','ソ':'35',
+  'ザ':'31','ジ':'32','ズ':'33','ゼ':'34','ゾ':'35',
+  'タ':'41','チ':'42','ツ':'43','テ':'44','ト':'45',
+  'ダ':'41','ヂ':'42','ヅ':'43','デ':'44','ド':'45',
+  'ナ':'51','ニ':'52','ヌ':'53','ネ':'54','ノ':'55',
+  'ハ':'61','ヒ':'62','フ':'63','ヘ':'64','ホ':'65',
+  'バ':'61','ビ':'62','ブ':'63','ベ':'64','ボ':'65',
+  'パ':'61','ピ':'62','プ':'63','ペ':'64','ポ':'65',
+  'マ':'71','ミ':'72','ム':'73','メ':'74','モ':'75',
+  'ヤ':'81','ユ':'83','ヨ':'85',
+  'ラ':'91','リ':'92','ル':'93','レ':'94','ロ':'95',
+  'ワ':'01','ヲ':'02','ン':'03',
+};
+
+// ============================================================
+// initializeMaster
+// ============================================================
+
+function initializeMaster() {
+  const ss = SpreadsheetApp.create('FG Event Platform - マスター');
+  PropertiesService.getScriptProperties()
+    .setProperty('MASTER_SPREADSHEET_ID', ss.getId());
+
+  const evSheet = ss.getActiveSheet();
+  evSheet.setName(SHEET.EVENT_LIST);
+  evSheet.getRange(1,1,1,6).setValues([['eventId','イベント名','スプレッドシートID','開始日','終了日','状態']]);
+  formatHeaderRow_(evSheet);
+
+  const uniSheet = ss.insertSheet(SHEET.UNI_MASTER);
+  uniSheet.getRange(1,1,1,3).setValues([['大学名','コード','状態']]);
+  formatHeaderRow_(uniSheet);
+
+  const url = ss.getUrl();
+  console.log('✅ マスタースプレッドシートを作成しました\nURL: ' + url);
+  notifyUser_('マスタースプレッドシートを作成しました。\nURL: ' + url);
+}
+
+// ============================================================
+// registerExistingEvent
+// ============================================================
+
+function registerExistingEvent() {
+  const EVENT_ID       = '2026_rd2';
+  const EVENT_NAME     = 'FORMULA GYMKHANA 2026 予選会 Rd.2';
+  const SPREADSHEET_ID = '← スプレッドシートIDをここに貼り付け';
+  const START_DATE     = '2026/08/22';
+  const END_DATE       = '2026/08/23';
+  const STATUS         = '完了';
+
+  const sheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+  sheet.appendRow([EVENT_ID, EVENT_NAME, SPREADSHEET_ID, START_DATE, END_DATE, STATUS]);
+  notifyUser_('イベントを登録しました: ' + EVENT_NAME);
+}
+
+// ============================================================
+// createNewEvent
+// ============================================================
+
+function createNewEvent() {
+  const EVENT_ID   = '2026_rd3';
+  const EVENT_NAME = 'FORMULA GYMKHANA 2026 予選会 Rd.3';
+  const START_DATE = '2026/08/XX';
+  const END_DATE   = '2026/08/XX';
+  createEvent_(EVENT_ID, EVENT_NAME, START_DATE, END_DATE);
+}
+
+function createEvent_(eventId, eventName, startDate, endDate) {
+  const ss = SpreadsheetApp.create(eventName);
+  setupEventSpreadsheet_(ss, eventId, eventName, startDate, endDate);
+  masterSs_().getSheetByName(SHEET.EVENT_LIST).appendRow([
+    eventId, eventName, ss.getId(), startDate, endDate, '準備中'
+  ]);
+  const url = ss.getUrl();
+  console.log('✅ ' + eventName + '\nURL: ' + url);
+  notifyUser_('イベントスプレッドシートを作成しました。\n' + eventName + '\nURL: ' + url);
+}
+
+function setupEventSpreadsheet_(ss, eventId, eventName, startDate, endDate) {
+  const schemas = {
+    [SHEET.CONFIG]: [
+      ['eventId', eventId], ['eventName', eventName],
+      ['startDate', startDate], ['endDate', endDate],
+      ['publicDeadline', endDate + ' 23:59'],
+      ['prizeThreshold', 15],
+      ['prizeCount', 3],
+      ['exchangeKey', Utilities.getUuid()],
+      ['stampStartAt',    ''],   // T3-a 追加: スタンプ取得開始日時（未設定=制限なし）
+      ['stampEndAt',      ''],   // T3-a 追加: スタンプ取得終了日時（未設定=制限なし）
+      ['exchangeDeadline',''],   // T3-a 追加: 景品交換期限（未設定=制限なし）
+    ],
+    [SHEET.STUDENTS]:           [STUDENT_COLS],
+    [SHEET.COMPANIES]:          [['companyId','企業名','stampKey','viewKey','表示順','hasNfc']],
+    [SHEET.VIEW_LOG]:           [['時刻','eventId','studentId','companyId','companyEmail']],
+    [SHEET.STAMP_LOG]:          [['時刻','eventId','studentId','氏名','大学名','属性','企業名','companyId','nfcCounter']],
+    [SHEET.STAMP_PARTICIPANTS]: [['時刻','eventId','studentId','stampToken','activatedAt','status']],
+    [SHEET.PRIZE_LOG]:          [['時刻','eventId','studentId','氏名','スタンプ数','対応者']],
+  };
+
+  let isFirst = true;
+  Object.entries(schemas).forEach(([name, headerRows]) => {
+    const sheet = isFirst
+      ? (ss.getActiveSheet().setName(name), ss.getActiveSheet())
+      : ss.insertSheet(name);
+    isFirst = false;
+    headerRows.forEach((row, i) => {
+      sheet.getRange(i + 1, 1, 1, row.length).setValues([row]);
+    });
+    formatHeaderRow_(sheet);
+  });
+}
+
+// ============================================================
+// addStampParticipantsSheet
+// 既存スプレッドシートにスタンプ参加者シートを追加する(移行用)
+// ============================================================
+
+function addStampParticipantsSheet(eventId) {
+  if (!eventId) {
+    notifyUser_('eventIdを引数に指定してください。例: addStampParticipantsSheet("2026_rd2")');
+    return;
+  }
+  const ss    = eventSs_(eventId);
+  const exist = ss.getSheetByName(SHEET.STAMP_PARTICIPANTS);
+  if (exist) {
+    notifyUser_('スタンプ参加者シートは既に存在します。');
+    return;
+  }
+  const sheet = ss.insertSheet(SHEET.STAMP_PARTICIPANTS);
+  sheet.getRange(1,1,1,6).setValues([['時刻','eventId','studentId','stampToken','activatedAt','status']]);
+  formatHeaderRow_(sheet);
+  notifyUser_('スタンプ参加者シートを追加しました: ' + eventId);
+}
+
+// ============================================================
+// setupPrizeConfig
+// 既存イベントの設定シートに景品設定を追加する(移行用)
+// prizeThreshold / prizeCount / exchangeKey を追加(既存値は上書きしない)
+// ============================================================
+
+function setupPrizeConfig(eventId, threshold, count) {
+  if (!eventId) {
+    notifyUser_('eventIdを指定してください。例: setupPrizeConfig("2026_rd2", 15, 3)');
+    return;
+  }
+  const sheet = eventSs_(eventId).getSheetByName(SHEET.CONFIG);
+  const data  = sheet.getDataRange().getValues();
+  const keys  = data.map(r => String(r[0]));
+
+  const ensure = (key, val) => {
+    const idx = keys.indexOf(key);
+    if (idx >= 0) return; // 既存値は変更しない
+    sheet.appendRow([key, val]);
+    keys.push(key);
+  };
+
+  ensure('prizeThreshold', threshold || 15);
+  ensure('prizeCount',     count || 3);
+  ensure('exchangeKey',    Utilities.getUuid());
+
+  CacheService.getScriptCache().remove('cfg_' + eventId);
+
+  // exchangeKeyを通知(景品交換URLに使う)
+  const updated = sheet.getDataRange().getValues();
+  const keyRow  = updated.find(r => String(r[0]) === 'exchangeKey');
+  const exKey   = keyRow ? keyRow[1] : '(不明)';
+
+  notifyUser_(
+    '景品設定を追加しました: ' + eventId + '\n\n' +
+    'exchangeKey(景品交換画面用):\n' + exKey + '\n\n' +
+    'prizeThreshold / prizeCount は設定シートで調整できます。'
+  );
+}
+
+// ============================================================
+// importStudents
+// ============================================================
+
+function importStudents(eventId) {
+  if (!eventId) {
+    const sheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+    const last  = sheet.getLastRow();
+    if (last < 2) { notifyUser_('イベントが登録されていません。'); return; }
+    eventId = String(sheet.getRange(last, 1).getValue());
+  }
+
+  const FORM_SPREADSHEET_ID = PropertiesService.getScriptProperties()
+    .getProperty('FORM_SPREADSHEET_ID');
+  if (!FORM_SPREADSHEET_ID) throw new Error('FORM_SPREADSHEET_IDが未設定です。');
+  const formSs = SpreadsheetApp.openById(FORM_SPREADSHEET_ID);
+  const targetSs = eventSs_(eventId);
+
+  const yearMatch  = String(eventId || '').match(/(\d{4})/);
+  const yearSuffix = yearMatch ? yearMatch[1].slice(-1) : String(new Date().getFullYear()).slice(-1);
+
+  const { uniMap, maxAutoCode } = loadUniversityMaster_();
+  let autoCodeCounter = maxAutoCode;
+  const newUniversities = [];
+
+  const existingSheet  = targetSs.getSheetByName(SHEET.STUDENTS);
+  const existingTokens = new Map();
+  if (existingSheet && existingSheet.getLastRow() > 1) {
+    const existing = existingSheet.getRange(2, 1, existingSheet.getLastRow() - 1, STUDENT_COLS.length).getValues();
+    existing.forEach(row => {
+      const n = row[STUDENT_COLS.indexOf('氏名')];
+      const s = row[STUDENT_COLS.indexOf('大学名')];
+      const t = row[STUDENT_COLS.indexOf('token')];
+      if (n && s && t) existingTokens.set(n + '|' + s, t);
+    });
+  }
+
+  const masterSheet = targetSs.getSheetByName(SHEET.STUDENTS);
+  masterSheet.clear();
+  masterSheet.getRange(1,1,1,STUDENT_COLS.length).setValues([STUDENT_COLS]);
+  formatHeaderRow_(masterSheet);
+
+  const sources = [
+    { sheetName: '出場選手一覧', attrFn: (headers, row) => { const i = headers.findIndex(h => h === 'ドライバー登録区分'); return i >= 0 ? String(row[i] || '') : 'Aドライバー'; } },
+    { sheetName: '女子ドライバー一覧',  attrFn: () => '女子クラスドライバー' },
+    { sheetName: '補欠ドライバー一覧',  attrFn: () => 'ドライバー登録メカニック' },
+    { sheetName: 'メカ・応援学生一覧',  attrFn: (headers, row) => { const i = headers.findIndex(h => h && h.includes('サービス作業は実施')); return (i >= 0 && String(row[i] || '') === 'はい') ? 'メカニック' : '応援学生'; } },
+  ];
+
+  const outputRows = [];
+  const seqMap     = new Map();
+
+  sources.forEach(src => {
+    const sheet = formSs.getSheetByName(src.sheetName);
+    if (!sheet || sheet.getLastRow() < 2) return;
+    const data    = sheet.getDataRange().getValues();
+    const headers = data[0].map(h => String(h || '').trim());
+    const get     = (row, name) => { const i = headers.findIndex(h => h === name); return i >= 0 ? row[i] : ''; };
+
+    data.slice(1).forEach(row => {
+      const name = get(row, '氏名');
+      if (!name) return;
+      const school   = String(get(row, '大学名') || '').trim();
+      const category = src.attrFn(headers, row);
+      const birthday = get(row, '生年月日');
+      let uniCode = uniMap.get(school);
+      if (!uniCode) {
+        autoCodeCounter += 1;
+        uniCode = String(autoCodeCounter).padStart(4, '0');
+        uniMap.set(school, uniCode);
+        newUniversities.push([school, uniCode, '自動割当(要確認)']);
+      }
+      const classCode = CLASS_CODES[category] || 'S';
+      const seqKey    = uniCode + classCode;
+      const seq       = (seqMap.get(seqKey) || 0) + 1;
+      seqMap.set(seqKey, seq);
+      const studentId = yearSuffix + uniCode + classCode + String(seq).padStart(2, '0');
+      outputRows.push([
+        studentId,
+        existingTokens.get(name + '|' + school) || Utilities.getUuid(),
+        name,
+        String(get(row, '氏名(ふりがな)') || '').replace(/　/g, ' ').trim(),
+        school, get(row, '学部学科'), get(row, '学年'), category,
+        get(row, '自動車部所属何年目ですか？'), get(row, '住所(都道府県)'),
+        birthday instanceof Date ? Utilities.formatDate(birthday, Session.getScriptTimeZone(), 'yyyy/MM/dd') : String(birthday || ''),
+        get(row, 'メールアドレス'), '事前',
+      ]);
+    });
+  });
+
+  if (outputRows.length > 0) masterSheet.getRange(2, 1, outputRows.length, STUDENT_COLS.length).setValues(outputRows);
+  if (newUniversities.length > 0) saveNewUniversities_(newUniversities);
+  CacheService.getScriptCache().remove('cfg_' + eventId);
+
+  const lines = [`学生マスターを更新しました。${outputRows.length}名を登録しました。`];
+  if (newUniversities.length > 0) {
+    lines.push('', `⚠ 新規大学 ${newUniversities.length}校を自動採番:`);
+    newUniversities.forEach(([n, c]) => lines.push(`  ${n} → ${c}`));
+    lines.push('', '大学マスターで正式コードに更新してください。');
+  }
+  notifyUser_(lines.join('\n'));
+}
+
+// ============================================================
+// initializeUniversityMaster
+// ============================================================
+
+function initializeUniversityMaster() {
+  const UNIVERSITIES = [
+    ['早稲田大学','0101','確定'],['青山学院大学','1101','確定'],
+    ['茨城大学','1201','確定'],['大分大学','1501','確定'],
+    ['大阪大学','1502','確定'],['大阪経済大学','1503','確定'],
+    ['大阪工業大学','1504','確定'],['大阪公立大学','1505','確定'],
+    ['大阪産業大学','1506','確定'],['鹿児島大学','2101','確定'],
+    ['金沢大学','2102','確定'],['関西大学','2103','確定'],
+    ['関西学院大学','2104','確定'],['関東工業自動車大学校','2105','確定'],
+    ['九州大学','2201','確定'],['九州産業大学','2202','確定'],
+    ['京都大学','2203','確定'],['京都産業大学','2204','確定'],
+    ['近畿大学','2205','確定'],['群馬大学','2302','確定'],
+    ['熊本大学','2303','確定'],['工学院大学','2501','確定'],
+    ['神戸大学','2502','確定'],['國學院大學','2503','確定'],
+    ['駒澤大学','2504','確定'],['芝浦工業大学','3201','確定'],
+    ['上智大学','3202','確定'],['信州大学','3203','確定'],
+    ['滋賀県立大学','3204','確定'],['静岡大学','3205','確定'],
+    ['椙山女学園大学','3301','確定'],['西南学院大学','3401','確定'],
+    ['専修大学','3402','確定'],['大同大学','4101','確定'],
+    ['拓殖大学','4102','確定'],['中央大学','4201','確定'],
+    ['東海大学','4501','確定'],['東京大学','4502','確定'],
+    ['東京電機大学','4503','確定'],['東京都立大学','4504','確定'],
+    ['東京理科大学','4505','確定'],['同志社大学','4506','確定'],
+    ['東北大学','4507','確定'],['トヨタ東京自動車大学校','4508','確定'],
+    ['トヨタ神戸自動車大学校','4509','確定'],['東京農工大学','4510','確定'],
+    ['長岡技術科学大学','5101','確定'],['中日本自動車短期大学','5102','確定'],
+    ['名古屋大学','5103','確定'],['名古屋工業大学','5104','確定'],
+    ['南山大学','5105','確定'],['新潟大学','5201','確定'],
+    ['日本大学','5202','確定'],['日本大学生産工学部','5203','確定'],
+    ['兵庫県立大学','6201','確定'],['広島大学','6202','確定'],
+    ['福岡県立大学','6301','確定'],['法政大学','6501','確定'],
+    ['北海道大学','6502','確定'],['明治大学','7401','確定'],
+    ['横浜国立大学','8501','確定'],['立命館大学','9201','確定'],
+  ];
+  const sheet = masterSs_().getSheetByName(SHEET.UNI_MASTER);
+  sheet.clear();
+  sheet.getRange(1,1,1,3).setValues([['大学名','コード','状態']]);
+  sheet.getRange(2,1,UNIVERSITIES.length,3).setValues(UNIVERSITIES);
+  formatHeaderRow_(sheet);
+  notifyUser_(`大学マスターに${UNIVERSITIES.length}校を登録しました。`);
+}
+
+// ============================================================
+// generateCompanyKeys
+// ============================================================
+
+function generateCompanyKeys(eventId) {
+  if (!eventId) { notifyUser_('eventIdを引数に指定してください。例: generateCompanyKeys("2026_rd2")'); return; }
+  const sheet    = eventSs_(eventId).getSheetByName(SHEET.COMPANIES);
+  const data     = sheet.getDataRange().getValues();
+  const headers  = data[0].map(String);
+  const stampCol = headers.indexOf('stampKey');
+  const viewCol  = headers.indexOf('viewKey');
+  const nfcCol   = headers.indexOf('hasNfc');
+  if (stampCol < 0 || viewCol < 0) { notifyUser_('企業マスターにstampKey/viewKey列がありません。'); return; }
+
+  let generated = 0;
+  data.slice(1).forEach((row, i) => {
+    const rowNum = i + 2;
+    let changed  = false;
+    if (!row[stampCol]) { sheet.getRange(rowNum, stampCol + 1).setValue(Utilities.getUuid()); changed = true; }
+    if (!row[viewCol])  { sheet.getRange(rowNum, viewCol  + 1).setValue(Utilities.getUuid()); changed = true; }
+    if (nfcCol >= 0 && row[nfcCol] === '') sheet.getRange(rowNum, nfcCol + 1).setValue(false);
+    if (changed) generated++;
+  });
+  notifyUser_(`${generated}社のキーを新規発行しました。`);
+}
+
+// ============================================================
+// 大学マスターヘルパー
+// ============================================================
+
+function loadUniversityMaster_() {
+  const sheet = masterSs_().getSheetByName(SHEET.UNI_MASTER);
+  if (!sheet || sheet.getLastRow() < 2) return { uniMap: new Map(), maxAutoCode: 0 };
+  const data      = sheet.getDataRange().getValues();
+  const headers   = data[0].map(String);
+  const nameCol   = headers.indexOf('大学名');
+  const codeCol   = headers.indexOf('コード');
+  const statusCol = headers.indexOf('状態');
+  const uniMap    = new Map();
+  let maxAutoCode = 0;
+  data.slice(1).forEach(row => {
+    const name = String(row[nameCol] || '').trim();
+    const code = String(row[codeCol] || '').trim().padStart(4, '0');
+    if (!name || !code) return;
+    uniMap.set(name, code);
+    if (statusCol >= 0 && row[statusCol] === '自動割当(要確認)') {
+      const num = Number(code);
+      if (!isNaN(num) && num > maxAutoCode) maxAutoCode = num;
+    }
+  });
+  return { uniMap, maxAutoCode };
+}
+
+function saveNewUniversities_(rows) {
+  const sheet = masterSs_().getSheetByName(SHEET.UNI_MASTER);
+  rows.forEach(row => sheet.appendRow(row));
+}
+
+// ============================================================
+// 共通ヘルパー
+// ============================================================
+
+function formatHeaderRow_(sheet) {
+  if (sheet.getLastRow() < 1) return;
+  const cols = sheet.getLastColumn();
+  sheet.setFrozenRows(1);
+  sheet.getRange(1,1,1,cols).setBackground('#0B2545').setFontColor('#FFFFFF').setFontWeight('bold').setHorizontalAlignment('center');
+}
+
+function notifyUser_(msg) {
+  try { SpreadsheetApp.getUi().alert(msg); } catch (e) { console.log('[通知] ' + msg); }
+}
+
+function clearCache(eventId) {
+  const cache = CacheService.getScriptCache();
+  if (eventId) {
+    cache.remove('cfg_' + eventId);
+    console.log('キャッシュをクリアしました: ' + eventId);
+  } else {
+    const sheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+    if (sheet && sheet.getLastRow() > 1) {
+      const ids = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+      ids.forEach(([id]) => { if (id) cache.remove('cfg_' + id); });
+    }
+    console.log('全イベントのキャッシュをクリアしました');
+  }
+}
+
+// ラッパー関数（スクリプトエディタから直接実行用）
+function runGenerateCompanyKeys()       { generateCompanyKeys('2026_rd2'); }
+function runAddStampParticipantsSheet() { addStampParticipantsSheet('2026_rd2'); }  // T7: 末尾に1つだけ残す
+function runSetupPrizeConfig()          { setupPrizeConfig('2026_rd2', 15, 3); }
