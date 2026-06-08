@@ -534,7 +534,7 @@ function isExchangeOpen_(cfg) {
 // ============================================================
 
 function findStudentByCardToken_(token, eventId) {
-  return findStudent_('token', token, eventId);
+  return findStudent_('cardToken', token, eventId);  // T11: token → cardToken
 }
 
 // T2: eventId 一致 + status === 'active' を追加
@@ -579,7 +579,7 @@ function mapStudent_(headers, row) {
   const g = name => { const i = headers.indexOf(name); return i >= 0 ? row[i] : ''; };
   return {
     studentId:  g('studentId'),
-    token:      g('token'),
+    cardToken:  g('cardToken'),   // T11: token → cardToken
     name:       g('氏名'),
     furigana:   g('ふりがな'),
     school:     g('大学名'),
