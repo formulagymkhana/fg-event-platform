@@ -11,51 +11,53 @@
              style-src 'self' 'unsafe-inline';
              media-src blob:;">
   <title>FORMULA GYMKHANA — 景品交換(スタッフ)</title>
+  <link rel="stylesheet" href="../js/style.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif; background: #F0F3F7; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
-    .card { background: #fff; border-radius: 16px; width: 100%; max-width: 380px; overflow: hidden; box-shadow: 0 4px 24px rgba(11,37,69,0.10); }
-    /* スタッフ画面はヘッダーを差別化(濃い赤茶) */
-    .fg-header { background: #5C1A1A; padding: 13px 20px; display: flex; align-items: center; gap: 10px; }
-    .fg-logo { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; color: #fff; }
-    .fg-logo span { background: #fff; color: #5C1A1A; padding: 1px 6px; border-radius: 2px; margin-left: 2px; }
-    .fg-page-name { margin-left: auto; font-size: 11px; color: #E0B0B0; }
+    body { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+
+    .card { width: 100%; max-width: 380px; }
     .card-body { padding: 28px 24px; text-align: center; }
-    .state-icon  { font-size: 48px; margin-bottom: 14px; }
-    .state-title { font-size: 17px; font-weight: 700; color: #1A2733; margin-bottom: 8px; }
-    .state-msg   { font-size: 13px; color: #6B7A8D; line-height: 1.7; margin-bottom: 20px; }
-    .btn { width: 100%; padding: 15px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
-    .btn-primary { background: #5C1A1A; color: #fff; }
-    .btn-primary:active { background: #7A2424; }
-    .btn-gray { background: #6B7A8D; color: #fff; margin-top: 10px; }
-    .btn-exchange { background: #1A6640; color: #fff; }
+
+    /* スタッフ用スピナー（--fg-staff 色） */
+    .spinner { border-top-color: var(--fg-staff); }
+
+    /* スタッフ用ボタン（赤茶） */
+    .btn { width: 100%; padding: 15px; border: none; border-radius: var(--radius-ui); font-size: 15px; font-weight: 600; cursor: pointer; }
+    .btn-staff   { background: var(--fg-staff); color: #fff; }
+    .btn-staff:active { background: #7A2424; }
+    .btn-gray    { background: var(--fg-muted); color: #fff; margin-top: 10px; }
+    .btn-exchange { background: var(--fg-success); color: #fff; }
     .btn-exchange:active { background: #248052; }
-    /* スキャン */
+
+    /* QRスキャン */
     #scan-wrapper { position: relative; width: 100%; aspect-ratio: 1/1; background: #000; overflow: hidden; }
-    #scan-video { width: 100%; height: 100%; object-fit: cover; }
-    .scan-guide { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-    .scan-frame { width: 60%; aspect-ratio: 1/1; position: relative; }
-    .scan-frame::before,.scan-frame::after,.scan-frame-inner::before,.scan-frame-inner::after { content:''; position:absolute; width:20px; height:20px; border-color:#fff; border-style:solid; }
-    .scan-frame::before  { top:0; left:0; border-width:3px 0 0 3px; }
-    .scan-frame::after   { top:0; right:0; border-width:3px 3px 0 0; }
-    .scan-frame-inner::before { bottom:0; left:0; border-width:0 0 3px 3px; }
-    .scan-frame-inner::after  { bottom:0; right:0; border-width:0 3px 3px 0; }
-    .scan-label { position:absolute; bottom:12px; left:0; right:0; text-align:center; font-size:13px; color:rgba(255,255,255,0.85); }
-    .cancel-btn { width:100%; padding:13px; background:#F0F3F7; color:#6B7A8D; border:none; font-size:13px; cursor:pointer; }
-    .spinner { width:36px; height:36px; border:3px solid #D4DBE6; border-top-color:#5C1A1A; border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 16px; }
-    @keyframes spin { to{transform:rotate(360deg)} }
+    #scan-video   { width: 100%; height: 100%; object-fit: cover; }
+    .scan-guide   { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+    .scan-frame   { width: 60%; aspect-ratio: 1/1; position: relative; }
+    .scan-frame::before, .scan-frame::after, .scan-frame-inner::before, .scan-frame-inner::after {
+      content: ''; position: absolute; width: 20px; height: 20px; border-color: #fff; border-style: solid;
+    }
+    .scan-frame::before       { top: 0;    left: 0;  border-width: 3px 0 0 3px; }
+    .scan-frame::after        { top: 0;    right: 0; border-width: 3px 3px 0 0; }
+    .scan-frame-inner::before { bottom: 0; left: 0;  border-width: 0 0 3px 3px; }
+    .scan-frame-inner::after  { bottom: 0; right: 0; border-width: 0 3px 3px 0; }
+    .scan-label { position: absolute; bottom: 12px; left: 0; right: 0; text-align: center; font-size: 13px; color: rgba(255,255,255,0.85); }
+    .cancel-btn { width: 100%; padding: 13px; background: var(--fg-bg); color: var(--fg-muted); border: none; font-size: 13px; cursor: pointer; border-top: 1px solid var(--fg-line); }
+    .cancel-btn:active { background: #D4DBE6; }
+
     /* 学生情報カード */
-    .student-name { font-size: 22px; font-weight: 700; color: #0B2545; margin-bottom: 4px; }
-    .student-sub { font-size: 13px; color: #6B7A8D; margin-bottom: 18px; }
-    .stamp-box { background: #F0F3F7; border-radius: 10px; padding: 16px; margin-bottom: 18px; }
-    .stamp-box .num { font-size: 32px; font-weight: 700; color: #0B2545; }
-    .stamp-box .unit { font-size: 15px; color: #6B7A8D; }
-    .stamp-box .label { font-size: 12px; color: #8BA3C4; margin-top: 2px; }
+    .student-name { font-size: 22px; font-weight: 700; color: var(--fg-navy); margin-bottom: 4px; }
+    .student-sub  { font-size: 13px; color: var(--fg-muted); margin-bottom: 18px; }
+    .stamp-box { background: var(--fg-bg); border-radius: 10px; padding: 16px; margin-bottom: 18px; border: 1px solid var(--fg-line); }
+    .stamp-box .num   { font-size: 32px; font-weight: 700; color: var(--fg-navy); }
+    .stamp-box .unit  { font-size: 15px; color: var(--fg-muted); }
+    .stamp-box .label { font-size: 12px; color: var(--fg-muted); margin-top: 2px; }
+
     /* 判定バッジ */
     .verdict { padding: 14px; border-radius: 10px; font-size: 15px; font-weight: 600; margin-bottom: 18px; }
-    .verdict.ok { background: #EAF3EC; color: #1A6640; }
-    .verdict.ng { background: #FBEAEA; color: #9A2A2A; }
-    .verdict.done { background: #EEF1F5; color: #6B7A8D; }
+    .verdict.ok   { background: var(--fg-success-bg);  color: var(--fg-success); border: 1px solid var(--fg-success-border); }
+    .verdict.ng   { background: #FBEAEA; color: #9A2A2A; }
+    .verdict.done { background: var(--fg-bg);           color: var(--fg-muted);  border: 1px solid var(--fg-line); }
     .verdict .sub { font-size: 12px; font-weight: 400; margin-top: 4px; opacity: 0.9; }
   </style>
 </head>
@@ -63,7 +65,7 @@
 
   <!-- キー未設定エラー -->
   <div class="card" id="state-no-key" style="display:none">
-    <div class="fg-header">
+    <div class="fg-header-staff">
       <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
       <div class="fg-page-name">景品交換 / スタッフ</div>
     </div>
@@ -76,7 +78,7 @@
 
   <!-- スキャン待機 -->
   <div class="card" id="state-ready" style="display:none">
-    <div class="fg-header">
+    <div class="fg-header-staff">
       <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
       <div class="fg-page-name">景品交換 / スタッフ</div>
     </div>
@@ -84,13 +86,13 @@
       <div class="state-icon">🎁</div>
       <p class="state-title">景品交換</p>
       <p class="state-msg">学生のQR名刺をスキャンして<br>景品引換状況を確認します。</p>
-      <button class="btn btn-primary" id="btn-scan">📷 学生QRをスキャン</button>
+      <button class="btn btn-staff" id="btn-scan">📷 学生QRをスキャン</button>
     </div>
   </div>
 
   <!-- スキャン中 -->
   <div class="card" id="state-scanning" style="display:none">
-    <div class="fg-header">
+    <div class="fg-header-staff">
       <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
       <div class="fg-page-name">QR読み取り中</div>
     </div>
@@ -106,19 +108,19 @@
 
   <!-- 通信中 -->
   <div class="card" id="state-loading" style="display:none">
-    <div class="fg-header">
+    <div class="fg-header-staff">
       <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
       <div class="fg-page-name">景品交換 / スタッフ</div>
     </div>
     <div class="card-body">
       <div class="spinner"></div>
-      <p style="font-size:13px;color:#6B7A8D;">確認中...</p>
+      <p style="font-size:13px;color:var(--fg-muted);">確認中...</p>
     </div>
   </div>
 
   <!-- 学生情報 + 判定 -->
   <div class="card" id="state-result" style="display:none">
-    <div class="fg-header">
+    <div class="fg-header-staff">
       <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
       <div class="fg-page-name">景品交換 / スタッフ</div>
     </div>
@@ -162,7 +164,7 @@
 
   <!-- 交換完了 -->
   <div class="card" id="state-done" style="display:none">
-    <div class="fg-header">
+    <div class="fg-header-staff">
       <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
       <div class="fg-page-name">景品交換 / スタッフ</div>
     </div>
@@ -170,13 +172,13 @@
       <div class="state-icon">✅</div>
       <p class="state-title">引換完了</p>
       <p class="state-msg"><b id="done-name"></b> さんに<br>景品を渡しました</p>
-      <button class="btn btn-primary" id="btn-next2">次の学生をスキャン</button>
+      <button class="btn btn-staff" id="btn-next2">次の学生をスキャン</button>
     </div>
   </div>
 
   <!-- エラー -->
   <div class="card" id="state-error" style="display:none">
-    <div class="fg-header">
+    <div class="fg-header-staff">
       <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
       <div class="fg-page-name">景品交換 / スタッフ</div>
     </div>

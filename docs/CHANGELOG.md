@@ -16,6 +16,19 @@
 
 ---
 
+## 2026-06-09 デザイン統一: exchange.html（スタッフ画面）
+- 変更ファイル:
+  - `app/exchange.html`
+- 変更内容:
+  - `../js/style.css` を読み込むよう `<link>` を追加。
+  - ヘッダーを `.fg-header-staff`（style.css 定義・`--fg-staff: #5C1A1A` 赤茶）に切り替え。ヘッダー色は維持。
+  - ローカル `.btn-primary` → `.btn-staff`（`--fg-staff` 色）にリネームし style.css の `.btn-primary`（`--fg-blue`）と衝突を解消。
+  - 背景色・カード色・`stamp-box`・`verdict` バッジを CSS 変数（`--fg-bg`/`--fg-navy`/`--fg-muted`/`--fg-success-bg` 等）に統一。
+  - スピナーの `border-top-color` を `--fg-staff` でオーバーライド（スタッフ画面のトーン保持）。
+  - JS・ID・ロジックは無変更（`btn-exchange` は ID 参照のみ確認済み）。
+- 理由/背景: デザイン統一タスク（commit 4/5）。スタッフ画面は赤茶ヘッダーを維持する設計方針通り。
+- 申し送り/注意点: なし
+
 ## 2026-06-09 デザイン統一: stamp.html + progress.html（円形ゲージ）
 - 変更ファイル:
   - `app/stamp.html`
