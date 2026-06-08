@@ -71,6 +71,11 @@ FG Event Platform（Formula Gymkhana のイベント管理基盤）の改修。
 - 将来構想: 脱Googleフォーム化（NOTES.md 参照。計画段階）。
 - 任意: eventId 比較の String() 統一（下記「任意（おまけ）」参照。NOTES.md にも記録）。
 
+**確定した運用方針（2026-06-09）**:
+- activateStamp の期間チェック: 不要（物理的に当日会場参加が前提）。
+- 景品交換: 学生側確定（`exchangePrize` / `progress.html`）に一本化。`markPrizeExchanged` はコードのみ残す。
+- イベント登録の STATUS: `registerExistingEvent()` は `準備中` で登録し、終了後に手動で `完了` へ変更する運用。
+
 ---
 
 ## タスク T2: findStudentByStampToken_() の検索条件強化 〔完了〕

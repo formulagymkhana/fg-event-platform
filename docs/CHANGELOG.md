@@ -16,6 +16,13 @@
 
 ---
 
+## 2026-06-09 registerExistingEvent の STATUS を 準備中 に修正
+- 変更ファイル:
+  - `docs/gas-patches/admin.gs.final.txt`
+- 変更内容: `registerExistingEvent()` の `STATUS = '完了'` を `'準備中'` に変更。`完了` のままだと `getCurrentEvent` にイベントが拾われず当日登録が機能しない。終了後に手動で `完了` へ変更する運用とする。
+- 理由/背景: 外部レビューで発覚。`getCurrentEvent` は状態が `完了` のイベントを除外する実装のため。
+- 申し送り/注意点: GAS再反映が必要（admin.gs のみ）。
+
 ## 2026-06-08 当日フォーム: ラジオ選択不可の修正・性別プルダウン化・学年追加
 - 変更ファイル:
   - `app/register.html`

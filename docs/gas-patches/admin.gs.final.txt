@@ -73,7 +73,7 @@ function registerExistingEvent() {
   const SPREADSHEET_ID = '← スプレッドシートIDをここに貼り付け';
   const START_DATE     = '2026/08/22';
   const END_DATE       = '2026/08/23';
-  const STATUS         = '完了';
+  const STATUS         = '準備中'; // 本番前は準備中。終了後に手動で完了へ変更する
 
   const sheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
   sheet.appendRow([EVENT_ID, EVENT_NAME, SPREADSHEET_ID, START_DATE, END_DATE, STATUS]);
