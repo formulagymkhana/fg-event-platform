@@ -65,6 +65,7 @@ function dispatch_(e) {
       case 'adminClearCache':   return actionAdminClearCache_(p);
       case 'adminGetCompanies': return actionAdminGetCompanies_(p);
       case 'adminGenerateKeys': return actionAdminGenerateKeys_(p);
+      case 'adminUpdateKey':    return actionAdminUpdateKey_(p);
       default:                        return err_('unknown_action');
     }
   } catch (e) {
@@ -1017,6 +1018,15 @@ function actionAdminGetCompanies_(p) {
     hasNfc:    g(row, 'hasNfc'),
   }));
   return ok_({ companies });
+}
+
+// 管理者キーを変更
+function actionAdminUpdateKey_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.newKey) return err_('missing_params');
+  PropertiesService.getScriptProperties().setProperty('ADMIN_KEY', String(p.newKey));
+  return ok_({ updated: true });
 }
 
 // 未発行キーを一括発行

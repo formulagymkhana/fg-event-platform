@@ -29,6 +29,7 @@ window.addEventListener('DOMContentLoaded', () => {
   id_('btn-gen-keys')?.addEventListener('click', handleGenerateKeys_);
   id_('btn-copy-url')?.addEventListener('click', handleCopyUrl_);
   id_('btn-reload')?.addEventListener('click', () => loadAll_());
+  id_('btn-change-key')?.addEventListener('click', handleChangeKey_);
 
   // Section toggles
   document.querySelectorAll('.section-hd').forEach(hd => {
@@ -271,6 +272,45 @@ function handleCopyUrl_() {
   const txt = id_('walkin-url').textContent;
   if (!txt || txt.startsWith('（')) return;
   copyText_(txt);
+}
+
+// ── Admin key change ──────────────────────────────
+async function handleChangeKey_() {
+  const newKey = getVal_('new-admin-key').trim();
+  const fb     = id_('key-feedback');
+  fb.className = 'save-fb'; fb.textContent = '';
+
+  if (!newKey) {
+    fb.textContent = '新しいキーを入力してください';
+    fb.className = 'save-fb err'; return;
+  }
+  if (newKey === adminKey_) {
+    fb.textContent = '現在と同じキーです';
+    fb.className = 'save-fb err'; return;
+  }
+
+  const btn = id_('btn-change-key');
+  btn.disabled = true; btn.textContent = '変更中...';
+
+  const res = await adminCall_('adminUpdateKey', { newKey });
+  btn.disabled = false; btn.textContent = 'キーを変更';
+
+  if (res.ok) {
+    // 新しいキーでセッションを更新してログアウト
+    sessionStorage.removeItem('fg_admin_key');
+    fb.textContent = '✓ 変更しました。新しいキーで再ログインしてください。';
+    fb.className = 'save-fb ok';
+    setTimeout(() => {
+      adminKey_ = '';
+      showView_('login');
+      id_('login-key').value = '';
+      const btn2 = id_('btn-login');
+      if (btn2) { btn2.disabled = false; btn2.textContent = 'ログイン'; }
+    }, 2000);
+  } else {
+    fb.textContent = '⚠ 失敗: ' + (res.message || '');
+    fb.className = 'save-fb err';
+  }
 }
 
 // ── Cache clear ───────────────────────────────────
