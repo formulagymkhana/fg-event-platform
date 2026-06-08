@@ -38,8 +38,13 @@ document.getElementById('btn-retry')?.addEventListener('click', () => showState(
 async function loadExistingProgress(token) {
   const res = await FG_API.getStampProgress(token);
   if (res.ok) {
-    renderBar('already-bar', 'already-count', res.data);
-    showState('already');
+    if (res.data.exchanged) {
+      // 交換済み → 完了メッセージ
+      renderContinuing(res.data);
+    } else {
+      renderBar('already-bar', 'already-count', res.data);
+      showState('already');
+    }
   } else {
     // トークン無効(古いCookie等) → スキャン画面に倒す
     showState('ready');
@@ -107,9 +112,8 @@ async function onQRFound(qrData) {
       setText('guide-count', String(res.data.prizeCount     || 3));
       showState('success');
     } else {
-      // 復帰(Cookie消失後の再スキャン) → 継続画面
-      renderBar('continuing-bar', 'continuing-count', res.data);
-      showState('continuing');
+      // 復帰(Cookie消失後の再スキャン) → 継続 or 交換済み画面
+      renderContinuing(res.data);
     }
   } else {
     showState('error');
@@ -129,6 +133,19 @@ function stopCamera() {
 }
 
 // ── 描画 ──────────────────────────────────────────
+
+function renderContinuing(d) {
+  if (d.exchanged) {
+    document.getElementById('continuing-icon').textContent = '🎁';
+    setText('continuing-title', '景品交換済みです！');
+    setText('continuing-msg', 'ご参加ありがとうございました！\n進捗ページで交換内容を確認できます。');
+    document.getElementById('continuing-bar-wrap').style.display = 'none';
+    document.getElementById('continuing-count').style.display    = 'none';
+  } else {
+    renderBar('continuing-bar', 'continuing-count', d);
+  }
+  showState('continuing');
+}
 
 function renderBar(barId, countId, d) {
   const count     = d.stampCount     || 0;
