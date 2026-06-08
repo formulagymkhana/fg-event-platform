@@ -56,8 +56,7 @@ async function handleSubmit() {
     phone:      val_('f-phone').trim(),
     prefecture: val_('f-prefecture'),
     competing:  radioVal_('competing'),    // 所属校が出場するか（記録対象に）
-    // 同意記録（送信時点で全てチェック必須なので通常 'true'）
-    rulesConsent:   document.getElementById('cb-rules').checked   ? 'true' : 'false',
+    // 同意記録（送信時点で両方チェック必須なので通常 'true'）
     snsConsent:     document.getElementById('cb-media').checked   ? 'true' : 'false',
     privacyConsent: document.getElementById('cb-privacy').checked ? 'true' : 'false',
   };
@@ -157,11 +156,6 @@ function validateForm_() {
   // 住所(都道府県): 必須（フォーム規則）
   if (!val_('f-prefecture')) {
     showErr_('err-prefecture', 'f-prefecture'); ok = false;
-  }
-  // 大会規則書・誓約書同意: 必須（フォーム規則）
-  if (!document.getElementById('cb-rules').checked) {
-    showErr_('err-rules');
-    document.getElementById('cb-wrap-rules').classList.add('error'); ok = false;
   }
   if (!document.getElementById('cb-media').checked) {
     showErr_('err-media');

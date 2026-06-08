@@ -782,7 +782,6 @@ function actionRegisterWalkIn_(p) {
       '生年月日': p.birthday || '', 'メールアドレス': p.email || '',
       '電話番号': p.phone || '',
       '所属校出場': p.competing || '',              // 所属校が出場するか
-      '規則誓約同意': p.rulesConsent  === 'true' ? 'true' : 'false', // 同意記録(大会規則書・誓約書)
       'SNS同意':     p.snsConsent     === 'true' ? 'true' : 'false', // 同意記録
       '個人情報同意': p.privacyConsent === 'true' ? 'true' : 'false', // 同意記録
       '登録種別': '当日',
