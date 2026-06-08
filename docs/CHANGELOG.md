@@ -16,6 +16,17 @@
 
 ---
 
+## 2026-06-09 デザイン統一: register.html + admin.html（最終）
+- 変更ファイル:
+  - `app/register.html`
+  - `app/admin.html`
+- 変更内容:
+  - register.html: `../js/style.css` 読み込み追加。ヘッダー白化 (`.fg-header`)、フォームの focus/accent を `--fg-blue` に統一。`.submit-btn` を `--fg-blue` ベースに変更。`.success-icon` を `--fg-blue-soft` カードに変更。`.guide-num`・`.bar-fill`・ラジオ `accent-color` を `--fg-blue` に統一。フォームリンク色を `var(--fg-navy)` に変更。
+  - admin.html: `../js/style.css` 読み込み追加。ローカル `:root` の `--navy`/`--gray`/`--gray-light`/`--border`/`--navy-light` を `--fg-*` 変数にエイリアス化。管理画面のダーク UI（ヘッダー/テーブル背景 `--navy`）は構造無変更で維持。
+  - JS・ID・ロジックは一切変更なし。
+- 理由/背景: デザイン統一タスク（commit 5/5）。全画面の style.css 適用が完了。
+- 申し送り/注意点: push 確認を取ること（push は確認後）。
+
 ## 2026-06-09 デザイン統一: exchange.html（スタッフ画面）
 - 変更ファイル:
   - `app/exchange.html`

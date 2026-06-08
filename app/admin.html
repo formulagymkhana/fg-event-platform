@@ -10,12 +10,19 @@
                          https://script.googleusercontent.com;
              style-src 'self' 'unsafe-inline';">
   <title>FG 管理パネル</title>
+  <link rel="stylesheet" href="../js/style.css">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     :root{
-      --navy:#0B2545;--navy-mid:#1A4A80;--navy-light:#EBF0F8;
-      --gray:#6B7A8D;--gray-light:#F0F3F7;--border:#D4DBE6;
-      --red:#C0392B;--green:#27AE60;
+      /* style.css の変数をローカル alias に束ねる */
+      --navy:       var(--fg-navy);
+      --navy-mid:   #1A4A80;
+      --navy-light: var(--fg-blue-soft);
+      --gray:       var(--fg-muted);
+      --gray-light: var(--fg-bg);
+      --border:     var(--fg-line);
+      --red:        #C0392B;
+      --green:      #27AE60;
     }
     body{font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;
       background:var(--gray-light);min-height:100vh;color:#1A2733;font-size:14px}
