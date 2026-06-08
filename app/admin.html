@@ -69,6 +69,44 @@
     .sm-btn{padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;
       font-weight:600;color:var(--navy);background:#fff;cursor:pointer}
 
+    /* ── エリアラベル（準備フロー / 当日運用 / 設定・管理） ── */
+    .area-label{
+      font-size:11px;font-weight:700;color:var(--gray);letter-spacing:.1em;text-transform:uppercase;
+      margin:20px 0 8px 2px;display:flex;align-items:center;gap:8px
+    }
+    .area-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+    /* ── 準備ステップ ── */
+    .step-hd-inner{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+    .step-num{
+      width:22px;height:22px;border-radius:50%;background:var(--navy);
+      color:#fff;font-size:11px;font-weight:700;
+      display:flex;align-items:center;justify-content:center;flex-shrink:0
+    }
+    .step-badge{
+      font-size:10px;font-weight:700;padding:2px 8px;border-radius:100px;
+      white-space:nowrap;flex-shrink:0
+    }
+    .step-badge.done{background:var(--fg-success-bg,#EAF8F0);color:var(--fg-success,#1A6640)}
+    .step-badge.todo{background:#FEF3C7;color:#92400E}
+    .step-badge.init{background:var(--gray-light);color:var(--gray)}
+    .step-desc{font-size:13px;color:var(--gray);margin-bottom:12px;line-height:1.6}
+    .step-note{font-size:12px;color:var(--gray);margin-top:10px;line-height:1.6}
+
+    /* 準備中ボタン行 */
+    .wip-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+    .wip-btn{
+      flex:1;padding:10px 14px;background:var(--gray-light);
+      border:1.5px dashed var(--border);border-radius:8px;
+      font-size:13px;color:var(--gray);cursor:pointer;text-align:left
+    }
+    .wip-btn:hover{background:#E4E9F0}
+    .wip-tag{
+      font-size:10px;color:var(--gray);background:var(--gray-light);
+      border:1px solid var(--border);border-radius:100px;
+      padding:2px 8px;white-space:nowrap;flex-shrink:0
+    }
+
     /* Stats */
     .stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}
     .stat-card{background:#fff;border-radius:10px;padding:14px;text-align:center;
@@ -86,13 +124,13 @@
     .act-btn:disabled{opacity:.5;cursor:not-allowed}
 
     /* Sections */
-    .section{background:#fff;border-radius:12px;margin-bottom:14px;
+    .section{background:#fff;border-radius:12px;margin-bottom:10px;
       box-shadow:0 1px 4px rgba(11,37,69,.08);overflow:hidden}
     .section-hd{padding:14px 16px;display:flex;align-items:center;justify-content:space-between;
       cursor:pointer;user-select:none}
     .section-title{font-size:13px;font-weight:700;color:var(--navy);display:flex;align-items:center;gap:6px}
     .section-count{font-size:11px;color:var(--gray);font-weight:400}
-    .section-toggle{font-size:14px;color:var(--gray);transition:transform .2s}
+    .section-toggle{font-size:14px;color:var(--gray);transition:transform .2s;flex-shrink:0}
     .section-toggle.open{transform:rotate(180deg)}
     .section-body{padding:0 16px 14px;display:none}
     .section-body.open{display:block}
@@ -107,6 +145,7 @@
 
     /* Config form */
     .cfg-group{margin-bottom:18px}
+    .cfg-group:last-child{margin-bottom:0}
     .cfg-group-title{font-size:11px;font-weight:700;color:#8BA3C4;letter-spacing:.08em;
       text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
     .cfg-row{margin-bottom:12px}
@@ -194,7 +233,7 @@
 
   <div class="app-body">
 
-    <!-- Event bar -->
+    <!-- ① イベントバー -->
     <div class="event-bar">
       <div class="ev-name" id="ev-name">読み込み中...</div>
       <div class="ev-sub">
@@ -203,7 +242,110 @@
       </div>
     </div>
 
-    <!-- Stats -->
+    <!-- ② 準備フロー -->
+    <div class="area-label">準備フロー</div>
+
+    <!-- Step 1: イベント作成 -->
+    <div class="section">
+      <div class="section-hd" data-section="step1">
+        <div class="step-hd-inner">
+          <span class="step-num">1</span>
+          <span class="section-title" style="gap:8px">
+            イベント作成
+            <span class="step-badge init" id="badge-step1">確認中</span>
+          </span>
+        </div>
+        <span class="section-toggle" id="toggle-step1">▼</span>
+      </div>
+      <div class="section-body" id="body-step1">
+        <p class="step-desc">イベント用スプレッドシートを新規作成します。<br>ヘッダーの「＋ 新規イベント」ボタンからも同じ操作ができます。</p>
+        <button class="save-btn" id="btn-step1-create">＋ 新規イベントを作成</button>
+        <p class="step-note">現在選択中のイベントは上部イベントバーで確認・切り替えができます。</p>
+      </div>
+    </div>
+
+    <!-- Step 2: 企業・学生の登録 -->
+    <div class="section">
+      <div class="section-hd" data-section="step2">
+        <div class="step-hd-inner">
+          <span class="step-num">2</span>
+          <span class="section-title" style="gap:8px">
+            企業・学生の登録
+            <span class="step-badge init" id="badge-step2">確認中</span>
+          </span>
+        </div>
+        <span class="section-toggle" id="toggle-step2">▼</span>
+      </div>
+      <div class="section-body" id="body-step2">
+        <p class="step-desc">企業マスターと学生マスターをイベントに登録します。</p>
+
+        <!-- 準備中: 学生マスター取込 -->
+        <div class="wip-row">
+          <button class="wip-btn" data-wip>📋 学生マスター取込（importStudents）</button>
+          <span class="wip-tag">準備中</span>
+        </div>
+        <!-- 準備中: 企業マスター編集 -->
+        <div class="wip-row">
+          <button class="wip-btn" data-wip>🏢 企業マスター編集</button>
+          <span class="wip-tag">準備中</span>
+        </div>
+
+        <!-- 実機能: 企業キー管理（settings から移動） -->
+        <div class="cfg-group" style="margin-top:16px">
+          <div class="cfg-group-title">企業キー管理</div>
+          <button class="save-btn" id="btn-gen-keys" style="margin-bottom:14px">未発行キーを一括発行</button>
+          <div id="company-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: QR・NFC URL 発行 -->
+    <div class="section">
+      <div class="section-hd" data-section="step3">
+        <div class="step-hd-inner">
+          <span class="step-num">3</span>
+          <span class="section-title" style="gap:8px">
+            QR・NFC URL 発行
+            <span class="step-badge init" id="badge-step3">確認中</span>
+          </span>
+        </div>
+        <span class="section-toggle" id="toggle-step3">▼</span>
+      </div>
+      <div class="section-body" id="body-step3">
+        <p class="step-desc">学生QR名刺・企業NFCタグのURLを発行し、印刷・掲示します。</p>
+
+        <!-- 準備中: 学生QR URL一括発行 -->
+        <div class="wip-row">
+          <button class="wip-btn" data-wip>📱 学生QR URL 一括発行</button>
+          <span class="wip-tag">準備中</span>
+        </div>
+        <!-- 準備中: 企業NFC URL発行 -->
+        <div class="wip-row">
+          <button class="wip-btn" data-wip>📡 企業NFC URL 発行</button>
+          <span class="wip-tag">準備中</span>
+        </div>
+        <!-- 準備中: ラベル用CSV出力 -->
+        <div class="wip-row">
+          <button class="wip-btn" data-wip>📄 ラベル用CSV 出力</button>
+          <span class="wip-tag">準備中</span>
+        </div>
+
+        <!-- 実機能: 当日参加登録URL（settings から移動） -->
+        <div class="cfg-group" style="margin-top:16px">
+          <div class="cfg-group-title">当日参加登録URL</div>
+          <div class="url-box">
+            <div style="font-size:11px;color:var(--gray);margin-bottom:4px">会場掲示用QRコードのリンク先</div>
+            <div class="url-val" id="walkin-url">—</div>
+            <button class="sm-btn" id="btn-copy-url">URLをコピー</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ③ 当日運用 -->
+    <div class="area-label">当日運用</div>
+
+    <!-- 統計 -->
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-val" id="stat-students">—</div><div class="stat-lbl">登録学生数</div></div>
       <div class="stat-card"><div class="stat-val" id="stat-walkins">—</div><div class="stat-lbl">当日参加者</div></div>
@@ -211,7 +353,7 @@
       <div class="stat-card"><div class="stat-val" id="stat-prizes">—</div><div class="stat-lbl">景品交換済</div></div>
     </div>
 
-    <!-- Actions -->
+    <!-- アクション -->
     <div class="action-row">
       <button class="act-btn act-btn-ghost" id="btn-reload">↻ 再読み込み</button>
       <button class="act-btn act-btn-danger" id="btn-clear-cache">⚠ キャッシュクリア</button>
@@ -265,7 +407,9 @@
       </div>
     </div>
 
-    <!-- 設定（折りたたみ） -->
+    <!-- ④ 設定・管理 -->
+    <div class="area-label">設定・管理</div>
+
     <div class="section">
       <div class="section-hd" data-section="settings">
         <span class="section-title">⚙️ 設定・管理</span>
@@ -273,7 +417,7 @@
       </div>
       <div class="section-body" id="body-settings">
 
-        <!-- 景品・期間設定 -->
+        <!-- 景品・期間設定（当日運用の調整） -->
         <div class="cfg-group">
           <div class="cfg-group-title">景品・期間設定</div>
           <div class="cfg-row-half">
@@ -305,23 +449,6 @@
           </div>
           <button class="save-btn" id="btn-save-config">保存</button>
           <span class="save-fb" id="save-feedback"></span>
-        </div>
-
-        <!-- 当日登録URL -->
-        <div class="cfg-group">
-          <div class="cfg-group-title">当日参加登録URL</div>
-          <div class="url-box">
-            <div style="font-size:11px;color:var(--gray);margin-bottom:4px">会場掲示用QRコードのリンク先</div>
-            <div class="url-val" id="walkin-url">—</div>
-            <button class="sm-btn" id="btn-copy-url">URLをコピー</button>
-          </div>
-        </div>
-
-        <!-- 企業キー -->
-        <div class="cfg-group">
-          <div class="cfg-group-title">企業キー管理</div>
-          <button class="save-btn" id="btn-gen-keys" style="margin-bottom:14px">未発行キーを一括発行</button>
-          <div id="company-list"></div>
         </div>
 
         <!-- 管理者キー変更 -->

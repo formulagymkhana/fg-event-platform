@@ -16,6 +16,33 @@
 
 ---
 
+## 2026-06-09 admin 運営動線の整理（準備ステップガイド追加・設定再配置）
+- 変更ファイル:
+  - `app/admin.html`（構造再設計）
+  - `js/admin.js`（最小差分）
+  - `docs/NOTES.md`（準備中機能の申し送り追記）
+- admin.html 変更内容:
+  - 全体構造を「イベントバー → 準備フロー → 当日運用 → 設定・管理」の順に再設計。
+  - 各ブロックの区切りに `.area-label` を追加（視覚的なフロー案内）。
+  - **準備ステップガイド（新規）**: 折りたたみカード3枚（Step1/2/3）を追加。各カードに自動完了バッジを表示。
+    - Step1（イベント作成）: `btn-step1-create` → 新規イベントモーダル呼び出し。
+    - Step2（企業・学生登録）: 「準備中」ボタン2本 ＋ 企業キー管理（`btn-gen-keys`/`company-list`）を settings から移動。
+    - Step3（URL発行）: 「準備中」ボタン3本 ＋ 当日参加登録URL（`walkin-url`/`btn-copy-url`）を settings から移動。
+  - settings セクションは「景品・期間設定」と「管理者キー変更」のみに整理。
+  - **ID変更なし**。DOM 移動のみで admin.js の参照は全て維持。
+- admin.js 変更内容:
+  - `btn-step1-create` のクリックリスナー追加（`showModal_('modal-create')` を呼び出し）。
+  - `data-wip` 属性を持つボタンへの委譲クリックハンドラを追加（「今後実装予定」トーストを表示）。
+  - `updateStepBadges_()` / `setBadge_()` 関数を新規追加（ステップバッジの完了判定・更新）。
+  - `loginWithKey_()` / `loadStats_()` / `loadCompanies_()` の完了後に `updateStepBadges_()` を呼び出す。
+- 完了判定ロジック（自動）:
+  - Step1: `allEvents_.length > 0`
+  - Step2: `stat-students > 0` かつ `company-list` に `.company-item` が1件以上
+  - Step3: `walkInCode_` 設定済み かつ 発行済みキーが1件以上
+- 申し送り/注意点:
+  - 準備中機能（学生マスター取込 UI・NFC URL 発行等）は別タスクで実装する。NOTES 参照。
+  - push は確認後。
+
 ## 2026-06-09 デザイン統一: register.html + admin.html（最終）
 - 変更ファイル:
   - `app/register.html`

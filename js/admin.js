@@ -22,6 +22,7 @@ window.addEventListener('DOMContentLoaded', () => {
     loadAll_();
   });
   id_('btn-new-event')?.addEventListener('click', () => showModal_('modal-create'));
+  id_('btn-step1-create')?.addEventListener('click', () => showModal_('modal-create'));
   id_('modal-close')?.addEventListener('click', () => hideModal_('modal-create'));
   id_('btn-create-event')?.addEventListener('click', handleCreateEvent_);
   id_('btn-save-config')?.addEventListener('click', handleSaveConfig_);
@@ -34,6 +35,13 @@ window.addEventListener('DOMContentLoaded', () => {
   // Section toggles
   document.querySelectorAll('.section-hd').forEach(hd => {
     hd.addEventListener('click', () => toggleSection_(hd.dataset.section));
+  });
+
+  // 準備中ボタン: 押すと未実装メッセージをトーストで案内
+  document.addEventListener('click', e => {
+    if (e.target.hasAttribute('data-wip')) {
+      showToast_('この機能は今後実装予定です。現在はスプレッドシート直接編集または GAS 関数で対応してください。');
+    }
   });
 
   // Restore session
@@ -65,6 +73,7 @@ async function loginWithKey_() {
     autoSelectEvent_();
     showView_('app');
     loadAll_();
+    updateStepBadges_();
     return true;
   }
   showLoginErr_(res.message || '認証に失敗しました');
@@ -143,6 +152,7 @@ async function loadStats_() {
   setText_('stat-walkins',  d.walkInCount      ?? '—');
   setText_('stat-stamps',   d.stampCount       ?? '—');
   setText_('stat-prizes',   d.prizeCount       ?? '—');
+  updateStepBadges_();
 }
 
 // ── Stamp log ─────────────────────────────────────
@@ -245,6 +255,7 @@ async function loadCompanies_() {
     </div>`).join('');
   container.querySelectorAll('.copy-btn[data-copy]').forEach(b =>
     b.addEventListener('click', () => copyText_(b.dataset.copy)));
+  updateStepBadges_();
 }
 
 async function handleGenerateKeys_() {
@@ -463,4 +474,37 @@ function fmtD_(val) {
 }
 function esc_(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── 準備ステップ バッジ更新 ─────────────────────────
+/**
+ * 取得済みデータをもとに各ステップの完了バッジを更新する。
+ * loadStats_() / loadCompanies_() / loginWithKey_() 完了後に呼ばれる。
+ */
+function updateStepBadges_() {
+  // Step 1: イベントが1件以上存在すれば完了
+  const step1Done = allEvents_.length > 0;
+  setBadge_('badge-step1', step1Done ? 'done' : 'todo',
+    step1Done ? '✓ 完了' : '未完了');
+
+  // Step 2: 学生数 > 0 かつ 企業が1社以上登録されていれば完了
+  const studentCount = parseInt(id_('stat-students')?.textContent, 10) || 0;
+  const companyCount = id_('company-list')?.querySelectorAll('.company-item').length || 0;
+  const step2Done    = studentCount > 0 && companyCount > 0;
+  setBadge_('badge-step2', step2Done ? 'done' : 'todo',
+    step2Done ? '✓ 完了' : '未完了');
+
+  // Step 3: walkInCode_ が設定済み かつ 企業キーが1件以上発行済みであれば完了
+  const anyKeyIssued = [...(id_('company-list')?.querySelectorAll('.key-val') || [])]
+    .some(el => el.textContent.trim() !== '未発行');
+  const step3Done = !!(walkInCode_) && anyKeyIssued;
+  setBadge_('badge-step3', step3Done ? 'done' : 'todo',
+    step3Done ? '✓ 完了' : '未完了');
+}
+
+function setBadge_(eid, type, label) {
+  const el = id_(eid);
+  if (!el) return;
+  el.className = 'step-badge ' + type;
+  el.textContent = label;
 }
