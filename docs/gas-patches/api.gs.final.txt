@@ -755,7 +755,7 @@ function actionRegisterWalkIn_(p) {
   // 学生マスターに追加
   const newRow = sHeaders.map(h => {
     const map = {
-      'studentId': studentId, 'token': token,
+      'studentId': studentId, 'cardToken': token,  // T11: token → cardToken
       '氏名': String(p.name).trim(), 'ふりがな': String(p.furigana || '').trim(),
       '大学名': String(p.school).trim(), '学部学科': p.department || '',
       '学年': p.year || '', '属性': '一般参加学生',
