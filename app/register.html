@@ -44,7 +44,7 @@
     /* ラジオ */
     .radio-group { display: flex; gap: 12px; flex-wrap: wrap; }
     .radio-group label { display: flex; align-items: center; gap: 6px; font-size: 14px; color: #1A2733; font-weight: 400; cursor: pointer; }
-    .radio-group input[type="radio"] { width: 16px; height: 16px; accent-color: #0B2545; cursor: pointer; }
+    .radio-group input[type="radio"] { width: 16px; height: 16px; flex-shrink: 0; padding: 0; border: 0; appearance: auto; -webkit-appearance: auto; accent-color: #0B2545; cursor: pointer; }
 
     /* 同意 */
     .consent-box { background: #F0F3F7; border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
@@ -197,6 +197,11 @@
                 <option>自動車大学校1年生</option><option>自動車大学校2年生</option>
                 <option>自動車大学校3年生</option><option>自動車大学校4年生</option>
               </optgroup>
+              <optgroup label="専門学校">
+                <option>専門学校1年生</option><option>専門学校2年生</option>
+                <option>専門学校3年生</option><option>専門学校4年生</option>
+              </optgroup>
+              <option>その他</option>
             </select>
             <p class="field-err" id="err-year">学年を選択してください</p>
           </div>
@@ -213,11 +218,10 @@
         </div>
         <div class="form-row">
           <label>性別<span class="req">*</span></label>
-          <div class="radio-group" style="margin-top:8px;">
-            <label><input type="radio" name="gender" value="男"> 男</label>
-            <label><input type="radio" name="gender" value="女"> 女</label>
-            <label><input type="radio" name="gender" value="回答しない"> 回答しない</label>
-          </div>
+          <select id="f-gender">
+            <option value="">選択</option>
+            <option>男</option><option>女</option><option>回答しない</option>
+          </select>
           <p class="field-err" id="err-gender">性別を選択してください</p>
         </div>
       </div>

@@ -49,7 +49,7 @@ async function handleSubmit() {
     school:     val_('f-school').trim(),
     department: val_('f-department').trim(),
     year:       val_('f-year'),
-    gender:     radioVal_('gender'),       // 性別（フォーム準拠で追加）
+    gender:     val_('f-gender'),          // 性別（プルダウン）
     clubYears:  val_('f-club-years'),
     birthday:   val_('f-birthday'),
     email:      val_('f-email').trim(),
@@ -134,9 +134,9 @@ function validateForm_() {
   if (!val_('f-club-years')) {
     showErr_('err-club-years', 'f-club-years'); ok = false;
   }
-  // 性別: 必須（フォーム準拠で追加）
-  if (!radioVal_('gender')) {
-    showErr_('err-gender'); ok = false;
+  // 性別: 必須（プルダウン）
+  if (!val_('f-gender')) {
+    showErr_('err-gender', 'f-gender'); ok = false;
   }
   if (!val_('f-birthday')) {
     showErr_('err-birthday', 'f-birthday'); ok = false;
