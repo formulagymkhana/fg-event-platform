@@ -803,7 +803,7 @@ function actionRegisterWalkIn_(p) {
 function validateAdmin_(p) {
   const valid = PropertiesService.getScriptProperties().getProperty('ADMIN_KEY');
   if (!valid) return err_('admin_key_not_configured');
-  if (String(p.adminKey || '') !== String(valid)) return err_('invalid_admin_key');
+  if (String(p.adminKey || '').trim() !== String(valid).trim()) return err_('invalid_admin_key');
   return null;
 }
 

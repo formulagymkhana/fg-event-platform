@@ -289,6 +289,20 @@ async function handleChangeKey_() {
     fb.className = 'save-fb err'; return;
   }
 
+  // 確認ステップ
+  const confirmed = window.confirm(
+    '管理者キーを変更します。\n\n' +
+    '新しいキー: ' + newKey + '\n\n' +
+    '変更後は全員このキーでログインし直す必要があります。\n' +
+    'このキーは控えましたか？よろしいですか？'
+  );
+  if (!confirmed) {
+    fb.textContent = 'キャンセルしました';
+    fb.className = 'save-fb err';
+    setTimeout(() => { fb.className = 'save-fb'; }, 2000);
+    return;
+  }
+
   const btn = id_('btn-change-key');
   btn.disabled = true; btn.textContent = '変更中...';
 
