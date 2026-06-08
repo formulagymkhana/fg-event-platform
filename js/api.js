@@ -14,10 +14,34 @@ const FG_API = (() => {
 
   // ── 内部共通関数 ──────────────────────────────
 
+  /**
+   * 今日のイベントIDをlocalStorageキャッシュ経由で取得。
+   * 当日初回のみGASへ問い合わせ、以降はキャッシュを返す(高速)。
+   * GASが応答しない場合は config.js の EVENT_ID にフォールバック。
+   */
+  async function getOrFetchEventId_() {
+    const today = new Date().toDateString();
+    try {
+      const cached     = localStorage.getItem('fg_event_id');
+      const cachedDate = localStorage.getItem('fg_event_date');
+      if (cached && cachedDate === today) return cached;
+      const res = await getCurrentEvent();
+      if (res.ok && res.data.eventId) {
+        localStorage.setItem('fg_event_id',   res.data.eventId);
+        localStorage.setItem('fg_event_date',  today);
+        return res.data.eventId;
+      }
+    } catch (e) {}
+    return FG_CONFIG.EVENT_ID;
+  }
+
   async function call_(action, params = {}) {
     const url = new URL(FG_CONFIG.API_BASE_URL);
     url.searchParams.set('action', action);
-    url.searchParams.set('event', FG_CONFIG.EVENT_ID);
+    // getCurrentEvent 自身はイベントID不要。それ以外は自動解決。
+    if (action !== 'getCurrentEvent' && !params.event) {
+      params = { event: await getOrFetchEventId_(), ...params };
+    }
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null) url.searchParams.set(k, v);
     });
@@ -37,6 +61,13 @@ const FG_API = (() => {
       }
       return { ok: false, error: 'network_error', message: '通信エラーが発生しました' };
     }
+  }
+
+  // ── イベント自動判定API ───────────────────────
+
+  /** 今日の日付に合致するアクティブなイベントを取得 */
+  function getCurrentEvent() {
+    return call_('getCurrentEvent', {});
   }
 
   // ── 企業向けAPI ───────────────────────────────
@@ -89,6 +120,17 @@ const FG_API = (() => {
     return call_('getCompanyStampVisitors', { key: viewKey });
   }
 
+  // ── 当日飛び込み登録API ──────────────────────
+
+  /**
+   * 当日飛び込み参加者を登録してstampTokenを発行する。
+   * params: { code, name, furigana, school, department, year,
+   *           clubYears, birthday, email, phone, prefecture }
+   */
+  function registerWalkIn(params) {
+    return call_('registerWalkIn', params);
+  }
+
   // ── 景品交換API(スタッフ用) ──────────────────
 
   /** 学生cardTokenとスタッフキーで景品交換状況を取得 */
@@ -134,6 +176,8 @@ const FG_API = (() => {
 
   // ── エクスポート ──────────────────────────────
   return {
+    // イベント自動判定
+    getCurrentEvent,
     // 企業向け
     getStudent,
     saveViewLog,
@@ -142,6 +186,8 @@ const FG_API = (() => {
     saveStamp,
     getStampProgress,
     exchangePrize,
+    // 飛び込み登録
+    registerWalkIn,
     // 企業閲覧
     getCompanyView,
     getCompanyStampVisitors,

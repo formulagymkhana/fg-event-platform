@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self';
+             script-src 'self';
+             connect-src https://script.google.com
+                         https://script.googleusercontent.com;
+             style-src 'self' 'unsafe-inline';
+             media-src blob:;">
+  <title>FORMULA GYMKHANA — 当日参加登録</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif; background: #F0F3F7; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 24px 16px 48px; }
+    .card { background: #fff; border-radius: 16px; width: 100%; max-width: 420px; overflow: hidden; box-shadow: 0 4px 24px rgba(11,37,69,0.10); }
+    .fg-header { background: #0B2545; padding: 13px 20px; display: flex; align-items: center; gap: 10px; }
+    .fg-logo { font-size: 11px; font-weight: 700; letter-spacing: 0.15em; color: #fff; }
+    .fg-logo span { background: #fff; color: #0B2545; padding: 1px 6px; border-radius: 2px; margin-left: 2px; }
+    .fg-page-name { margin-left: auto; font-size: 11px; color: #8BA3C4; }
+    .card-body { padding: 28px 24px 32px; }
+    .state-icon { font-size: 48px; text-align: center; margin-bottom: 14px; }
+    .state-title { font-size: 18px; font-weight: 700; color: #0B2545; text-align: center; margin-bottom: 8px; }
+    .state-msg { font-size: 13px; color: #6B7A8D; line-height: 1.75; text-align: center; margin-bottom: 20px; }
+
+    /* フォーム */
+    .form-section { margin-bottom: 20px; }
+    .section-label { font-size: 11px; font-weight: 700; color: #8BA3C4; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid #E8ECF0; }
+    .form-row { margin-bottom: 14px; }
+    .form-row label { display: block; font-size: 12px; font-weight: 600; color: #1A2733; margin-bottom: 5px; }
+    .form-row label .req { color: #C0392B; margin-left: 3px; }
+    .form-row input, .form-row select {
+      width: 100%; padding: 11px 13px; border: 1.5px solid #D4DBE6; border-radius: 8px;
+      font-size: 15px; color: #1A2733; background: #fff; appearance: none; -webkit-appearance: none;
+      transition: border-color 0.15s;
+    }
+    .form-row input:focus, .form-row select:focus { outline: none; border-color: #0B2545; }
+    .form-row input.error, .form-row select.error { border-color: #C0392B; }
+    .form-row .hint { font-size: 11px; color: #8BA3C4; margin-top: 4px; }
+    .form-row-half { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .form-row-half .form-row { margin-bottom: 0; }
+
+    /* ラジオ */
+    .radio-group { display: flex; gap: 12px; flex-wrap: wrap; }
+    .radio-group label { display: flex; align-items: center; gap: 6px; font-size: 14px; color: #1A2733; font-weight: 400; cursor: pointer; }
+    .radio-group input[type="radio"] { width: 16px; height: 16px; accent-color: #0B2545; cursor: pointer; }
+
+    /* 同意 */
+    .consent-box { background: #F0F3F7; border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
+    .consent-box label { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: #1A2733; line-height: 1.6; cursor: pointer; }
+    .consent-box input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; accent-color: #0B2545; cursor: pointer; }
+    .consent-box.error { border: 1.5px solid #C0392B; }
+
+    /* 来場日バッジ */
+    .event-badge { background: #EBF0F8; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #0B2545; font-weight: 600; display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+    .event-badge .label { font-size: 11px; color: #8BA3C4; font-weight: 400; }
+
+    /* ボタン */
+    .submit-btn { width: 100%; padding: 16px; background: #0B2545; color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; letter-spacing: 0.04em; transition: background 0.2s; margin-top: 4px; }
+    .submit-btn:active { background: #1A4A80; }
+    .submit-btn:disabled { background: #B0BAC8; cursor: not-allowed; }
+
+    /* 成功画面 */
+    .success-icon { width: 72px; height: 72px; border-radius: 50%; background: #0B2545; color: #fff; font-size: 32px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; animation: popIn 0.4s cubic-bezier(0.175,0.885,0.32,1.275); }
+    @keyframes popIn { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+    .welcome-sub { font-size: 14px; color: #6B7A8D; margin-bottom: 20px; text-align: center; }
+    .guide-box { background: #F0F3F7; border-radius: 10px; padding: 16px 16px 14px; margin-bottom: 20px; text-align: left; }
+    .guide-step { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+    .guide-step:last-child { margin-bottom: 0; }
+    .guide-num { width: 22px; height: 22px; border-radius: 50%; background: #0B2545; color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .guide-text { font-size: 13px; color: #1A2733; line-height: 1.5; padding-top: 1px; }
+    .guide-text b { color: #0B2545; }
+    .bar-track { width: 100%; height: 14px; background: #E8ECF0; border-radius: 100px; overflow: hidden; margin-top: 8px; }
+    .bar-fill { height: 100%; background: linear-gradient(90deg,#0B2545,#1A4A80); border-radius: 100px; width: 0; transition: width 0.6s ease 0.2s; }
+    .result-count { font-size: 13px; color: #6B7A8D; margin: 8px 0 20px; text-align: center; }
+    .action-link { display: block; margin-top: 12px; padding: 12px; border-radius: 8px; font-size: 13px; text-decoration: none; text-align: center; background: #F0F3F7; color: #0B2545; }
+
+    /* スピナー */
+    .spinner { width: 36px; height: 36px; border: 3px solid #D4DBE6; border-top-color: #0B2545; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+
+    /* エラーテキスト */
+    .field-err { font-size: 11px; color: #C0392B; margin-top: 4px; display: none; }
+    .field-err.show { display: block; }
+    .form-error-banner { background: #FBEAEA; border-radius: 8px; padding: 12px 14px; font-size: 13px; color: #9A2A2A; margin-bottom: 16px; display: none; }
+    .form-error-banner.show { display: block; }
+  </style>
+</head>
+<body>
+
+  <!-- URLコード不正 -->
+  <div class="card" id="state-no-code" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
+      <div class="fg-page-name">当日参加登録</div>
+    </div>
+    <div class="card-body">
+      <div class="state-icon">🔒</div>
+      <p class="state-title">URLが正しくありません</p>
+      <p class="state-msg">会場に掲示されているQRコードから<br>アクセスしてください。</p>
+    </div>
+  </div>
+
+  <!-- ローディング -->
+  <div class="card" id="state-loading" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
+      <div class="fg-page-name">当日参加登録</div>
+    </div>
+    <div class="card-body" style="text-align:center;padding:40px 24px;">
+      <div class="spinner"></div>
+      <p style="font-size:13px;color:#6B7A8D;">準備中...</p>
+    </div>
+  </div>
+
+  <!-- 登録フォーム -->
+  <div class="card" id="state-form" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
+      <div class="fg-page-name">当日参加登録</div>
+    </div>
+    <div class="card-body">
+      <p class="state-title" style="margin-bottom:6px;">当日参加登録</p>
+      <p class="state-msg" style="margin-bottom:16px;">必要事項を入力してスタンプラリーに参加しましょう。</p>
+
+      <!-- 来場日バッジ -->
+      <div class="event-badge">
+        <span>📅</span>
+        <span><span class="label">来場日 </span><span id="event-date-label">—</span></span>
+      </div>
+
+      <div id="form-error-banner" class="form-error-banner"></div>
+
+      <!-- 基本情報 -->
+      <div class="form-section">
+        <p class="section-label">基本情報</p>
+
+        <div class="form-row">
+          <label>氏名<span class="req">*</span></label>
+          <input type="text" id="f-name" placeholder="例：山田 太郎" autocomplete="name">
+          <p class="field-err" id="err-name">氏名を入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>氏名（ふりがな）<span class="req">*</span></label>
+          <input type="text" id="f-furigana" placeholder="例：やまだ たろう" autocomplete="name">
+          <p class="field-err" id="err-furigana">ふりがなを入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>大学名<span class="req">*</span></label>
+          <input type="text" id="f-school" placeholder="例：○○大学" autocomplete="organization">
+          <p class="field-err" id="err-school">大学名を入力してください</p>
+        </div>
+        <div class="form-row-half">
+          <div class="form-row">
+            <label>学部・学科</label>
+            <input type="text" id="f-department" placeholder="例：工学部">
+          </div>
+          <div class="form-row">
+            <label>学年<span class="req">*</span></label>
+            <select id="f-year">
+              <option value="">選択</option>
+              <option>1年</option><option>2年</option><option>3年</option>
+              <option>4年</option><option>5年</option><option>6年</option>
+              <option>院1年</option><option>院2年</option><option>その他</option>
+            </select>
+            <p class="field-err" id="err-year">学年を選択してください</p>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>自動車部所属年数</label>
+          <select id="f-club-years">
+            <option value="">選択（未所属の場合は空欄）</option>
+            <option>1年目</option><option>2年目</option><option>3年目</option>
+            <option>4年目</option><option>5年目以上</option><option>未所属</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 連絡先 -->
+      <div class="form-section">
+        <p class="section-label">連絡先</p>
+        <div class="form-row">
+          <label>生年月日<span class="req">*</span></label>
+          <input type="date" id="f-birthday" autocomplete="bday">
+          <p class="field-err" id="err-birthday">生年月日を入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>メールアドレス<span class="req">*</span></label>
+          <input type="email" id="f-email" placeholder="例：taro@example.com" autocomplete="email" inputmode="email">
+          <p class="field-err" id="err-email">有効なメールアドレスを入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>電話番号<span class="req">*</span></label>
+          <input type="tel" id="f-phone" placeholder="例：090-1234-5678" autocomplete="tel" inputmode="tel">
+          <p class="field-err" id="err-phone">電話番号を入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>住所（都道府県）</label>
+          <select id="f-prefecture">
+            <option value="">選択</option>
+            <option>北海道</option><option>青森県</option><option>岩手県</option><option>宮城県</option>
+            <option>秋田県</option><option>山形県</option><option>福島県</option><option>茨城県</option>
+            <option>栃木県</option><option>群馬県</option><option>埼玉県</option><option>千葉県</option>
+            <option>東京都</option><option>神奈川県</option><option>新潟県</option><option>富山県</option>
+            <option>石川県</option><option>福井県</option><option>山梨県</option><option>長野県</option>
+            <option>岐阜県</option><option>静岡県</option><option>愛知県</option><option>三重県</option>
+            <option>滋賀県</option><option>京都府</option><option>大阪府</option><option>兵庫県</option>
+            <option>奈良県</option><option>和歌山県</option><option>鳥取県</option><option>島根県</option>
+            <option>岡山県</option><option>広島県</option><option>山口県</option><option>徳島県</option>
+            <option>香川県</option><option>愛媛県</option><option>高知県</option><option>福岡県</option>
+            <option>佐賀県</option><option>長崎県</option><option>熊本県</option><option>大分県</option>
+            <option>宮崎県</option><option>鹿児島県</option><option>沖縄県</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- その他 -->
+      <div class="form-section">
+        <p class="section-label">その他</p>
+        <div class="form-row">
+          <label>所属校は本大会予選に出場しますか？</label>
+          <div class="radio-group" style="margin-top:8px;">
+            <label><input type="radio" name="competing" value="yes"> はい</label>
+            <label><input type="radio" name="competing" value="no">  いいえ</label>
+            <label><input type="radio" name="competing" value="unknown" checked> わからない</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 同意 -->
+      <div class="form-section">
+        <p class="section-label">同意事項</p>
+        <div class="consent-box" id="cb-wrap-media">
+          <label>
+            <input type="checkbox" id="cb-media">
+            大会に付随する各メディアの取材・大会運営SNSへの掲載について同意します
+          </label>
+        </div>
+        <p class="field-err" id="err-media">同意が必要です</p>
+
+        <div class="consent-box" id="cb-wrap-privacy">
+          <label>
+            <input type="checkbox" id="cb-privacy">
+            入力いただいた個人情報はFG大会運営のみに使用します。取り扱いに同意します
+          </label>
+        </div>
+        <p class="field-err" id="err-privacy">同意が必要です</p>
+      </div>
+
+      <button class="submit-btn" id="btn-submit">登録してスタンプラリーに参加する</button>
+    </div>
+  </div>
+
+  <!-- 送信中 -->
+  <div class="card" id="state-submitting" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
+      <div class="fg-page-name">当日参加登録</div>
+    </div>
+    <div class="card-body" style="text-align:center;padding:40px 24px;">
+      <div class="spinner"></div>
+      <p style="font-size:13px;color:#6B7A8D;">登録中...</p>
+    </div>
+  </div>
+
+  <!-- 登録完了 -->
+  <div class="card" id="state-success" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
+      <div class="fg-page-name">当日参加登録</div>
+    </div>
+    <div class="card-body">
+      <div class="success-icon">✓</div>
+      <p class="state-title">登録完了！</p>
+      <p class="welcome-sub">スタンプラリーへようこそ</p>
+      <div class="guide-box">
+        <div class="guide-step">
+          <span class="guide-num">1</span>
+          <span class="guide-text">気になる企業ブースを回ろう</span>
+        </div>
+        <div class="guide-step">
+          <span class="guide-num">2</span>
+          <span class="guide-text">ブースのNFCタグにスマホをタッチすると<b>スタンプGET</b></span>
+        </div>
+        <div class="guide-step">
+          <span class="guide-num">3</span>
+          <span class="guide-text"><b id="guide-goal">15</b>個集めると景品を<b><span id="guide-count">3</span>個GET</b>できます！</span>
+        </div>
+      </div>
+      <div class="bar-track"><div class="bar-fill" id="result-bar"></div></div>
+      <p class="result-count" id="result-count">0 / 15 個</p>
+      <a href="progress.html" class="action-link">スタンプ進捗を確認する →</a>
+    </div>
+  </div>
+
+  <!-- エラー -->
+  <div class="card" id="state-error" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
+      <div class="fg-page-name">当日参加登録</div>
+    </div>
+    <div class="card-body">
+      <div class="state-icon">⚠</div>
+      <p class="state-title" id="error-title">エラー</p>
+      <p class="state-msg"   id="error-msg"></p>
+      <button class="submit-btn" id="btn-retry" style="margin-top:8px;">もう一度試す</button>
+    </div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/register.js"></script>
+</body>
+</html>

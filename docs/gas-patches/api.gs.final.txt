@@ -51,6 +51,8 @@ function dispatch_(e) {
       case 'getExchangeStatus':       return actionGetExchangeStatus_(p);
       case 'markPrizeExchanged':      return actionMarkPrizeExchanged_(p);
       case 'getEventList':            return actionGetEventList_(p);
+      case 'getCurrentEvent':         return actionGetCurrentEvent_(p);   // T6 追加
+      case 'registerWalkIn':          return actionRegisterWalkIn_(p);    // T6 追加
       default:                        return err_('unknown_action');
     }
   } catch (e) {
@@ -639,7 +641,138 @@ function err_(code) {
     used_nfc:              'このNFCタグは使用済みです',
     stamp_closed:          'スタンプ取得期間外です',      // T3-e 追加
     exchange_closed:       '景品交換期間が終了しました',  // T3-e 追加
+    no_active_event:       '本日開催のイベントが見つかりません', // T6 追加
+    invalid_code:          '登録コードが無効です',               // T6 追加
+    already_registered:    'すでに本日のイベントに登録済みです', // T6 追加
     server_error:          'サーバーエラーが発生しました',
   };
   return { ok: false, error: code, message: MSG[code] || code };
+}
+
+// ============================================================
+// アクション: getCurrentEvent (T6)
+// 今日の日付に合致するアクティブなイベントを返す
+// ============================================================
+
+function actionGetCurrentEvent_(p) {
+  const sheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+  if (!sheet || sheet.getLastRow() < 2) return err_('no_active_event');
+
+  const data      = sheet.getDataRange().getValues();
+  const headers   = data[0].map(String);
+  const idCol     = headers.indexOf('eventId');
+  const nameCol   = headers.indexOf('イベント名');
+  const startCol  = headers.indexOf('開始日');
+  const endCol    = headers.indexOf('終了日');
+  const statusCol = headers.indexOf('状態');
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const row = data.slice(1).find(r => {
+    if (statusCol >= 0 && String(r[statusCol]) === '完了') return false;
+    const start = new Date(r[startCol]); start.setHours(0, 0, 0, 0);
+    const end   = new Date(r[endCol]);   end.setHours(23, 59, 59, 999);
+    return today >= start && today <= end;
+  });
+
+  if (!row) return err_('no_active_event');
+
+  return ok_({
+    eventId:   String(row[idCol]),
+    eventName: row[nameCol],
+    startDate: row[startCol] instanceof Date
+      ? Utilities.formatDate(row[startCol], Session.getScriptTimeZone(), 'yyyy/MM/dd')
+      : String(row[startCol]),
+    endDate: row[endCol] instanceof Date
+      ? Utilities.formatDate(row[endCol], Session.getScriptTimeZone(), 'yyyy/MM/dd')
+      : String(row[endCol]),
+  });
+}
+
+// ============================================================
+// アクション: registerWalkIn (T6)
+// 当日飛び込み参加者を登録してstampTokenを発行する。
+// 同日・同一学生(氏名+大学名)の重複登録は既存stampTokenを返す。
+//
+// GASスクリプトプロパティ WALK_IN_CODE を設定すると
+// code パラメータで照合する(未設定の場合は認証スキップ)。
+// ============================================================
+
+function actionRegisterWalkIn_(p) {
+  if (!p.event) return err_('missing_event');
+  if (!p.name || !p.school) return err_('missing_params');
+
+  // 会場コード検証(スクリプトプロパティが設定されている場合のみ)
+  const validCode = PropertiesService.getScriptProperties().getProperty('WALK_IN_CODE');
+  if (validCode && String(p.code || '') !== String(validCode)) {
+    return err_('invalid_code');
+  }
+
+  const studentSheet = eventSs_(p.event).getSheetByName(SHEET.STUDENTS);
+  const sData        = studentSheet.getDataRange().getValues();
+  const sHeaders     = sData[0].map(String);
+  const nameCol      = sHeaders.indexOf('氏名');
+  const schoolCol    = sHeaders.indexOf('大学名');
+  const sidCol       = sHeaders.indexOf('studentId');
+
+  // 同日・同一学生の重複チェック(氏名+大学名)
+  const existing = sData.slice(1).find(r =>
+    String(r[nameCol])   === String(p.name).trim() &&
+    String(r[schoolCol]) === String(p.school).trim()
+  );
+  if (existing) {
+    const existStudentId = String(existing[sidCol]);
+    // 既存stampTokenを返す
+    const participantSheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_PARTICIPANTS);
+    const pData    = participantSheet.getDataRange().getValues();
+    const pHeaders = pData[0].map(String);
+    const pSidCol  = pHeaders.indexOf('studentId');
+    const pStCol   = pHeaders.indexOf('stampToken');
+    const pRow     = pData.slice(1).find(r =>
+      String(r[pSidCol]) === existStudentId &&
+      String(r[pHeaders.indexOf('eventId')]) === String(p.event)
+    );
+    const stampToken = pRow ? String(pRow[pStCol]) : Utilities.getUuid();
+    const count = countStamps_(p.event, existStudentId);
+    const result = buildStampResult_(p.event, existStudentId, count, { stampToken });
+    return { ok: false, error: 'already_registered', data: result,
+             message: 'すでに本日のイベントに登録済みです' };
+  }
+
+  // studentId 生成(Vクラス)
+  const yearMatch  = String(p.event).match(/(\d{4})/);
+  const yearSuffix = yearMatch ? yearMatch[1].slice(-1) : String(new Date().getFullYear()).slice(-1);
+  const { uniMap } = loadUniversityMaster_();
+  const uniCode = uniMap.get(String(p.school).trim()) || '0000';
+  const vCount  = sData.slice(1).filter(r =>
+    String(r[sHeaders.indexOf('属性')]) === '一般参加学生' &&
+    String(r[sHeaders.indexOf('登録種別')]) === '当日'
+  ).length;
+  const studentId = yearSuffix + uniCode + 'V' + String(vCount + 1).padStart(2, '0');
+  const token     = Utilities.getUuid();
+
+  // 学生マスターに追加
+  const newRow = sHeaders.map(h => {
+    const map = {
+      'studentId': studentId, 'token': token,
+      '氏名': String(p.name).trim(), 'ふりがな': String(p.furigana || '').trim(),
+      '大学名': String(p.school).trim(), '学部学科': p.department || '',
+      '学年': p.year || '', '属性': '一般参加学生',
+      '自動車部在籍年数': p.clubYears || '',
+      '住所(都道府県)': p.prefecture || '',
+      '生年月日': p.birthday || '', 'メールアドレス': p.email || '',
+      '電話番号': p.phone || '', '登録種別': '当日',
+    };
+    return map[h] !== undefined ? map[h] : '';
+  });
+  studentSheet.appendRow(newRow);
+
+  // スタンプ参加者シートに追加
+  const stampToken = Utilities.getUuid();
+  eventSs_(p.event).getSheetByName(SHEET.STAMP_PARTICIPANTS).appendRow([
+    new Date(), p.event, studentId, stampToken, new Date(), 'active',
+  ]);
+
+  return ok_(buildStampResult_(p.event, studentId, 0, { stampToken, isNew: true }));
 }
