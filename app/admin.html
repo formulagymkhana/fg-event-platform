@@ -164,14 +164,27 @@
     .save-fb.err{color:var(--red);display:inline}
 
     /* Company */
-    .company-item{background:var(--gray-light);border-radius:9px;padding:12px;margin-bottom:8px}
-    .company-name{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:7px}
+    .company-item{background:var(--gray-light);border-radius:9px;padding:12px;margin-bottom:8px;position:relative}
+    .company-name{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:7px;padding-right:28px}
     .key-row{display:flex;align-items:center;gap:7px;margin-bottom:3px}
     .key-lbl{font-size:10px;color:var(--gray);width:65px;flex-shrink:0}
     .key-val{font-size:10px;font-family:monospace;background:#fff;padding:3px 7px;
       border-radius:4px;flex:1;overflow:hidden;text-overflow:ellipsis}
     .copy-btn{padding:2px 7px;border:1px solid var(--border);border-radius:4px;
       font-size:10px;cursor:pointer;background:#fff;color:var(--navy);flex-shrink:0}
+    .del-btn{position:absolute;top:10px;right:10px;background:none;border:none;
+      font-size:16px;cursor:pointer;color:var(--gray);line-height:1;padding:2px}
+    .del-btn:hover{color:var(--red)}
+
+    /* Add-company form */
+    .add-co-form{background:#fff;border:1px dashed var(--border);border-radius:9px;
+      padding:12px;margin-bottom:12px}
+    .add-co-form-title{font-size:11px;font-weight:700;color:var(--navy);margin-bottom:8px}
+    .add-co-row{display:flex;gap:6px;margin-bottom:6px}
+    .add-co-row input{flex:1;border:1px solid var(--border);border-radius:6px;
+      padding:7px 9px;font-size:13px;outline:none}
+    .add-co-row input:focus{border-color:var(--navy)}
+    .add-co-err{font-size:11px;color:var(--red);margin-bottom:6px;display:none}
 
     /* URL box */
     .url-box{background:var(--gray-light);border-radius:9px;padding:12px;margin-bottom:10px}
@@ -284,16 +297,23 @@
           <button class="wip-btn" data-wip>📋 学生マスター取込（importStudents）</button>
           <span class="wip-tag">準備中</span>
         </div>
-        <!-- 準備中: 企業マスター編集 -->
-        <div class="wip-row">
-          <button class="wip-btn" data-wip>🏢 企業マスター編集</button>
-          <span class="wip-tag">準備中</span>
-        </div>
+        <!-- 企業追加フォーム -->
+        <div class="cfg-group" style="margin-top:4px">
+          <div class="cfg-group-title">企業管理</div>
 
-        <!-- 実機能: 企業キー管理（settings から移動） -->
-        <div class="cfg-group" style="margin-top:16px">
-          <div class="cfg-group-title">企業キー管理</div>
-          <button class="save-btn" id="btn-gen-keys" style="margin-bottom:14px">未発行キーを一括発行</button>
+          <div class="add-co-form">
+            <div class="add-co-form-title">＋ 企業を追加</div>
+            <div class="add-co-row">
+              <input type="text" id="new-co-name" placeholder="企業名（必須）" autocomplete="off">
+            </div>
+            <div class="add-co-row">
+              <input type="text" id="new-co-id" placeholder="企業ID（空欄で自動生成）" autocomplete="off">
+            </div>
+            <div class="add-co-err" id="add-co-err"></div>
+            <button class="save-btn" id="btn-add-company">追加</button>
+          </div>
+
+          <button class="save-btn" id="btn-gen-keys" style="margin-bottom:14px;background:var(--navy-mid)">🔑 未発行キーを一括発行</button>
           <div id="company-list"></div>
         </div>
       </div>

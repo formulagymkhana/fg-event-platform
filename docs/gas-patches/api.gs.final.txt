@@ -64,6 +64,8 @@ function dispatch_(e) {
       case 'adminGetPrizeLog':  return actionAdminGetPrizeLog_(p);
       case 'adminClearCache':   return actionAdminClearCache_(p);
       case 'adminGetCompanies': return actionAdminGetCompanies_(p);
+      case 'adminAddCompany':   return actionAdminAddCompany_(p);
+      case 'adminDeleteCompany':return actionAdminDeleteCompany_(p);
       case 'adminGenerateKeys': return actionAdminGenerateKeys_(p);
       case 'adminUpdateKey':    return actionAdminUpdateKey_(p);
       default:                        return err_('unknown_action');
@@ -1024,6 +1026,52 @@ function actionAdminGetCompanies_(p) {
     hasNfc:    g(row, 'hasNfc'),
   }));
   return ok_({ companies });
+}
+
+// 企業を追加
+function actionAdminAddCompany_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.event) return err_('missing_event');
+  if (!p.name)  return err_('missing_params');
+
+  const sheet   = eventSs_(p.event).getSheetByName(SHEET.COMPANIES);
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const idCol   = headers.indexOf('companyId');
+
+  // companyId: 指定がなければ短いランダムIDを生成
+  const companyId = String(p.companyId || '').trim()
+    || ('co' + Utilities.getUuid().replace(/-/g, '').slice(0, 6));
+
+  // 重複チェック
+  if (data.slice(1).some(r => String(r[idCol]) === companyId)) {
+    return err_('company_id_exists');
+  }
+
+  // 表示順: 既存行数 + 1
+  const displayOrder = data.length; // ヘッダ含む行数 = 既存企業数 + 1
+  // schema: companyId, 企業名, stampKey, viewKey, 表示順, hasNfc
+  sheet.appendRow([companyId, String(p.name), '', '', displayOrder, false]);
+  return ok_({ companyId, name: String(p.name) });
+}
+
+// 企業を削除
+function actionAdminDeleteCompany_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.event || !p.companyId) return err_('missing_params');
+
+  const sheet   = eventSs_(p.event).getSheetByName(SHEET.COMPANIES);
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const idCol   = headers.indexOf('companyId');
+
+  const rowIdx = data.findIndex((r, i) => i > 0 && String(r[idCol]) === String(p.companyId));
+  if (rowIdx < 0) return err_('company_not_found');
+
+  sheet.deleteRow(rowIdx + 1); // 1-indexed
+  return ok_({ deleted: true, companyId: String(p.companyId) });
 }
 
 // 管理者キーを変更

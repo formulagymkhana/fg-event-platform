@@ -28,6 +28,7 @@ window.addEventListener('DOMContentLoaded', () => {
   id_('btn-create-event')?.addEventListener('click', handleCreateEvent_);
   id_('btn-save-config')?.addEventListener('click', handleSaveConfig_);
   id_('btn-clear-cache')?.addEventListener('click', handleClearCache_);
+  id_('btn-add-company')?.addEventListener('click', handleAddCompany_);
   id_('btn-gen-keys')?.addEventListener('click', handleGenerateKeys_);
   id_('btn-copy-url')?.addEventListener('click', handleCopyUrl_);
   id_('btn-reload')?.addEventListener('click', () => loadAll_());
@@ -251,6 +252,7 @@ async function loadCompanies_(gen = null, ev = null) {
   }
   container.innerHTML = list.map(c => `
     <div class="company-item">
+      <button class="del-btn" data-del-company="${esc_(c.companyId)}" title="削除">×</button>
       <div class="company-name">${esc_(c.name)} <span style="font-size:10px;color:var(--gray)">${esc_(c.companyId)}</span></div>
       <div class="key-row">
         <span class="key-lbl">スタンプキー</span>
@@ -265,7 +267,52 @@ async function loadCompanies_(gen = null, ev = null) {
     </div>`).join('');
   container.querySelectorAll('.copy-btn[data-copy]').forEach(b =>
     b.addEventListener('click', () => copyText_(b.dataset.copy)));
+  container.querySelectorAll('.del-btn[data-del-company]').forEach(b =>
+    b.addEventListener('click', () => handleDeleteCompany_(b.dataset.delCompany)));
   updateStepBadges_();
+}
+
+async function handleAddCompany_() {
+  if (!curEvent_) return;
+  const name      = id_('new-co-name').value.trim();
+  const companyId = id_('new-co-id').value.trim();
+  const errEl     = id_('add-co-err');
+  errEl.style.display = 'none';
+
+  if (!name) {
+    errEl.textContent = '企業名を入力してください';
+    errEl.style.display = 'block'; return;
+  }
+
+  const btn = id_('btn-add-company');
+  btn.disabled = true; btn.textContent = '追加中...';
+
+  const res = await adminCall_('adminAddCompany', { event: curEvent_, name, companyId: companyId || undefined });
+  btn.disabled = false; btn.textContent = '追加';
+
+  if (res.ok) {
+    id_('new-co-name').value = '';
+    id_('new-co-id').value   = '';
+    showToast_('✓ 追加しました: ' + name);
+    loadCompanies_();
+  } else {
+    const msg = res.error === 'company_id_exists' ? 'その企業IDはすでに存在します' : (res.message || '追加に失敗しました');
+    errEl.textContent = msg;
+    errEl.style.display = 'block';
+  }
+}
+
+async function handleDeleteCompany_(companyId) {
+  if (!curEvent_ || !companyId) return;
+  if (!window.confirm(`「${companyId}」を削除しますか？\nキー発行済みの場合、スタンプ・閲覧が使えなくなります。`)) return;
+
+  const res = await adminCall_('adminDeleteCompany', { event: curEvent_, companyId });
+  if (res.ok) {
+    showToast_('✓ 削除しました: ' + companyId);
+    loadCompanies_();
+  } else {
+    showToast_('⚠ 削除失敗: ' + (res.message || ''));
+  }
 }
 
 async function handleGenerateKeys_() {

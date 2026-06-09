@@ -16,6 +16,19 @@
 
 ---
 
+## 2026-06-09 admin パネルから企業の追加・削除を実装
+- 変更ファイル:
+  - `app/admin.html`（企業追加フォームUI・削除ボタン・CSS追加）
+  - `js/admin.js`（handleAddCompany_ / handleDeleteCompany_ / company-listに削除ボタン追加）
+  - `docs/gas-patches/api.gs.final.txt`（adminAddCompany / adminDeleteCompany アクション追加）
+- 変更内容:
+  - 「企業管理」セクションに追加フォームを設置（企業名必須・企業ID任意、空欄なら GAS 側で自動生成）。
+  - 各企業カードに「×」削除ボタンを追加（confirm ダイアログ付き）。
+  - GAS: `actionAdminAddCompany_` — 重複 ID チェック後に COMPANIES シートへ appendRow。
+  - GAS: `actionAdminDeleteCompany_` — companyId で行を特定して deleteRow。
+  - 追加・削除後は `loadCompanies_()` を再呼び出しして一覧を自動更新。
+- 申し送り: GAS ファイルを手動でエディタへ貼り付け・再デプロイが必要。削除は取り消し不可なのでダイアログで確認済み。
+
 ## 2026-06-09 イベント切替時の競合状態（Race Condition）修正
 - 変更ファイル:
   - `js/admin.js`
