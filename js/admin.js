@@ -45,6 +45,9 @@ window.addEventListener('DOMContentLoaded', () => {
     hd.addEventListener('click', () => toggleSection_(hd.dataset.section));
   });
 
+  // イベント削除（ダッシュボード設定内）
+  id_('btn-delete-event')?.addEventListener('click', () => handleDeleteEvent_(curEvent_));
+
   // 準備中ボタン: トースト案内
   document.addEventListener('click', e => {
     if (e.target.hasAttribute('data-wip')) {
@@ -494,6 +497,33 @@ async function handleCreateEvent_() {
   } else {
     errEl.textContent = res.message || '作成に失敗しました';
     errEl.style.display = 'block';
+  }
+}
+
+// ── Delete Event ──────────────────────────────────
+async function handleDeleteEvent_(eventId) {
+  if (!eventId) return;
+  const ev = allEvents_.find(e => e.eventId === eventId);
+  const label = ev ? `「${ev.name || eventId}」(${eventId})` : `「${eventId}」`;
+  if (!window.confirm(
+    `${label} をマスター一覧から削除しますか？\n\n` +
+    '⚠ イベントのスプレッドシート本体は削除されません。\n' +
+    '削除後は管理画面から参照できなくなります。'
+  )) return;
+
+  const res = await adminCall_('adminDeleteEvent', { eventId });
+  if (res.ok) {
+    showToast_('✓ 削除しました: ' + eventId);
+    // ローカルのリストを更新して再描画
+    allEvents_ = allEvents_.filter(e => e.eventId !== eventId);
+    renderEventList_();
+    // もし削除対象が現在表示中のイベントなら一覧へ戻る
+    if (curEvent_ === eventId) {
+      curEvent_ = '';
+      location.hash = '#';
+    }
+  } else {
+    showToast_('⚠ 削除失敗: ' + (res.message || ''));
   }
 }
 

@@ -58,6 +58,7 @@ function dispatch_(e) {
       case 'adminGetConfig':    return actionAdminGetConfig_(p);
       case 'adminUpdateConfig': return actionAdminUpdateConfig_(p);
       case 'adminCreateEvent':  return actionAdminCreateEvent_(p);
+      case 'adminDeleteEvent':  return actionAdminDeleteEvent_(p);
       case 'adminGetStats':     return actionAdminGetStats_(p);
       case 'adminGetStampLog':  return actionAdminGetStampLog_(p);
       case 'adminGetWalkIns':   return actionAdminGetWalkIns_(p);
@@ -894,6 +895,25 @@ function actionAdminCreateEvent_(p) {
   }
   createEvent_(p.eventId, p.eventName, p.startDate, p.endDate);
   return ok_({ created: true, eventId: p.eventId });
+}
+
+// イベントをマスター一覧から削除（スプレッドシート本体は削除しない）
+function actionAdminDeleteEvent_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.eventId) return err_('missing_params');
+
+  const sheet   = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const idCol   = headers.indexOf('eventId');
+
+  const rowIdx = data.findIndex((r, i) => i > 0 && String(r[idCol]) === String(p.eventId));
+  if (rowIdx < 0) return err_('event_not_found');
+
+  sheet.deleteRow(rowIdx + 1); // 1-indexed
+  CacheService.getScriptCache().remove('cfg_' + String(p.eventId));
+  return ok_({ deleted: true, eventId: String(p.eventId) });
 }
 
 // 統計（学生数・スタンプ数・参加者数・景品交換数）
