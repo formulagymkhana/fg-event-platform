@@ -10,6 +10,7 @@ let adminKey_   = '';
 let curEvent_   = '';
 let allEvents_  = [];
 let walkInCode_ = '';
+let loadGen_    = 0;   // イベント切替の競合状態防止: loadAll_ 呼び出しごとにインクリメント
 
 // ── Init ──────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
@@ -131,21 +132,24 @@ function updateEventBar_() {
 // ── Load all data ─────────────────────────────────
 async function loadAll_() {
   if (!curEvent_) return;
-  loadStats_();
-  loadStampLog_();
-  loadWalkIns_();
-  loadPrizeLog_();
-  loadConfig_();
-  loadCompanies_();
+  const gen = ++loadGen_;   // 世代番号をスナップショット
+  const ev  = curEvent_;    // イベントIDをスナップショット(切替中に変わっても安全)
+  loadStats_(gen, ev);
+  loadStampLog_(gen, ev);
+  loadWalkIns_(gen, ev);
+  loadPrizeLog_(gen, ev);
+  loadConfig_(gen, ev);
+  loadCompanies_(gen, ev);
 }
 
 // ── Stats ─────────────────────────────────────────
-async function loadStats_() {
+async function loadStats_(gen, ev) {
   setText_('stat-students',  '…');
   setText_('stat-walkins',   '…');
   setText_('stat-stamps',    '…');
   setText_('stat-prizes',    '…');
-  const res = await adminCall_('adminGetStats', { event: curEvent_ });
+  const res = await adminCall_('adminGetStats', { event: ev });
+  if (gen !== loadGen_) return;  // 切替後に古いレスポンスが返ってきたら無視
   if (!res.ok) return;
   const d = res.data;
   setText_('stat-students', d.studentCount    ?? '—');
@@ -156,8 +160,9 @@ async function loadStats_() {
 }
 
 // ── Stamp log ─────────────────────────────────────
-async function loadStampLog_() {
-  const res = await adminCall_('adminGetStampLog', { event: curEvent_ });
+async function loadStampLog_(gen, ev) {
+  const res = await adminCall_('adminGetStampLog', { event: ev });
+  if (gen !== loadGen_) return;
   if (!res.ok) return;
   const log = res.data.log || [];
   setText_('stamp-count', `(${res.data.total || 0}件 / 最新${log.length}件)`);
@@ -167,8 +172,9 @@ async function loadStampLog_() {
 }
 
 // ── Walk-ins ──────────────────────────────────────
-async function loadWalkIns_() {
-  const res = await adminCall_('adminGetWalkIns', { event: curEvent_ });
+async function loadWalkIns_(gen, ev) {
+  const res = await adminCall_('adminGetWalkIns', { event: ev });
+  if (gen !== loadGen_) return;
   if (!res.ok) return;
   const list = res.data.walkins || [];
   setText_('walkin-count', `(${list.length}名)`);
@@ -178,8 +184,9 @@ async function loadWalkIns_() {
 }
 
 // ── Prize log ─────────────────────────────────────
-async function loadPrizeLog_() {
-  const res = await adminCall_('adminGetPrizeLog', { event: curEvent_ });
+async function loadPrizeLog_(gen, ev) {
+  const res = await adminCall_('adminGetPrizeLog', { event: ev });
+  if (gen !== loadGen_) return;
   if (!res.ok) return;
   const log = res.data.log || [];
   setText_('prize-count', `(${log.length}件)`);
@@ -189,8 +196,9 @@ async function loadPrizeLog_() {
 }
 
 // ── Config ────────────────────────────────────────
-async function loadConfig_() {
-  const res = await adminCall_('adminGetConfig', { event: curEvent_ });
+async function loadConfig_(gen, ev) {
+  const res = await adminCall_('adminGetConfig', { event: ev });
+  if (gen !== loadGen_) return;
   if (!res.ok) return;
   const cfg = res.data.config || {};
   setVal_('cfg-prizeThreshold',   cfg.prizeThreshold  || 15);
@@ -229,9 +237,11 @@ async function handleSaveConfig_() {
 }
 
 // ── Companies ─────────────────────────────────────
-async function loadCompanies_() {
+async function loadCompanies_(gen = null, ev = null) {
+  ev = ev ?? curEvent_;   // 単体呼び出し時は curEvent_ を使用
   updateWalkInUrl_();
-  const res = await adminCall_('adminGetCompanies', { event: curEvent_ });
+  const res = await adminCall_('adminGetCompanies', { event: ev });
+  if (gen !== null && gen !== loadGen_) return;  // loadAll_ 経由のときのみ世代チェック
   if (!res.ok) return;
   const list = res.data.companies || [];
   const container = id_('company-list');
