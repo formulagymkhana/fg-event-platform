@@ -248,6 +248,7 @@
   <div id="page-events">
     <header class="app-hd">
       <div class="app-logo">FORMULA <span>GYMKHANA</span></div>
+      <a class="hd-btn" href="#settings">⚙ 設定</a>
       <button class="hd-btn" id="btn-logout">ログアウト</button>
     </header>
     <div class="app-body">
@@ -325,9 +326,6 @@
 
       <!-- 当日運用 -->
       <div class="area-label">当日運用</div>
-      <div class="action-row">
-        <button class="act-btn act-btn-danger" id="btn-clear-cache">⚠ キャッシュクリア</button>
-      </div>
 
       <div class="section">
         <div class="section-hd" data-section="stamps">
@@ -414,16 +412,6 @@
             <button class="save-btn" id="btn-save-config">保存</button>
             <span class="save-fb" id="save-feedback"></span>
           </div>
-          <div class="cfg-group">
-            <div class="cfg-group-title">管理者キー変更</div>
-            <div class="cfg-row">
-              <label>新しいADMIN KEY</label>
-              <div class="cfg-hint">変更後は新しいキーで再ログインが必要です</div>
-              <input type="text" class="cfg-input" id="new-admin-key" placeholder="例: fg-admin-27" autocomplete="off">
-            </div>
-            <button class="save-btn" id="btn-change-key">キーを変更</button>
-            <span class="save-fb" id="key-feedback"></span>
-          </div>
         </div>
       </div>
 
@@ -490,6 +478,63 @@
       </p>
     </div>
   </div><!-- /page-students -->
+
+  <!-- ─────────────────────────────────────
+       PAGE: 全体設定
+  ───────────────────────────────────── -->
+  <div id="page-settings" style="display:none">
+    <header class="page-hd">
+      <a class="page-back" href="#">← 一覧</a>
+      <span class="page-title">全体設定</span>
+    </header>
+    <div class="app-body">
+
+      <!-- 管理者キー変更 -->
+      <div class="section">
+        <div class="section-hd" data-section="s-adminkey">
+          <span class="section-title">🔑 管理者キー変更</span>
+          <span class="section-toggle" id="toggle-s-adminkey">▼</span>
+        </div>
+        <div class="section-body" id="body-s-adminkey">
+          <div class="cfg-row">
+            <label>新しい ADMIN KEY</label>
+            <div class="cfg-hint">変更後は全員このキーで再ログインが必要です</div>
+            <input type="text" class="cfg-input" id="new-admin-key" placeholder="例: fg-admin-27" autocomplete="off">
+          </div>
+          <button class="save-btn" id="btn-change-key">キーを変更</button>
+          <span class="save-fb" id="key-feedback"></span>
+        </div>
+      </div>
+
+      <!-- キャッシュ管理 -->
+      <div class="section">
+        <div class="section-hd" data-section="s-cache">
+          <span class="section-title">🗑 キャッシュ管理</span>
+          <span class="section-toggle" id="toggle-s-cache">▼</span>
+        </div>
+        <div class="section-body" id="body-s-cache">
+          <p class="step-desc">GAS側のキャッシュ（TTL 5分）を手動でクリアします。<br>設定変更後や切替直後にデータが古い場合に使用してください。</p>
+          <button class="act-btn act-btn-danger" id="btn-clear-cache">⚠ キャッシュクリア（全イベント共通）</button>
+        </div>
+      </div>
+
+      <!-- アプリ情報 -->
+      <div class="section">
+        <div class="section-hd" data-section="s-info">
+          <span class="section-title">ℹ️ アプリ情報</span>
+          <span class="section-toggle" id="toggle-s-info">▼</span>
+        </div>
+        <div class="section-body" id="body-s-info">
+          <div style="font-size:12px;color:var(--gray);line-height:1.9">
+            <div>FG Event Platform</div>
+            <div>GitHub: <span style="font-family:monospace">formulagymkhana/fg-event-platform</span></div>
+            <div>GAS API: <span id="info-api-url" style="font-family:monospace;word-break:break-all;font-size:10px"></span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div><!-- /page-settings -->
 
 </div><!-- /view-app -->
 

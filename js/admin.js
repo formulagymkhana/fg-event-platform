@@ -110,6 +110,13 @@ function route_() {
     return;
   }
 
+  if (hash === 'settings') {
+    showPage_('settings');
+    // API URL を情報欄に表示
+    setText_('info-api-url', FG_CONFIG.API_BASE_URL);
+    return;
+  }
+
   const [eventId, section] = hash.split('/');
   curEvent_ = eventId;
   updateNavLinks_();
@@ -134,7 +141,7 @@ function route_() {
 }
 
 function showPage_(name) {
-  ['events', 'dashboard', 'companies', 'students'].forEach(p => {
+  ['events', 'dashboard', 'companies', 'students', 'settings'].forEach(p => {
     const el = id_('page-' + p);
     if (el) el.style.display = p === name ? '' : 'none';
   });
