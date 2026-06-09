@@ -1,8 +1,11 @@
 /**
- * FG Event Platform — 管理パネルロジック (T12 簡素化版)
+ * FG Event Platform — 管理パネルロジック
  *
- * 認証: GASスクリプトプロパティ ADMIN_KEY → sessionStorage に保存
- * 起動時に今日のイベントを自動選択して全データを一括ロード。
+ * ルーティング: location.hash ベースの SPA
+ *   #              → イベント一覧 (page-events)
+ *   #eventId       → ダッシュボード (page-dashboard)
+ *   #eventId/companies → 企業管理 (page-companies)
+ *   #eventId/students  → 学生管理 (page-students)
  */
 
 // ── State ─────────────────────────────────────────
@@ -10,43 +13,49 @@ let adminKey_   = '';
 let curEvent_   = '';
 let allEvents_  = [];
 let walkInCode_ = '';
-let loadGen_    = 0;   // イベント切替の競合状態防止: loadAll_ 呼び出しごとにインクリメント
+let loadGen_    = 0;   // Race Condition 防止: loadAll_ 呼び出しごとにインクリメント
 
 // ── Init ──────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
+  // Login
   id_('btn-login')?.addEventListener('click', handleLogin_);
   id_('login-key')?.addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin_(); });
+
+  // Logout (イベント一覧ページ)
   id_('btn-logout')?.addEventListener('click', handleLogout_);
-  id_('event-select')?.addEventListener('change', () => {
-    curEvent_ = id_('event-select').value;
-    updateEventBar_();
-    loadAll_();
-  });
+
+  // 新規イベント
   id_('btn-new-event')?.addEventListener('click', () => showModal_('modal-create'));
-  id_('btn-step1-create')?.addEventListener('click', () => showModal_('modal-create'));
   id_('modal-close')?.addEventListener('click', () => hideModal_('modal-create'));
   id_('btn-create-event')?.addEventListener('click', handleCreateEvent_);
+
+  // ダッシュボード操作
+  id_('btn-reload')?.addEventListener('click', () => loadAll_());
   id_('btn-save-config')?.addEventListener('click', handleSaveConfig_);
   id_('btn-clear-cache')?.addEventListener('click', handleClearCache_);
+  id_('btn-change-key')?.addEventListener('click', handleChangeKey_);
+  id_('btn-copy-url')?.addEventListener('click', handleCopyUrl_);
+
+  // 企業管理ページ
   id_('btn-add-company')?.addEventListener('click', handleAddCompany_);
   id_('btn-gen-keys')?.addEventListener('click', handleGenerateKeys_);
-  id_('btn-copy-url')?.addEventListener('click', handleCopyUrl_);
-  id_('btn-reload')?.addEventListener('click', () => loadAll_());
-  id_('btn-change-key')?.addEventListener('click', handleChangeKey_);
 
   // Section toggles
   document.querySelectorAll('.section-hd').forEach(hd => {
     hd.addEventListener('click', () => toggleSection_(hd.dataset.section));
   });
 
-  // 準備中ボタン: 押すと未実装メッセージをトーストで案内
+  // 準備中ボタン: トースト案内
   document.addEventListener('click', e => {
     if (e.target.hasAttribute('data-wip')) {
       showToast_('この機能は今後実装予定です。現在はスプレッドシート直接編集または GAS 関数で対応してください。');
     }
   });
 
-  // Restore session
+  // ハッシュルーティング
+  window.addEventListener('hashchange', () => { if (adminKey_) route_(); });
+
+  // セッション復元
   const saved = sessionStorage.getItem('fg_admin_key');
   if (saved) { adminKey_ = saved; loginWithKey_(); }
   else showView_('login');
@@ -71,10 +80,8 @@ async function loginWithKey_() {
     sessionStorage.setItem('fg_admin_key', adminKey_);
     allEvents_  = res.data.events    || [];
     walkInCode_ = res.data.walkInCode || '';
-    populateEventSel_();
-    autoSelectEvent_();
     showView_('app');
-    loadAll_();
+    route_();          // ハッシュに応じてページを表示
     updateStepBadges_();
     return true;
   }
@@ -85,56 +92,93 @@ async function loginWithKey_() {
 function handleLogout_() {
   sessionStorage.removeItem('fg_admin_key');
   adminKey_ = curEvent_ = '';
+  allEvents_ = [];
+  history.replaceState(null, '', location.pathname); // ハッシュをクリア
   showView_('login');
   id_('login-key').value = '';
   const btn = id_('btn-login');
   if (btn) { btn.disabled = false; btn.textContent = 'ログイン'; }
 }
 
-// ── Event selector ────────────────────────────────
-function populateEventSel_() {
-  const sel = id_('event-select');
-  sel.innerHTML = '';
-  allEvents_.forEach(ev => {
-    const opt = document.createElement('option');
-    opt.value = ev.eventId;
-    opt.textContent = ev.eventId;
-    sel.appendChild(opt);
+// ── Hash routing ──────────────────────────────────
+function route_() {
+  const hash = location.hash.replace(/^#/, '');
+
+  if (!hash) {
+    renderEventList_();
+    showPage_('events');
+    return;
+  }
+
+  const [eventId, section] = hash.split('/');
+  curEvent_ = eventId;
+  updateNavLinks_();
+
+  if (section === 'companies') {
+    showPage_('companies');
+    loadCompanies_();
+  } else if (section === 'students') {
+    showPage_('students');
+    // 学生数を stat-students から student-count-step3 に反映
+    const n = id_('stat-students')?.textContent;
+    setText_('student-count-step3', (n && n !== '—') ? n : '—');
+    // stats が未取得なら読み込む
+    if (!n || n === '—') loadStats_(++loadGen_, curEvent_);
+  } else {
+    showPage_('dashboard');
+    const ev = allEvents_.find(e => e.eventId === curEvent_);
+    setText_('dash-ev-name', ev ? (ev.name || ev.eventId) : curEvent_);
+    updateWalkInUrl_();
+    loadAll_();
+  }
+}
+
+function showPage_(name) {
+  ['events', 'dashboard', 'companies', 'students'].forEach(p => {
+    const el = id_('page-' + p);
+    if (el) el.style.display = p === name ? '' : 'none';
   });
 }
 
-/** 今日の日付に合致するイベントを自動選択。なければ最新を選ぶ。 */
-function autoSelectEvent_() {
-  if (!allEvents_.length) return;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const active = allEvents_.find(ev => {
-    if (ev.status === '完了') return false;
-    const s = new Date(ev.startDate); s.setHours(0, 0, 0, 0);
-    const e = new Date(ev.endDate);   e.setHours(23, 59, 59, 999);
-    return today >= s && today <= e;
-  });
-
-  const chosen = active || allEvents_[allEvents_.length - 1];
-  curEvent_ = chosen.eventId;
-  id_('event-select').value = curEvent_;
-  updateEventBar_();
+/** イベント一覧をカード形式でレンダリング */
+function renderEventList_() {
+  const list = id_('event-card-list');
+  if (!list) return;
+  if (!allEvents_.length) {
+    list.innerHTML = '<p class="empty-msg">イベントがありません。下のボタンで作成してください。</p>';
+    return;
+  }
+  list.innerHTML = allEvents_.map(ev => {
+    const statusClass = ev.status === '完了' ? 'done' : ev.status === '準備中' ? 'wip' : 'active';
+    return `
+      <a class="event-card" href="#${esc_(ev.eventId)}">
+        <div class="ev-card-name">${esc_(ev.name || ev.eventId)}</div>
+        <div class="ev-card-sub">${fmtD_(ev.startDate)} 〜 ${fmtD_(ev.endDate)}</div>
+        <div class="ev-card-row">
+          <span class="ev-card-id">${esc_(ev.eventId)}</span>
+          <span class="ev-card-status ${statusClass}">${esc_(ev.status || '—')}</span>
+        </div>
+      </a>`;
+  }).join('');
 }
 
-function updateEventBar_() {
-  const ev = allEvents_.find(e => e.eventId === curEvent_);
-  if (!ev) return;
-  setText_('ev-name', ev.name || ev.eventId);
-  setText_('ev-dates', `${fmtD_(ev.startDate)} 〜 ${fmtD_(ev.endDate)}`);
-  updateWalkInUrl_();
+/** ダッシュボード上のナビカードと戻るリンクの href を更新 */
+function updateNavLinks_() {
+  const co = id_('nav-co-card');
+  const st = id_('nav-st-card');
+  const backCo = id_('back-dash-co');
+  const backSt = id_('back-dash-st');
+  if (co) co.href = '#' + curEvent_ + '/companies';
+  if (st) st.href = '#' + curEvent_ + '/students';
+  if (backCo) backCo.href = '#' + curEvent_;
+  if (backSt) backSt.href = '#' + curEvent_;
 }
 
 // ── Load all data ─────────────────────────────────
 async function loadAll_() {
   if (!curEvent_) return;
-  const gen = ++loadGen_;   // 世代番号をスナップショット
-  const ev  = curEvent_;    // イベントIDをスナップショット(切替中に変わっても安全)
+  const gen = ++loadGen_;
+  const ev  = curEvent_;
   loadStats_(gen, ev);
   loadStampLog_(gen, ev);
   loadWalkIns_(gen, ev);
@@ -145,18 +189,18 @@ async function loadAll_() {
 
 // ── Stats ─────────────────────────────────────────
 async function loadStats_(gen, ev) {
-  setText_('stat-students',  '…');
-  setText_('stat-walkins',   '…');
-  setText_('stat-stamps',    '…');
-  setText_('stat-prizes',    '…');
+  setText_('stat-students', '…');
+  setText_('stat-walkins',  '…');
+  setText_('stat-stamps',   '…');
+  setText_('stat-prizes',   '…');
   const res = await adminCall_('adminGetStats', { event: ev });
-  if (gen !== loadGen_) return;  // 切替後に古いレスポンスが返ってきたら無視
+  if (gen !== loadGen_) return;
   if (!res.ok) return;
   const d = res.data;
-  setText_('stat-students', d.studentCount    ?? '—');
-  setText_('stat-walkins',  d.walkInCount      ?? '—');
-  setText_('stat-stamps',   d.stampCount       ?? '—');
-  setText_('stat-prizes',   d.prizeCount       ?? '—');
+  setText_('stat-students', d.studentCount ?? '—');
+  setText_('stat-walkins',  d.walkInCount  ?? '—');
+  setText_('stat-stamps',   d.stampCount   ?? '—');
+  setText_('stat-prizes',   d.prizeCount   ?? '—');
   updateStepBadges_();
 }
 
@@ -239,15 +283,16 @@ async function handleSaveConfig_() {
 
 // ── Companies ─────────────────────────────────────
 async function loadCompanies_(gen = null, ev = null) {
-  ev = ev ?? curEvent_;   // 単体呼び出し時は curEvent_ を使用
+  ev = ev ?? curEvent_;
   updateWalkInUrl_();
   const res = await adminCall_('adminGetCompanies', { event: ev });
-  if (gen !== null && gen !== loadGen_) return;  // loadAll_ 経由のときのみ世代チェック
+  if (gen !== null && gen !== loadGen_) return;
   if (!res.ok) return;
   const list = res.data.companies || [];
   const container = id_('company-list');
   if (!list.length) {
-    container.innerHTML = '<p class="empty-msg">企業が未登録です。スプレッドシートの企業マスターに追加してください。</p>';
+    container.innerHTML = '<p class="empty-msg">企業が未登録です。上のフォームから追加してください。</p>';
+    updateStepBadges_();
     return;
   }
   container.innerHTML = list.map(c => `
@@ -320,7 +365,7 @@ async function handleGenerateKeys_() {
   const btn = id_('btn-gen-keys');
   btn.disabled = true; btn.textContent = '発行中...';
   const res = await adminCall_('adminGenerateKeys', { event: curEvent_ });
-  btn.disabled = false; btn.textContent = '未発行キーを一括発行';
+  btn.disabled = false; btn.textContent = '🔑 未発行キーを一括発行';
   if (res.ok) { showToast_('✓ キーを発行しました'); loadCompanies_(); }
   else showToast_('⚠ 失敗: ' + (res.message || ''));
 }
@@ -357,7 +402,6 @@ async function handleChangeKey_() {
     fb.className = 'save-fb err'; return;
   }
 
-  // 確認ステップ
   const confirmed = window.confirm(
     '管理者キーを変更します。\n\n' +
     '新しいキー: ' + newKey + '\n\n' +
@@ -378,7 +422,6 @@ async function handleChangeKey_() {
   btn.disabled = false; btn.textContent = 'キーを変更';
 
   if (res.ok) {
-    // 新しいキーでセッションを更新してログアウト
     sessionStorage.removeItem('fg_admin_key');
     fb.textContent = '✓ 変更しました。新しいキーで再ログインしてください。';
     fb.className = 'save-fb ok';
@@ -411,7 +454,7 @@ async function handleCreateEvent_() {
   const startDate = getVal_('new-start-date');
   const endDate   = getVal_('new-end-date');
   const errEl = id_('create-err');
-  errEl.style.display = 'none'; errEl.classList.remove('show');
+  errEl.style.display = 'none';
 
   if (!eventId || !eventName || !startDate || !endDate) {
     errEl.textContent = 'すべての項目を入力してください';
@@ -434,16 +477,13 @@ async function handleCreateEvent_() {
   if (res.ok) {
     hideModal_('modal-create');
     showToast_('✓ イベントを作成しました: ' + eventId);
+    // イベントリストを再取得してダッシュボードへ
     const evRes = await adminCall_('adminGetEvents', {});
     if (evRes.ok) {
       allEvents_  = evRes.data.events    || [];
       walkInCode_ = evRes.data.walkInCode || '';
-      populateEventSel_();
-      curEvent_ = eventId;
-      id_('event-select').value = eventId;
-      updateEventBar_();
-      loadAll_();
     }
+    location.hash = '#' + eventId;  // ダッシュボードへ遷移
   } else {
     errEl.textContent = res.message || '作成に失敗しました';
     errEl.style.display = 'block';
@@ -534,31 +574,21 @@ function esc_(s) {
 }
 
 // ── 準備ステップ バッジ更新 ─────────────────────────
-/**
- * 取得済みデータをもとに各ステップの完了バッジを更新する。
- * loadStats_() / loadCompanies_() / loginWithKey_() 完了後に呼ばれる。
- */
 function updateStepBadges_() {
-  // Step 1: イベントが1件以上存在すれば完了
-  const step1Done = allEvents_.length > 0;
-  setBadge_('badge-step1', step1Done ? 'done' : 'todo',
-    step1Done ? '✓ 完了' : '未完了');
-
-  // Step 2: 企業が1社以上登録されていれば完了
+  // Step 2（企業管理ナビカード）: 企業登録数
   const companyCount = id_('company-list')?.querySelectorAll('.company-item').length || 0;
   const step2Done    = companyCount > 0;
   setBadge_('badge-step2', step2Done ? 'done' : 'todo',
     step2Done ? `✓ ${companyCount}社` : '未登録');
 
-  // Step 3: 学生数 > 0 であれば完了
+  // Step 3（学生管理ナビカード）: 登録学生数
   const studentCount = parseInt(id_('stat-students')?.textContent, 10) || 0;
   const step3Done    = studentCount > 0;
   setBadge_('badge-step3', step3Done ? 'done' : 'todo',
     step3Done ? `✓ ${studentCount}名` : '未登録');
-  // Step3 内のサマリ表示も更新
-  setText_('student-count-step3', studentCount || '0');
+  setText_('student-count-step3', studentCount || '—');
 
-  // Step 4: walkInCode_ が設定済み かつ 企業キーが1件以上発行済みであれば完了
+  // Step 4（URL発行アコーディオン）
   const anyKeyIssued = [...(id_('company-list')?.querySelectorAll('.key-val') || [])]
     .some(el => el.textContent.trim() !== '未発行');
   const step4Done = !!(walkInCode_) && anyKeyIssued;
@@ -567,8 +597,9 @@ function updateStepBadges_() {
 }
 
 function setBadge_(eid, type, label) {
-  const el = id_(eid);
-  if (!el) return;
-  el.className = 'step-badge ' + type;
+  const el = id_(eid); if (!el) return;
+  // base class: nav-card-count または step-badge を維持
+  const base = el.classList.contains('nav-card-count') ? 'nav-card-count' : 'step-badge';
+  el.className = base + ' ' + type;
   el.textContent = label;
 }

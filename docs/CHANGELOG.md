@@ -16,6 +16,24 @@
 
 ---
 
+## 2026-06-09 admin パネルをハッシュルーティング SPA に刷新
+- 変更ファイル:
+  - `app/admin.html`（全面再設計）
+  - `js/admin.js`（ルーティング追加・構造再編）
+- 変更内容:
+  - `location.hash` ベースの SPA ルーティングを実装。
+    - `#` → イベント一覧ページ（カード形式）
+    - `#eventId` → イベントダッシュボード（統計・ナビカード・当日運用・設定）
+    - `#eventId/companies` → 企業管理ページ
+    - `#eventId/students` → 学生管理ページ
+  - ドロップダウン（event-select）を廃止。イベント一覧カードでイベントを選択。
+  - ダッシュボードに「企業管理」「学生管理」ナビカードを設置（バッジで登録数を表示）。
+  - 新規イベント作成後はダッシュボードへ自動遷移。
+  - ブラウザの「戻る」ボタンでページ間を移動可能（hashchange イベントで処理）。
+  - `setBadge_()` を nav-card-count / step-badge 両対応に更新。
+- 削除した機能: `populateEventSel_`, `autoSelectEvent_`, `updateEventBar_`, `event-select` dropdown
+- 追加した機能: `route_()`, `showPage_()`, `renderEventList_()`, `updateNavLinks_()`
+
 ## 2026-06-09 準備ステップを4段階に分割（企業登録・学生登録を独立化）
 - 変更ファイル:
   - `app/admin.html`（Step2/3 分割 → Step4 追加）
