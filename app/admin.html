@@ -277,61 +277,89 @@
       </div>
     </div>
 
-    <!-- Step 2: 企業・学生の登録 -->
+    <!-- Step 2: 企業登録 -->
     <div class="section">
       <div class="section-hd" data-section="step2">
         <div class="step-hd-inner">
           <span class="step-num">2</span>
           <span class="section-title" style="gap:8px">
-            企業・学生の登録
+            企業登録
             <span class="step-badge init" id="badge-step2">確認中</span>
           </span>
         </div>
         <span class="section-toggle" id="toggle-step2">▼</span>
       </div>
       <div class="section-body" id="body-step2">
-        <p class="step-desc">企業マスターと学生マスターをイベントに登録します。</p>
+        <p class="step-desc">参加企業を登録し、スタンプキー・閲覧キーを発行します。</p>
 
-        <!-- 準備中: 学生マスター取込 -->
-        <div class="wip-row">
-          <button class="wip-btn" data-wip>📋 学生マスター取込（importStudents）</button>
-          <span class="wip-tag">準備中</span>
-        </div>
         <!-- 企業追加フォーム -->
-        <div class="cfg-group" style="margin-top:4px">
-          <div class="cfg-group-title">企業管理</div>
-
-          <div class="add-co-form">
-            <div class="add-co-form-title">＋ 企業を追加</div>
-            <div class="add-co-row">
-              <input type="text" id="new-co-name" placeholder="企業名（必須）" autocomplete="off">
-            </div>
-            <div class="add-co-row">
-              <input type="text" id="new-co-id" placeholder="企業ID（空欄で自動生成）" autocomplete="off">
-            </div>
-            <div class="add-co-err" id="add-co-err"></div>
-            <button class="save-btn" id="btn-add-company">追加</button>
+        <div class="add-co-form">
+          <div class="add-co-form-title">＋ 企業を追加</div>
+          <div class="add-co-row">
+            <input type="text" id="new-co-name" placeholder="企業名（必須）" autocomplete="off">
           </div>
-
-          <button class="save-btn" id="btn-gen-keys" style="margin-bottom:14px;background:var(--navy-mid)">🔑 未発行キーを一括発行</button>
-          <div id="company-list"></div>
+          <div class="add-co-row">
+            <input type="text" id="new-co-id" placeholder="企業ID（空欄で自動生成）" autocomplete="off">
+          </div>
+          <div class="add-co-err" id="add-co-err"></div>
+          <button class="save-btn" id="btn-add-company">追加</button>
         </div>
+
+        <button class="save-btn" id="btn-gen-keys" style="margin-bottom:14px;background:var(--navy-mid)">🔑 未発行キーを一括発行</button>
+        <div id="company-list"></div>
       </div>
     </div>
 
-    <!-- Step 3: QR・NFC URL 発行 -->
+    <!-- Step 3: 学生登録 -->
     <div class="section">
       <div class="section-hd" data-section="step3">
         <div class="step-hd-inner">
           <span class="step-num">3</span>
           <span class="section-title" style="gap:8px">
-            QR・NFC URL 発行
+            学生登録
             <span class="step-badge init" id="badge-step3">確認中</span>
           </span>
         </div>
         <span class="section-toggle" id="toggle-step3">▼</span>
       </div>
       <div class="section-body" id="body-step3">
+        <p class="step-desc">Googleフォームの回答を学生マスターに取り込みます。</p>
+
+        <!-- 準備中: 学生マスター取込 -->
+        <div class="wip-row">
+          <button class="wip-btn" data-wip>📋 学生マスター取込（importStudents）</button>
+          <span class="wip-tag">準備中</span>
+        </div>
+        <!-- 準備中: 学生一覧プレビュー -->
+        <div class="wip-row">
+          <button class="wip-btn" data-wip>👥 登録済み学生を確認</button>
+          <span class="wip-tag">準備中</span>
+        </div>
+
+        <!-- 学生数サマリ（loadStats_ の値を流用） -->
+        <div class="cfg-group" style="margin-top:12px">
+          <div class="cfg-group-title">現在の登録状況</div>
+          <div style="font-size:13px;padding:8px 0">
+            登録学生数: <strong id="student-count-step3">—</strong> 名
+          </div>
+          <p class="step-note">GASエディタで <code>importStudents('イベントID')</code> を実行すると取り込みができます。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4: QR・NFC URL 発行 -->
+    <div class="section">
+      <div class="section-hd" data-section="step4">
+        <div class="step-hd-inner">
+          <span class="step-num">4</span>
+          <span class="section-title" style="gap:8px">
+            QR・NFC URL 発行
+            <span class="step-badge init" id="badge-step4">確認中</span>
+          </span>
+        </div>
+        <span class="section-toggle" id="toggle-step4">▼</span>
+      </div>
+      <div class="section-body" id="body-step4">
         <p class="step-desc">学生QR名刺・企業NFCタグのURLを発行し、印刷・掲示します。</p>
 
         <!-- 準備中: 学生QR URL一括発行 -->
@@ -350,7 +378,7 @@
           <span class="wip-tag">準備中</span>
         </div>
 
-        <!-- 実機能: 当日参加登録URL（settings から移動） -->
+        <!-- 実機能: 当日参加登録URL -->
         <div class="cfg-group" style="margin-top:16px">
           <div class="cfg-group-title">当日参加登録URL</div>
           <div class="url-box">

@@ -544,19 +544,26 @@ function updateStepBadges_() {
   setBadge_('badge-step1', step1Done ? 'done' : 'todo',
     step1Done ? '✓ 完了' : '未完了');
 
-  // Step 2: 学生数 > 0 かつ 企業が1社以上登録されていれば完了
-  const studentCount = parseInt(id_('stat-students')?.textContent, 10) || 0;
+  // Step 2: 企業が1社以上登録されていれば完了
   const companyCount = id_('company-list')?.querySelectorAll('.company-item').length || 0;
-  const step2Done    = studentCount > 0 && companyCount > 0;
+  const step2Done    = companyCount > 0;
   setBadge_('badge-step2', step2Done ? 'done' : 'todo',
-    step2Done ? '✓ 完了' : '未完了');
+    step2Done ? `✓ ${companyCount}社` : '未登録');
 
-  // Step 3: walkInCode_ が設定済み かつ 企業キーが1件以上発行済みであれば完了
+  // Step 3: 学生数 > 0 であれば完了
+  const studentCount = parseInt(id_('stat-students')?.textContent, 10) || 0;
+  const step3Done    = studentCount > 0;
+  setBadge_('badge-step3', step3Done ? 'done' : 'todo',
+    step3Done ? `✓ ${studentCount}名` : '未登録');
+  // Step3 内のサマリ表示も更新
+  setText_('student-count-step3', studentCount || '0');
+
+  // Step 4: walkInCode_ が設定済み かつ 企業キーが1件以上発行済みであれば完了
   const anyKeyIssued = [...(id_('company-list')?.querySelectorAll('.key-val') || [])]
     .some(el => el.textContent.trim() !== '未発行');
-  const step3Done = !!(walkInCode_) && anyKeyIssued;
-  setBadge_('badge-step3', step3Done ? 'done' : 'todo',
-    step3Done ? '✓ 完了' : '未完了');
+  const step4Done = !!(walkInCode_) && anyKeyIssued;
+  setBadge_('badge-step4', step4Done ? 'done' : 'todo',
+    step4Done ? '✓ 完了' : '未完了');
 }
 
 function setBadge_(eid, type, label) {
