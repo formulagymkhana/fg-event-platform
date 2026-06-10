@@ -199,18 +199,21 @@ async function loadAll_() {
 
 // ── Stats ─────────────────────────────────────────
 async function loadStats_(gen, ev) {
-  setText_('stat-students', '…');
-  setText_('stat-walkins',  '…');
-  setText_('stat-stamps',   '…');
-  setText_('stat-prizes',   '…');
+  ['stat-preregistered','stat-walkins','stat-stamp-participants','stat-prizes'].forEach(id => setText_(id, '…'));
   const res = await adminCall_('adminGetStats', { event: ev });
   if (gen !== loadGen_) return;
   if (!res.ok) return;
   const d = res.data;
-  setText_('stat-students', d.studentCount ?? '—');
-  setText_('stat-walkins',  d.walkInCount  ?? '—');
-  setText_('stat-stamps',   d.stampCount   ?? '—');
-  setText_('stat-prizes',   d.prizeCount   ?? '—');
+  setText_('stat-preregistered',      d.preRegisteredCount  ?? '—');
+  setText_('stat-walkins',            d.walkInCount         ?? '—');
+  setText_('stat-stamp-participants', d.stampParticipants   ?? '—');
+  setText_('stat-prizes',             d.prizeCount          ?? '—');
+  // 学生管理ページのカード
+  const total = (d.preRegisteredCount || 0) + (d.walkInCount || 0);
+  setText_('student-count-step3',  total              || '—');
+  setText_('student-prereg-step3', d.preRegisteredCount ?? '—');
+  setText_('student-walkin-step3', d.walkInCount        ?? '—');
+  setText_('student-stamp-step3',  d.stampParticipants  ?? '—');
   updateStepBadges_();
 }
 
@@ -256,8 +259,8 @@ async function loadConfig_(gen, ev) {
   if (gen !== loadGen_) return;
   if (!res.ok) return;
   const cfg = res.data.config || {};
-  setVal_('cfg-prizeThreshold',   cfg.prizeThreshold  || 15);
-  setVal_('cfg-prizeCount',       cfg.prizeCount       || 3);
+  setVal_('cfg-prizeUnitSize', cfg.prizeUnitSize || cfg.prizeThreshold || 5);
+  setVal_('cfg-maxPrizes',    cfg.maxPrizes     || cfg.prizeCount    || 3);
   setVal_('cfg-stampStartAt',     toDtLocal_(cfg.stampStartAt));
   setVal_('cfg-stampEndAt',       toDtLocal_(cfg.stampEndAt));
   setVal_('cfg-exchangeDeadline', toDtLocal_(cfg.exchangeDeadline));
@@ -271,8 +274,8 @@ async function handleSaveConfig_() {
   btn.disabled = true; fb.className = 'save-fb'; fb.textContent = '';
 
   const map = {
-    prizeThreshold:   getVal_('cfg-prizeThreshold'),
-    prizeCount:       getVal_('cfg-prizeCount'),
+    prizeUnitSize:    getVal_('cfg-prizeUnitSize'),
+    maxPrizes:        getVal_('cfg-maxPrizes'),
     stampStartAt:     fromDtLocal_(getVal_('cfg-stampStartAt')),
     stampEndAt:       fromDtLocal_(getVal_('cfg-stampEndAt')),
     exchangeDeadline: fromDtLocal_(getVal_('cfg-exchangeDeadline')),
@@ -618,12 +621,13 @@ function updateStepBadges_() {
   setBadge_('badge-step2', step2Done ? 'done' : 'todo',
     step2Done ? `✓ ${companyCount}社` : '未登録');
 
-  // Step 3（学生管理ナビカード）: 登録学生数
-  const studentCount = parseInt(id_('stat-students')?.textContent, 10) || 0;
+  // Step 3（学生管理ナビカード）: 登録学生数（事前 + 当日）
+  const preReg       = parseInt(id_('stat-preregistered')?.textContent, 10) || 0;
+  const walkIn       = parseInt(id_('stat-walkins')?.textContent,       10) || 0;
+  const studentCount = preReg + walkIn;
   const step3Done    = studentCount > 0;
   setBadge_('badge-step3', step3Done ? 'done' : 'todo',
     step3Done ? `✓ ${studentCount}名` : '未登録');
-  setText_('student-count-step3', studentCount || '—');
 
   // Step 4（URL発行アコーディオン）
   const anyKeyIssued = [...(id_('company-list')?.querySelectorAll('.key-val') || [])]

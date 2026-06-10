@@ -276,9 +276,9 @@
 
       <!-- 統計グリッド -->
       <div class="stat-grid">
-        <div class="stat-card"><div class="stat-val" id="stat-students">—</div><div class="stat-lbl">登録学生数</div></div>
-        <div class="stat-card"><div class="stat-val" id="stat-walkins">—</div><div class="stat-lbl">当日参加者</div></div>
-        <div class="stat-card"><div class="stat-val" id="stat-stamps">—</div><div class="stat-lbl">スタンプ総数</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-preregistered">—</div><div class="stat-lbl">事前登録学生</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-walkins">—</div><div class="stat-lbl">当日参加学生</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-stamp-participants">—</div><div class="stat-lbl">スタンプ参加者</div></div>
         <div class="stat-card"><div class="stat-val" id="stat-prizes">—</div><div class="stat-lbl">景品交換済</div></div>
       </div>
 
@@ -387,14 +387,15 @@
         <div class="section-body" id="body-settings">
           <div class="cfg-group">
             <div class="cfg-group-title">景品・期間設定</div>
+            <div class="cfg-hint" style="margin-bottom:8px">例: 5個ごと・最大3個 → 5個で1個、10個で2個、15個で3個</div>
             <div class="cfg-row-half">
               <div class="cfg-row">
-                <label>必要スタンプ数</label>
-                <input type="number" class="cfg-input" id="cfg-prizeThreshold" min="1" max="100">
+                <label>N個ごとに1枠解放</label>
+                <input type="number" class="cfg-input" id="cfg-prizeUnitSize" min="1" max="100">
               </div>
               <div class="cfg-row">
-                <label>景品数</label>
-                <input type="number" class="cfg-input" id="cfg-prizeCount" min="1" max="20">
+                <label>最大景品数</label>
+                <input type="number" class="cfg-input" id="cfg-maxPrizes" min="1" max="20">
               </div>
             </div>
             <div class="cfg-row">
@@ -469,11 +470,11 @@
     <div class="app-body">
       <p class="step-desc" style="margin-top:4px">Googleフォームの回答を学生マスターに取り込みます。</p>
 
-      <div class="stat-grid" style="grid-template-columns:1fr">
-        <div class="stat-card">
-          <div class="stat-val" id="student-count-step3">—</div>
-          <div class="stat-lbl">登録学生数</div>
-        </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-val" id="student-count-step3">—</div><div class="stat-lbl">合計</div></div>
+        <div class="stat-card"><div class="stat-val" id="student-prereg-step3">—</div><div class="stat-lbl">事前登録</div></div>
+        <div class="stat-card"><div class="stat-val" id="student-walkin-step3">—</div><div class="stat-lbl">当日参加</div></div>
+        <div class="stat-card"><div class="stat-val" id="student-stamp-step3">—</div><div class="stat-lbl">スタンプ参加</div></div>
       </div>
 
       <div class="wip-row">

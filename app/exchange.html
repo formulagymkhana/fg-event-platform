@@ -129,15 +129,16 @@
       <p class="student-sub"  id="r-sub"></p>
 
       <div class="stamp-box">
-        <span class="num" id="r-count">0</span><span class="unit"> / <span id="r-threshold">15</span> 個</span>
-        <div class="label">取得スタンプ数</div>
+        <span class="num" id="r-count">0</span><span class="unit"> 個取得</span>
+        <div class="label">交換済み <span id="r-exchanged-count">0</span> / <span id="r-max-prizes">3</span> 個</div>
       </div>
 
-      <!-- 達成・引換可能 -->
+      <!-- 引換可能 -->
       <div id="r-can-exchange" style="display:none">
         <div class="verdict ok">
           ✓ 引換可能
-          <div class="sub">景品を <b id="r-prize-count">3</b> 個 渡してください</div>
+          <div class="sub">景品を <b id="r-claimable-count">1</b> 個 渡してください</div>
+          <div class="sub" id="r-exchanged-note" style="font-size:11px;margin-top:3px;opacity:.8"></div>
         </div>
         <button class="btn btn-exchange" id="btn-exchange">景品を渡した（引換完了）</button>
       </div>
@@ -150,11 +151,19 @@
         </div>
       </div>
 
-      <!-- 交換済み -->
-      <div id="r-already" style="display:none">
+      <!-- 一部交換済み・追加収集中 -->
+      <div id="r-collecting" style="display:none">
         <div class="verdict done">
-          ⚠ すでに交換済みです
-          <div class="sub">この学生は景品を受け取り済みです</div>
+          📦 追加収集中
+          <div class="sub" id="r-collecting-msg"></div>
+        </div>
+      </div>
+
+      <!-- 全景品交換済み -->
+      <div id="r-all-done" style="display:none">
+        <div class="verdict done">
+          ✅ 全景品交換済み
+          <div class="sub" id="r-all-done-msg"></div>
         </div>
       </div>
 
@@ -171,7 +180,7 @@
     <div class="card-body">
       <div class="state-icon">✅</div>
       <p class="state-title">引換完了</p>
-      <p class="state-msg"><b id="done-name"></b> さんに<br>景品を渡しました</p>
+      <p class="state-msg"><b id="done-name"></b> さんに<br>景品を <b id="done-count">1</b> 個 渡しました</p>
       <button class="btn btn-staff" id="btn-next2">次の学生をスキャン</button>
     </div>
   </div>

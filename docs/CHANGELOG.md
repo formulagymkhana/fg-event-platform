@@ -16,6 +16,27 @@
 
 ---
 
+## 2026-06-10 景品モデルを累積交換方式に刷新・統計グリッド改修
+- 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `app/admin.html`, `js/admin.js`, `app/exchange.html`, `js/exchange.js`, `js/progress.js`
+- 変更内容:
+  - **景品モデル変更（GAS）**: 1回限り → 累積交換方式。
+    - `prizeThreshold`/`prizeCount` → `prizeUnitSize`/`maxPrizes` に変更（旧キーにフォールバック対応）
+    - `isExchanged_`（boolean）→ `countExchanged_`（累計景品数）に置換
+    - `buildStampResult_` が `claimableNow`/`exchangedCount`/`eligibleTotal`/`nextThreshold` を返すように変更
+    - `actionExchangePrize_` / `actionMarkPrizeExchanged_`: `nothing_to_claim` エラーに変更、PRIZE_LOGに `claimedCount` 列を追加
+    - `actionGetExchangeStatus_`: 新フィールド返却に対応
+  - **統計グリッド変更**: 登録学生数・スタンプ総数 → 事前登録学生/当日参加学生/スタンプ参加者/景品交換済 の4項目に変更
+  - **adminGetStats 拡張**: `preRegisteredCount`・`stampParticipants`（ユニーク参加者数）を追加
+  - **学生管理ページ**: 合計/事前登録/当日参加/スタンプ参加の4カードに変更
+  - **設定フォーム**: prizeThreshold/prizeCount → prizeUnitSize/maxPrizes に変更（ヒント文追加）
+  - **exchange.html / exchange.js**: 複数回交換対応のUI（引換可能/追加収集中/全交換済み）
+  - **progress.js**: 段階交換UIに対応（claimableNow/nextThreshold でメッセージ分岐）
+- 理由/背景: 電子スタンプラリーの強みを活かした柔軟な景品交換モデルへ移行
+- 申し送り/注意点:
+  - **GAS 再デプロイが必要**
+  - 既存の設定シートに `prizeUnitSize`/`maxPrizes` の行を追加する必要あり（旧キーへのフォールバックあり）
+  - PRIZE_LOG の新規行には `claimedCount` 列が追加される（旧行は1個扱いで互換）
+
 ## 2026-06-09 UX改善: 削除ボタン移動・QR導線・当日参加者フロー
 - 変更ファイル: `app/admin.html`, `js/admin.js`, `app/progress.html`
 - 変更内容:

@@ -114,19 +114,33 @@ async function onQRFound(qrData) {
 function renderResult(d) {
   setText('r-name', d.name);
   setText('r-sub', `${d.school}　${d.category}`);
-  setText('r-count', String(d.stampCount));
-  setText('r-threshold', String(d.prizeThreshold));
-  setText('r-prize-count', String(d.prizeCount));
+  setText('r-count',          String(d.stampCount));
+  setText('r-exchanged-count', String(d.exchangedCount || 0));
+  setText('r-max-prizes',      String(d.maxPrizes      || 3));
 
-  hide('r-can-exchange'); hide('r-not-cleared'); hide('r-already');
+  hide('r-can-exchange'); hide('r-not-cleared'); hide('r-collecting'); hide('r-all-done');
 
-  if (d.exchanged) {
-    show('r-already');
-  } else if (d.cleared) {
+  if (d.claimableNow > 0) {
+    // 今すぐ交換できる
+    setText('r-claimable-count', String(d.claimableNow));
+    setText('r-exchanged-note',
+      d.exchangedCount > 0 ? `（既に ${d.exchangedCount} 個交換済み）` : '');
     show('r-can-exchange');
+  } else if (d.exchanged) {
+    // 最大数まで全て交換済み
+    setText('r-all-done-msg', `合計 ${d.exchangedCount} 個の景品を受け取り済みです`);
+    show('r-all-done');
+  } else if (d.exchangedCount > 0) {
+    // 一部交換済み・次の閾値に向けて収集中
+    const msg = d.nextThreshold
+      ? `${d.exchangedCount} 個交換済み　あと ${d.nextThreshold - d.stampCount} 個で次の交換可`
+      : `${d.exchangedCount} 個交換済み`;
+    setText('r-collecting-msg', msg);
+    show('r-collecting');
   } else {
-    const remaining = d.prizeThreshold - d.stampCount;
-    setText('r-remaining', `景品まであと ${remaining} 個`);
+    // 未達成（1枚も交換していない）
+    const toNext = (d.prizeUnitSize || 5) - (d.stampCount % (d.prizeUnitSize || 5));
+    setText('r-remaining', `最初の景品まであと ${toNext === (d.prizeUnitSize || 5) ? d.prizeUnitSize : toNext} 個`);
     show('r-not-cleared');
   }
 }
@@ -145,13 +159,14 @@ async function doExchange() {
   btn.textContent = '景品を渡した（引換完了）';
 
   if (res.ok) {
-    setText('done-name', res.data.name);
+    setText('done-name',  res.data.name);
+    setText('done-count', String(res.data.claimedNow || 1));
     showState('done');
   } else {
     showState('error');
-    if (res.error === 'already_exchanged') {
-      setText('error-title', 'すでに交換済みです');
-      setText('error-msg', 'この学生は景品を受け取り済みです。');
+    if (res.error === 'nothing_to_claim') {
+      setText('error-title', '交換できる景品がありません');
+      setText('error-msg', 'スタンプ数が条件を満たしていないか、既に最大数を交換済みです。');
     } else if (res.error === 'not_cleared') {
       setText('error-title', 'まだ条件を満たしていません');
       setText('error-msg', 'スタンプ数が足りません。');

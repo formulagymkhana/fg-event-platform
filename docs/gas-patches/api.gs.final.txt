@@ -3,10 +3,10 @@
  *
  * 1つのGASで複数イベントのスプレッドシートを管理する。
  *
- * 景品モデル: 「N個集めるとM個選べる」
+ * 景品モデル: 「N個ごとに1枠解放、最大M個まで累積交換可」
  *   設定シート:
- *     prizeThreshold … 必要スタンプ数 (例: 15)
- *     prizeCount     … 選べる景品数   (例: 3)
+ *     prizeUnitSize  … 何個ごとに1枠解放するか (例: 5)
+ *     maxPrizes      … 交換できる景品の最大数   (例: 3)
  *     exchangeKey    … 景品交換画面のスタッフ認証キー (UUID)
  *     stampStartAt   … スタンプ取得開始日時 (例: 2026/08/22 09:00)  ← T3追加
  *     stampEndAt     … スタンプ取得終了日時 (例: 2026/08/23 17:00)  ← T3追加
@@ -268,15 +268,14 @@ function actionExchangePrize_(p) {
   if (!isExchangeOpen_(cfg)) return err_('exchange_closed');
   const student = findStudentByStampToken_(p.token, p.event);
   if (!student) return err_('invalid_token');
-  const count     = countStamps_(p.event, student.studentId);
-  const threshold = Number(cfg.prizeThreshold) || Number(cfg.prizeCriteria) || 5;
-  if (count < threshold) return err_('not_cleared');
-  if (isExchanged_(p.event, student.studentId)) return err_('already_exchanged');
+  const count  = countStamps_(p.event, student.studentId);
+  const result = buildStampResult_(p.event, student.studentId, count, {});
+  if (result.claimableNow <= 0) return err_('nothing_to_claim');
   eventSs_(p.event).getSheetByName(SHEET.PRIZE_LOG).appendRow([
     new Date(), p.event, student.studentId, student.name,
-    count, '学生確定',
+    count, result.claimableNow, '学生確定',
   ]);
-  // progress.js は res.data を renderProgress に渡すため buildStampResult_ 形式で返す
+  // appendRow後に countExchanged_ が更新されるので再計算して返す
   return ok_(buildStampResult_(p.event, student.studentId, count, {}));
 }
 
@@ -302,15 +301,19 @@ function actionGetExchangeStatus_(p) {
   const result = buildStampResult_(p.event, student.studentId, count, {});
 
   return ok_({
-    studentId:      student.studentId,
-    name:           student.name,
-    school:         student.school,
-    category:       student.category,
-    stampCount:     count,
-    prizeThreshold: result.prizeThreshold,
-    prizeCount:     result.prizeCount,
-    cleared:        result.cleared,
-    exchanged:      result.exchanged,
+    studentId:     student.studentId,
+    name:          student.name,
+    school:        student.school,
+    category:      student.category,
+    stampCount:    count,
+    prizeUnitSize: result.prizeUnitSize,
+    maxPrizes:     result.maxPrizes,
+    eligibleTotal: result.eligibleTotal,
+    exchangedCount:result.exchangedCount,
+    claimableNow:  result.claimableNow,
+    nextThreshold: result.nextThreshold,
+    cleared:       result.cleared,
+    exchanged:     result.exchanged,
   });
 }
 
@@ -332,22 +335,23 @@ function actionMarkPrizeExchanged_(p) {
   const student = findStudentByCardToken_(p.token, p.event);
   if (!student) return err_('invalid_token');
 
-  const count     = countStamps_(p.event, student.studentId);
-  const threshold = Number(cfg.prizeThreshold) || Number(cfg.prizeCriteria) || 5;
+  const count  = countStamps_(p.event, student.studentId);
+  const result = buildStampResult_(p.event, student.studentId, count, {});
 
-  if (count < threshold) return err_('not_cleared');
-  if (isExchanged_(p.event, student.studentId)) return err_('already_exchanged');
+  if (result.claimableNow <= 0) return err_('nothing_to_claim');
 
   eventSs_(p.event).getSheetByName(SHEET.PRIZE_LOG).appendRow([
     new Date(), p.event, student.studentId, student.name,
-    count, p.staff || '',
+    count, result.claimableNow, p.staff || '',
   ]);
 
   return ok_({
-    studentId:  student.studentId,
-    name:       student.name,
-    stampCount: count,
-    exchanged:  true,
+    studentId:     student.studentId,
+    name:          student.name,
+    stampCount:    count,
+    claimedNow:    result.claimableNow,
+    exchangedCount: result.exchangedCount + result.claimableNow,
+    exchanged:     (result.exchangedCount + result.claimableNow) >= result.maxPrizes,
   });
 }
 
@@ -442,20 +446,24 @@ function actionGetEventList_(p) {
 // 景品ヘルパー
 // ============================================================
 
-/** 学生が景品交換済みか */
-function isExchanged_(eventId, studentId) {
+/**
+ * 学生が景品交換した累計景品数
+ * PRIZE_LOG の claimedCount 列を合計する。
+ * 旧形式（claimedCount列なし）は行数をカウント（1行=1個扱い）。
+ */
+function countExchanged_(eventId, studentId) {
   const sheet = eventSs_(eventId).getSheetByName(SHEET.PRIZE_LOG);
-  if (!sheet || sheet.getLastRow() < 2) return false;
+  if (!sheet || sheet.getLastRow() < 2) return 0;
 
   const data    = sheet.getDataRange().getValues();
   const headers = data[0].map(String);
   const evCol   = headers.indexOf('eventId');
   const sidCol  = headers.indexOf('studentId');
+  const cntCol  = headers.indexOf('claimedCount');
 
-  return data.slice(1).some(r =>
-    String(r[evCol]) === String(eventId) &&
-    String(r[sidCol]) === String(studentId)
-  );
+  return data.slice(1)
+    .filter(r => String(r[evCol]) === String(eventId) && String(r[sidCol]) === String(studentId))
+    .reduce((sum, r) => sum + (cntCol >= 0 ? Number(r[cntCol]) || 1 : 1), 0);
 }
 
 /** スタンプ数を数える */
@@ -468,22 +476,35 @@ function countStamps_(eventId, studentId) {
 }
 
 /**
- * スタンプ結果の共通レスポンスを組み立てる
- * stampCount, prizeThreshold, prizeCount, cleared, exchanged を含む。
- * extra で stampToken / company / stamps / justCleared などを追加可能。
+ * スタンプ結果の共通レスポンスを組み立てる（累積交換モデル）
+ *
+ * 景品ロジック:
+ *   eligibleTotal = min( floor(stampCount / prizeUnitSize), maxPrizes )
+ *   claimableNow  = max( 0, eligibleTotal - exchangedCount )
+ *   cleared       = claimableNow > 0
+ *   exchanged     = exchangedCount >= maxPrizes（これ以上交換不可）
  */
 function buildStampResult_(eventId, studentId, stampCount, extra) {
-  const cfg        = getConfig_(eventId);
-  const threshold  = Number(cfg.prizeThreshold) || Number(cfg.prizeCriteria) || 5;
-  const prizeCount = Number(cfg.prizeCount) || 1;
-  const exchanged  = isExchanged_(eventId, studentId);
+  const cfg           = getConfig_(eventId);
+  const prizeUnitSize = Number(cfg.prizeUnitSize) || Number(cfg.prizeThreshold) || 5;
+  const maxPrizes     = Number(cfg.maxPrizes)     || Number(cfg.prizeCount)     || 3;
+  const exchangedCount  = countExchanged_(eventId, studentId);
+  const eligibleTotal   = Math.min(Math.floor(stampCount / prizeUnitSize), maxPrizes);
+  const claimableNow    = Math.max(0, eligibleTotal - exchangedCount);
+  // 次の交換閾値（これ以上交換不可なら null）
+  const nextTier        = exchangedCount + 1;
+  const nextThreshold   = nextTier <= maxPrizes ? nextTier * prizeUnitSize : null;
 
   return Object.assign({
     stampCount,
-    prizeThreshold: threshold,
-    prizeCount,
-    cleared:        stampCount >= threshold,
-    exchanged,
+    prizeUnitSize,
+    maxPrizes,
+    eligibleTotal,
+    exchangedCount,
+    claimableNow,
+    nextThreshold,
+    cleared:  claimableNow > 0,
+    exchanged: exchangedCount >= maxPrizes,
   }, extra || {});
 }
 
@@ -940,9 +961,19 @@ function actionAdminGetStats_(p) {
   const participantSheet = ss.getSheetByName(SHEET.STAMP_PARTICIPANTS);
   const prizeSheet       = ss.getSheetByName(SHEET.PRIZE_LOG);
 
+  // スタンプ参加者（イベント内で1個以上スタンプした学生のユニーク数）
+  let stampParticipants = 0;
+  if (stampSheet && stampSheet.getLastRow() > 1) {
+    const sRows = stampSheet.getRange(2, 1, stampSheet.getLastRow() - 1, 3).getValues();
+    const uniq  = new Set(sRows.filter(r => String(r[1]) === String(p.event)).map(r => String(r[2])));
+    stampParticipants = uniq.size;
+  }
+
   return ok_({
     studentCount,
+    preRegisteredCount: studentCount - walkInCount,
     walkInCount,
+    stampParticipants,
     stampCount:       stampSheet       ? Math.max(0, stampSheet.getLastRow()       - 1) : 0,
     participantCount: participantSheet ? Math.max(0, participantSheet.getLastRow() - 1) : 0,
     prizeCount:       prizeSheet       ? Math.max(0, prizeSheet.getLastRow()       - 1) : 0,

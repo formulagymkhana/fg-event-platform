@@ -46,37 +46,52 @@ async function loadProgress() {
 }
 
 function renderProgress(d) {
-  const count     = d.stampCount     || 0;
-  const threshold = d.prizeThreshold || 5;
-  const prizeNum  = d.prizeCount     || 1;
-  const stamps    = d.stamps         || [];
-  const cleared   = d.cleared        || false;
-  const exchanged = d.exchanged      || false;
+  const count          = d.stampCount     || 0;
+  const prizeUnitSize  = d.prizeUnitSize  || d.prizeThreshold || 5;
+  const maxPrizes      = d.maxPrizes      || d.prizeCount     || 3;
+  const claimableNow   = d.claimableNow   || 0;
+  const exchangedCount = d.exchangedCount || 0;
+  const nextThreshold  = d.nextThreshold  || null;
+  const stamps         = d.stamps         || [];
+  const cleared        = d.cleared        || false;  // claimableNow > 0
+  const exchanged      = d.exchanged      || false;  // exchangedCount >= maxPrizes
 
   setText('count-num', String(count));
 
-  const pct = Math.min(100, Math.round((count / threshold) * 100));
+  // ゲージ: 次の交換閾値に向けた進捗
+  const gaugeTarget = nextThreshold || (maxPrizes * prizeUnitSize);
+  const pct = Math.min(100, Math.round((count / gaugeTarget) * 100));
   document.getElementById('bar-fill').style.width = pct + '%';
   document.querySelector('.progress-ring')?.style.setProperty('--pct', pct);
-  setText('bar-label', `${count} / ${threshold} 個`);
+  setText('bar-label', `${count} / ${gaugeTarget} 個`);
 
-  // ステータス(優先度: 交換済み > 達成 > 進行中)
+  // ステータス表示をリセット
   hide('status-cleared'); hide('status-exchanged'); hide('status-progress');
   hide('exchange-action');
-  // 交換アクションは初期状態(start表示/confirm非表示)に戻す
   show('exchange-start'); hide('exchange-confirm');
 
   if (exchanged) {
+    // 最大数まで全交換済み
+    const el = document.getElementById('status-exchanged');
+    el.textContent = `✓ 全景品受け取り済み（計 ${exchangedCount} 個）`;
     show('status-exchanged');
   } else if (cleared) {
+    // 今すぐ交換できる
     const el = document.getElementById('status-cleared');
-    el.innerHTML = `🎉 景品引換可能！<div class="status-sub">交換所で好きな景品を${prizeNum}個選べます</div>`;
+    const alreadyNote = exchangedCount > 0 ? `（既に ${exchangedCount} 個受け取り済み）` : '';
+    el.innerHTML = `🎉 景品 ${claimableNow} 個と交換できます！<div class="status-sub">${alreadyNote}交換所でスタッフにお声がけください</div>`;
     show('status-cleared');
-    // 達成 & 未交換 → 交換ボタンを表示
     show('exchange-action');
+  } else if (nextThreshold) {
+    // 次の閾値に向けて収集中（一部交換済み）
+    const remaining  = nextThreshold - count;
+    const alreadyNote = exchangedCount > 0 ? `（${exchangedCount} 個交換済み）` : '';
+    setText('status-progress', `あと ${remaining} 個でさらに1個GET！ ${alreadyNote}`);
+    show('status-progress');
   } else {
-    const remaining = threshold - count;
-    setText('status-progress', `あと ${remaining} 個で景品${prizeNum}個GET！`);
+    // まだ最初の閾値にも届いていない
+    const remaining = prizeUnitSize - count;
+    setText('status-progress', `あと ${remaining} 個で景品と交換できます`);
     show('status-progress');
   }
 
@@ -118,8 +133,8 @@ async function doExchange() {
     // 進捗を再読み込み(交換済み表示に切り替わる)
     renderProgress(res.data);
     showState('progress');
-  } else if (res.error === 'already_exchanged') {
-    loadProgress(); // 既に交換済み → 最新状態を再取得
+  } else if (res.error === 'nothing_to_claim' || res.error === 'already_exchanged') {
+    loadProgress(); // 交換可能数なし → 最新状態を再取得
   } else {
     showState('error');
     setText('error-title', 'エラーが発生しました');
