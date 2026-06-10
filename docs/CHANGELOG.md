@@ -16,6 +16,21 @@
 
 ---
 
+## 2026-06-10 景品交換ログ個数列追加・新規イベント作成を新モデル対応・削除ボタン整理
+- 変更ファイル: `app/admin.html`, `js/admin.js`, `docs/gas-patches/api.gs.final.txt`, `docs/gas-patches/admin.gs.final.txt`
+- 変更内容:
+  - **admin.html**: 「⚠ 危険ゾーン」ブロック廃止 → 設定末尾にシンプルな削除ボタン＋1行説明に変更
+  - **admin.html**: 景品交換テーブルに「個数」(claimedCount)列を追加
+  - **admin.js**: 景品ログ行に claimedCount を表示（旧データは1個扱い）
+  - **api.gs**: `actionAdminGetPrizeLog_` をヘッダーベース読み取りに変更し `claimedCount` を返却
+  - **admin.gs**: `setupEventSpreadsheet_` を新モデルに対応
+    - CONFIG の初期値: `prizeThreshold`/`prizeCount` → `prizeUnitSize(5)`/`maxPrizes(3)`
+    - PRIZE_LOG ヘッダー: `claimedCount` 列を追加
+- 理由/背景: 新規イベント作成時に旧キーで設定が初期化されていた不整合を解消。景品交換ログの個数を管理画面で確認できるように
+- 申し送り/注意点:
+  - GAS 再デプロイ済み（api.gs / admin.gs）
+  - 既存スプレッドシートの PRIZE_LOG に `claimedCount` 列がない場合、API側で1個扱いにフォールバック済み
+
 ## 2026-06-10 景品モデルを累積交換方式に刷新・統計グリッド改修
 - 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `app/admin.html`, `js/admin.js`, `app/exchange.html`, `js/exchange.js`, `js/progress.js`
 - 変更内容:
