@@ -109,8 +109,8 @@ function setupEventSpreadsheet_(ss, eventId, eventName, startDate, endDate) {
       ['eventId', eventId], ['eventName', eventName],
       ['startDate', startDate], ['endDate', endDate],
       ['publicDeadline', endDate + ' 23:59'],
-      ['prizeThreshold', 15],
-      ['prizeCount', 3],
+      ['prizeUnitSize', 5],
+      ['maxPrizes', 3],
       ['exchangeKey', Utilities.getUuid()],
       ['stampStartAt',    ''],   // T3-a 追加: スタンプ取得開始日時（未設定=制限なし）
       ['stampEndAt',      ''],   // T3-a 追加: スタンプ取得終了日時（未設定=制限なし）
@@ -121,7 +121,7 @@ function setupEventSpreadsheet_(ss, eventId, eventName, startDate, endDate) {
     [SHEET.VIEW_LOG]:           [['時刻','eventId','studentId','companyId','companyEmail']],
     [SHEET.STAMP_LOG]:          [['時刻','eventId','studentId','氏名','大学名','属性','企業名','companyId','nfcCounter']],
     [SHEET.STAMP_PARTICIPANTS]: [['時刻','eventId','studentId','stampToken','activatedAt','status']],
-    [SHEET.PRIZE_LOG]:          [['時刻','eventId','studentId','氏名','スタンプ数','対応者']],
+    [SHEET.PRIZE_LOG]:          [['時刻','eventId','studentId','氏名','スタンプ数','対応者','claimedCount']],
   };
 
   let isFirst = true;

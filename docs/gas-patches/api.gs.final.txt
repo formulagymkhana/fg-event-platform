@@ -1036,14 +1036,17 @@ function actionAdminGetPrizeLog_(p) {
   const sheet = eventSs_(p.event).getSheetByName(SHEET.PRIZE_LOG);
   if (!sheet || sheet.getLastRow() < 2) return ok_({ log: [], total: 0 });
 
-  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).getValues();
-  const tz   = Session.getScriptTimeZone();
-  const log  = data.map(r => ({
-    time:       r[0] instanceof Date ? Utilities.formatDate(r[0], tz, 'MM/dd HH:mm') : String(r[0]),
-    studentId:  r[2],
-    name:       r[3],
-    stampCount: r[4],
-    staff:      r[5],
+  const allData = sheet.getDataRange().getValues();
+  const headers = allData[0].map(String);
+  const cntCol  = headers.indexOf('claimedCount');
+  const tz      = Session.getScriptTimeZone();
+  const log     = allData.slice(1).map(r => ({
+    time:         r[0] instanceof Date ? Utilities.formatDate(r[0], tz, 'MM/dd HH:mm') : String(r[0]),
+    studentId:    r[2],
+    name:         r[3],
+    stampCount:   r[4],
+    staff:        r[5],
+    claimedCount: cntCol >= 0 ? (Number(r[cntCol]) || 1) : 1,
   }));
   return ok_({ log, total: log.length });
 }

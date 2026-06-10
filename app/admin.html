@@ -84,11 +84,8 @@
     .ev-card-status.active{background:var(--fg-success-bg,#EAF8F0);color:var(--fg-success,#1A6640)}
     .ev-card-status.done{background:#F3F4F6;color:var(--gray)}
     .ev-card-status.wip{background:#FEF3C7;color:#92400E}
-    /* ── 危険ゾーン ── */
-    .danger-zone{margin-top:20px;padding-top:16px;border-top:1px solid #FECACA}
-    .danger-zone-title{font-size:11px;font-weight:700;color:#9A2A2A;letter-spacing:.08em;
-      text-transform:uppercase;margin-bottom:8px}
-    .danger-note{font-size:11px;color:var(--gray);margin-bottom:10px;line-height:1.6}
+    /* ── イベント削除 ── */
+    .delete-event-wrap{margin-top:24px;padding-top:16px;border-top:1px solid var(--fg-line)}
 
     /* ── ナビカード（ダッシュボード → 企業・学生） ── */
     .nav-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
@@ -370,7 +367,7 @@
         <div class="section-body" id="body-prizes">
           <div class="tbl-wrap">
             <table class="data-tbl">
-              <thead><tr><th>時刻</th><th>氏名</th><th>スタンプ数</th><th>対応者</th></tr></thead>
+              <thead><tr><th>時刻</th><th>氏名</th><th>スタンプ数</th><th>個数</th><th>対応者</th></tr></thead>
               <tbody id="prize-tbody"></tbody>
             </table>
           </div>
@@ -419,10 +416,9 @@
             <span class="save-fb" id="save-feedback"></span>
           </div>
 
-          <!-- 危険ゾーン -->
-          <div class="danger-zone">
-            <div class="danger-zone-title">⚠ 危険ゾーン</div>
-            <p class="danger-note">このイベントをマスター一覧から削除します。<br>イベントのスプレッドシート本体は削除されません。</p>
+          <!-- イベント削除 -->
+          <div class="delete-event-wrap">
+            <p style="font-size:11px;color:var(--gray);margin-bottom:10px;line-height:1.6">イベントをマスター一覧から削除します。スプレッドシート本体は削除されません。</p>
             <button class="act-btn act-btn-danger" id="btn-delete-event">🗑 このイベントを削除</button>
           </div>
         </div>

@@ -249,8 +249,8 @@ async function loadPrizeLog_(gen, ev) {
   const log = res.data.log || [];
   setText_('prize-count', `(${log.length}件)`);
   id_('prize-tbody').innerHTML = log.length
-    ? log.map(r => `<tr><td>${r.time}</td><td>${esc_(r.name)}</td><td>${r.stampCount}</td><td>${esc_(r.staff || '—')}</td></tr>`).join('')
-    : '<tr><td colspan="4" class="empty-msg">データなし</td></tr>';
+    ? log.map(r => `<tr><td>${r.time}</td><td>${esc_(r.name)}</td><td>${r.stampCount}</td><td>${r.claimedCount ?? 1}</td><td>${esc_(r.staff || '—')}</td></tr>`).join('')
+    : '<tr><td colspan="5" class="empty-msg">データなし</td></tr>';
 }
 
 // ── Config ────────────────────────────────────────
