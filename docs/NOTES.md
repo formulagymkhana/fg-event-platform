@@ -16,6 +16,24 @@
 
 ---
 
+## [記録] イベント(大会)スコープと端末cookieの混在リスク（2026-06-11 記録）
+- 構造: 1つのGASで複数イベント。**イベントごとに別スプレッドシート**(eventSs_)。
+  マスターに EVENT_LIST のみ。フロント(GitHub Pages)とGAS本体は全イベント共通。
+- **イベント別(毎回別物)**: cardToken(学生名札)/stampToken/viewKey・stampKey(企業キー)/
+  exchangeKey/各ログ(スタンプ・QR閲覧・景品)/CONFIG(景品設定・期限)。
+- **全イベント共通(1つ)**: API_BASE_URL・ADMIN_KEY・WALK_IN_CODE・EVENT_LIST・フロント資材。
+- **端末に残る(イベントに紐づかない=混在注意)**:
+  - cookie `fg_stamp_token` / `fg_company_view` … ドメイン単位。前回イベントの値が残っていても
+    今回イベントのシートに無ければ一致せず(=安全側で記録されないだけ)。要再取得。
+  - localStorage `fg_event_id`(日付で自動更新) / `fg_company_name`(表示用)。
+- **「前回の名札を持ってくる人」**: 旧名札QRは旧イベントのcardToken。新イベントのシートには
+  存在せず無効 → **来場者は毎回新しい名札が必要**(または当日参加登録で新規発行)。
+- **設計ギャップ(今回判明)**: card系URLは元々 event を持たず当日日付で自動判定。
+  → 会期外テストや複数大会同時で取り違える(fallback `2026_test`)。
+  対処: 企業QR用URLに `&event=<eventId>` を埋め込んで解消(2026-06-11)。
+  学生名札URLは従来通り(会期中は日付判定でOK)。テスト時は `?event=` を付けるか
+  EVENT_LIST に「今日」を含むテストイベントを置く。
+
 ## [記録] QR閲覧ログの自動記録/手動登録の区別方法と重複抑制（2026-06-11 記録）
 - 状況: 企業QR(cookie方式)による閲覧ログ自動記録を実装（card.html?viewkey=<viewKey>）。
 - **区別方法**: VIEW_LOG の6列目 `source` で区別する。

@@ -36,12 +36,15 @@ document.getElementById('btn-scan-cancel')?.addEventListener('click', closeCompa
 (async () => {
   const token   = FG_API.getParam('token');
   const vkParam = FG_API.getParam('viewkey');
+  // ページURLのevent(あれば)。学生情報・自動記録のイベント文脈に使う。
+  // 会期外や複数大会の取り違えを防ぐため、URLに event があれば優先する。
+  const pageEvent = FG_API.getParam('event') || null;
 
-  // ── 企業QR登録モード(card.html?viewkey=...) ──
+  // ── 企業QR登録モード(card.html?viewkey=...&event=...) ──
   // 企業QRを通常カメラで読むとここに入る。viewKeyをcookieへ保存し、
   // 以降の学生QR閲覧を自動記録できるようにする。
   if (vkParam) {
-    const res = await FG_API.resolveViewKey(vkParam);
+    const res = await FG_API.resolveViewKey(vkParam, pageEvent);
     if (res.ok) {
       FG_API.saveCompanyViewKey(vkParam);
       try { localStorage.setItem('fg_company_name', res.data.companyName); } catch (e) {}
@@ -79,7 +82,7 @@ document.getElementById('btn-scan-cancel')?.addEventListener('click', closeCompa
 
   _d = res.data;
   render(_d);
-  autoViewLog_(token);
+  autoViewLog_(token, pageEvent);
 })();
 
 /**
@@ -87,10 +90,10 @@ document.getElementById('btn-scan-cancel')?.addEventListener('click', closeCompa
  * なければ企業QR読み取りの案内を表示する。
  * 記録は裏で実行し、学生情報の表示は妨げない。
  */
-function autoViewLog_(token) {
+function autoViewLog_(token, pageEvent) {
   const vk = FG_API.getCompanyViewKey();
   if (vk) {
-    FG_API.saveViewLogAuto(token, vk);  // fire-and-forget(失敗しても表示は維持)
+    FG_API.saveViewLogAuto(token, vk, pageEvent);  // fire-and-forget(失敗しても表示は維持)
     showCompanyRegistered_();
   } else {
     $('company-section').style.display = 'block';
@@ -268,9 +271,13 @@ function scanLoop_(video) {
 }
 
 async function onCompanyQR_(qrData) {
-  // 企業QR = card.html?viewkey=<viewKey> のURL
-  let vk = null;
-  try { vk = new URL(qrData).searchParams.get('viewkey'); } catch (e) { /* URLでない */ }
+  // 企業QR = card.html?viewkey=<viewKey>&event=<eventId> のURL
+  let vk = null, qrEvent = null;
+  try {
+    const u = new URL(qrData);
+    vk      = u.searchParams.get('viewkey');
+    qrEvent = u.searchParams.get('event');  // 企業QRが属するイベント
+  } catch (e) { /* URLでない */ }
 
   if (!vk) {
     setOverlayMsg_('企業QRではありません。配布された企業QRを読み取ってください。', 'err');
@@ -280,7 +287,8 @@ async function onCompanyQR_(qrData) {
   _scanPaused = true;
   setOverlayMsg_('確認中...', '');
 
-  const res = await FG_API.resolveViewKey(vk);
+  // 企業の検証は企業QRのイベントで行う
+  const res = await FG_API.resolveViewKey(vk, qrEvent);
   if (!res.ok) {
     setOverlayMsg_('無効な企業QRです。もう一度お試しください。', 'err');
     _scanPaused = false; // スキャン再開
@@ -291,8 +299,10 @@ async function onCompanyQR_(qrData) {
   FG_API.saveCompanyViewKey(vk);
   try { localStorage.setItem('fg_company_name', res.data.companyName); } catch (e) {}
 
-  const token = FG_API.getParam('token');
-  if (token) FG_API.saveViewLogAuto(token, vk);  // 今表示中の学生を記録
+  // 今表示中の学生の記録は「学生ページのイベント文脈」で行う
+  const token     = FG_API.getParam('token');
+  const pageEvent = FG_API.getParam('event') || null;
+  if (token) FG_API.saveViewLogAuto(token, vk, pageEvent);  // 今表示中の学生を記録
 
   setOverlayMsg_(`✓ ${res.data.companyName} として登録しました`, 'ok');
   setTimeout(() => {

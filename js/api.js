@@ -82,14 +82,20 @@ const FG_API = (() => {
     return call_('saveViewLog', { token: cardToken, company: companyId, email });
   }
 
-  /** 企業cookie(viewKey)による閲覧ログ自動記録。企業IDはGAS側で解決 */
-  function saveViewLogAuto(cardToken, viewKey) {
-    return call_('saveViewLog', { token: cardToken, vk: viewKey });
+  /** 企業cookie(viewKey)による閲覧ログ自動記録。企業IDはGAS側で解決。
+   *  event 省略時は自動判定(当日のイベント)にフォールバック。 */
+  function saveViewLogAuto(cardToken, viewKey, event) {
+    const p = { token: cardToken, vk: viewKey };
+    if (event) p.event = event;
+    return call_('saveViewLog', p);
   }
 
-  /** 企業QR登録: viewKeyの有効性を確認し企業名を取得 */
-  function resolveViewKey(viewKey) {
-    return call_('resolveViewKey', { key: viewKey });
+  /** 企業QR登録: viewKeyの有効性を確認し企業名を取得。
+   *  event 省略時は自動判定にフォールバック。 */
+  function resolveViewKey(viewKey, event) {
+    const p = { key: viewKey };
+    if (event) p.event = event;
+    return call_('resolveViewKey', p);
   }
 
   // ── 学生向けAPI ───────────────────────────────

@@ -16,6 +16,17 @@
 
 ---
 
+## 2026-06-11 企業QR用URLのUI改善＋イベントID埋め込み（前項の追補）
+- 変更ファイル: `js/admin.js`, `app/admin.html`, `js/card.js`, `js/api.js`
+- 変更内容:
+  - **admin UI**: 企業QR用URLを、スタンプキー/閲覧キーの2行の**下に独立した行**で配置（破線区切り・末尾にコピーボタン）。見やすさ改善
+  - **イベントID埋め込み**: 企業QR用URLを `card.html?viewkey=<viewKey>&event=<eventId>` に変更。会期外テストや複数大会同時運用での「無効」を解消（従来は event 無しで当日日付判定→会期外は `2026_test` にフォールバックし不一致）
+  - **card.js / api.js**: `resolveViewKey` / `saveViewLogAuto` に event 引数を追加。企業QRのイベントで企業を検証し、表示中学生の記録は学生ページのイベント文脈で行う
+- 理由/背景: 企業URLが「無効」になる事象の調査で、card系URLがイベントIDを持たず会期外で取り違える設計ギャップが判明（NOTES 2026-06-11 参照）
+- 申し送り/注意点:
+  - 本機能は GAS の `resolveViewKey` / `saveViewLog(vk)` 対応が前提 → **GAS未再デプロイだと企業URLは必ず「無効」になる**
+  - 学生名札URLは従来通り event 無し（会期中は日付判定でOK）。会期外テストは `?event=` 付与か EVENT_LIST にテストイベント設定が必要
+
 ## 2026-06-11 企業特定によるQR閲覧ログの企業別記録（cookie方式）
 - 変更ファイル: `app/card.html`, `js/card.js`, `js/api.js`, `js/admin.js`, `docs/gas-patches/api.gs.final.txt`, `docs/gas-patches/admin.gs.final.txt`
 - 変更内容:
