@@ -21,15 +21,8 @@
     /* ローディングスピナー位置 */
     .spinner { margin: 32px auto 16px; }
 
-    /* ステータスメッセージ */
-    .status-msg { margin: 18px 24px 0; padding: 14px 16px; border-radius: 10px; font-size: 14px; text-align: center; }
-    .status-msg.cleared {
-      background: linear-gradient(135deg, var(--fg-blue), #2E7DD1);
-      color: #fff; font-weight: 600;
-    }
-    .status-msg.cleared .status-sub { font-size: 12px; font-weight: 400; opacity: 0.85; margin-top: 4px; }
-    .status-msg.exchanged  { background: var(--fg-success-bg); color: var(--fg-success); font-weight: 600; border: 1px solid var(--fg-success-border); }
-    .status-msg.in-progress { background: var(--fg-bg); color: var(--fg-muted); border: 1px solid var(--fg-line); }
+    /* ステータスカードの配置（カード直下なので左右マージンが必要） */
+    .status-card { margin: 18px 24px 0; }
 
     /* 景品引換アクション */
     .exchange-action { padding: 14px 24px 0; }
@@ -108,9 +101,9 @@
     <div id="bar-fill" style="display:none"></div>
 
     <!-- ステータス -->
-    <div class="status-msg cleared"     id="status-cleared"   style="display:none"></div>
-    <div class="status-msg exchanged"   id="status-exchanged" style="display:none">✓ 景品引換済み</div>
-    <div class="status-msg in-progress" id="status-progress"  style="display:none"></div>
+    <div class="status-card cleared" id="status-cleared"   style="display:none"></div>
+    <div class="status-card success" id="status-exchanged" style="display:none">✓ 景品引換済み</div>
+    <div class="status-card neutral" id="status-progress"  style="display:none"></div>
 
     <!-- 景品引換アクション(達成 & 未交換のときだけ表示) -->
     <div class="exchange-action" id="exchange-action" style="display:none">

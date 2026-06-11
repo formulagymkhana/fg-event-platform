@@ -18,6 +18,13 @@
   --fg-success:      #1A6640;
   --fg-success-border:#CDEEDC;
   --fg-staff:        #5C1A1A;
+  --fg-warning-bg:   #FFF7E6;
+  --fg-warning:      #8A5A00;
+  --fg-warning-border:#FFE0A3;
+  --fg-error-bg:     #FBEAEA;
+  --fg-error:        #9A2A2A;
+  --fg-error-border: #F1C2C2;
+  --fg-disabled:     #B0BAC8;
   --radius-card:     20px;
   --radius-ui:       12px;
   --shadow-card:     0 8px 32px rgba(11,37,69,0.12);
@@ -166,8 +173,17 @@ body {
 }
 
 .btn-primary:disabled {
-  background: #B0BAC8;
+  background: var(--fg-disabled);
   cursor: not-allowed;
+}
+
+/* PC操作・アクセシビリティ用フォーカスリング */
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.action-link:focus-visible,
+.btn:focus-visible {
+  outline: 3px solid rgba(0, 87, 184, 0.25);
+  outline-offset: 3px;
 }
 
 .btn-secondary {
@@ -264,4 +280,210 @@ body {
   font-size: 12px;
   color: var(--fg-muted);
   margin-top: 4px;
+}
+
+/* ── ステータスカード（成功/情報/警告/エラー/達成） ── */
+.status-card {
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.status-card.success {
+  background: var(--fg-success-bg);
+  border: 1px solid var(--fg-success-border);
+  color: var(--fg-success);
+}
+
+.status-card.info {
+  background: var(--fg-blue-soft);
+  border: 1px solid var(--fg-blue-border);
+  color: var(--fg-navy);
+}
+
+.status-card.warning {
+  background: var(--fg-warning-bg);
+  border: 1px solid var(--fg-warning-border);
+  color: var(--fg-warning);
+}
+
+.status-card.error {
+  background: var(--fg-error-bg);
+  border: 1px solid var(--fg-error-border);
+  color: var(--fg-error);
+}
+
+.status-card.neutral {
+  background: var(--fg-bg);
+  border: 1px solid var(--fg-line);
+  color: var(--fg-muted);
+}
+
+/* 達成（青グラデ・progress/stampの達成バナー） */
+.status-card.cleared {
+  background: linear-gradient(135deg, var(--fg-blue), #2E7DD1);
+  color: #fff;
+}
+
+.status-card .status-sub,
+.status-card .sub {
+  font-size: 12px;
+  font-weight: 400;
+  margin-top: 4px;
+  opacity: 0.9;
+}
+
+/* ── 企業ブースカード / 完了カード（stamp.html用） ── */
+.booth-card {
+  background: var(--fg-blue-soft);
+  border: 1px solid var(--fg-blue-border);
+  border-radius: 16px;
+  padding: 20px 18px;
+  margin-bottom: 22px;
+  text-align: center;
+}
+
+.booth-name {
+  color: var(--fg-blue);
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.booth-msg {
+  color: var(--fg-navy);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.complete-card {
+  background: var(--fg-success-bg);
+  border: 1px solid var(--fg-success-border);
+  border-radius: 16px;
+  padding: 18px;
+  text-align: center;
+}
+
+.complete-label {
+  color: var(--fg-success);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+.complete-main {
+  color: var(--fg-navy);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.complete-sub {
+  margin-top: 4px;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+/* ── スタッフバッジ ─────────────────────────────── */
+.staff-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--fg-error-bg);
+  color: var(--fg-staff);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+
+/* ── QRスキャン枠（start.html / exchange.html 共通） ── */
+.scan-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: #000;
+  overflow: hidden;
+}
+
+.scan-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.scan-guide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.scan-frame {
+  width: 60%;
+  aspect-ratio: 1 / 1;
+  position: relative;
+}
+
+.scan-frame::before, .scan-frame::after,
+.scan-frame-inner::before, .scan-frame-inner::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-color: #fff;
+  border-style: solid;
+}
+
+.scan-frame::before       { top: 0;    left: 0;  border-width: 3px 0 0 3px; }
+.scan-frame::after        { top: 0;    right: 0; border-width: 3px 3px 0 0; }
+.scan-frame-inner::before { bottom: 0; left: 0;  border-width: 0 0 3px 3px; }
+.scan-frame-inner::after  { bottom: 0; right: 0; border-width: 0 3px 3px 0; }
+
+.scan-line {
+  position: absolute;
+  left: 5%;
+  right: 5%;
+  height: 2px;
+  background: rgba(255,255,255,0.7);
+  animation: scanMove 2s ease-in-out infinite;
+  top: 10%;
+}
+
+@keyframes scanMove {
+  0%, 100% { top: 10%; }
+  50%      { top: 85%; }
+}
+
+.scan-label {
+  position: absolute;
+  bottom: 12px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255,255,255,0.8);
+}
+
+.cancel-btn {
+  width: 100%;
+  padding: 13px;
+  background: var(--fg-bg);
+  color: var(--fg-muted);
+  border: none;
+  font-size: 13px;
+  cursor: pointer;
+  border-top: 1px solid var(--fg-line);
+}
+
+.cancel-btn:active {
+  background: #D4DBE6;
 }

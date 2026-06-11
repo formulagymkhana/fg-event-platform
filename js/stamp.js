@@ -52,8 +52,10 @@
 
 function renderSuccess(d) {
   const count     = d.stampCount     || 0;
-  const threshold = d.prizeThreshold || 5;
-  const prizeNum  = d.prizeCount     || 1;
+  const unitSize  = d.prizeUnitSize  || d.prizeThreshold || 5;
+  const maxPrizes = d.maxPrizes      || d.prizeCount     || 3;
+  const threshold = d.nextThreshold  || (maxPrizes * unitSize);
+  const prizeNum  = d.claimableNow   || 1;
   const cleared   = d.cleared        || false;
 
   setText('success-company', d.company + ' のブース');
@@ -66,7 +68,7 @@ function renderSuccess(d) {
   // 達成時バナー
   if (cleared) {
     const el = document.getElementById('cleared-banner');
-    el.innerHTML = `🎉 景品引換可能！<div class="cleared-sub">交換所で好きな景品を${prizeNum}個選べます</div>`;
+    el.innerHTML = `🎉 景品引換可能！<div class="status-sub">交換所で好きな景品を${prizeNum}個選べます</div>`;
     el.style.display = 'block';
   }
 }

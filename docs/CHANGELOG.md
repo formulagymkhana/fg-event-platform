@@ -16,6 +16,28 @@
 
 ---
 
+## 2026-06-11 共通デザイン体系の拡充（第1弾・第2弾）
+- 変更ファイル: `js/style.css`, `app/progress.html`, `app/exchange.html`, `app/start.html`, `app/stamp.html`, `js/stamp.js`
+- 変更内容:
+  - **style.css 追加（第1弾）**:
+    - 色変数追加: `--fg-warning-*` / `--fg-error-*` / `--fg-disabled`
+    - `:focus-visible` フォーカスリング（btn-primary/secondary/action-link/btn）
+    - `.status-card`（success/info/warning/error/neutral/cleared + .sub/.status-sub）
+    - `.booth-card` / `.complete-card`（stamp.html 企画書風改修用・未適用）
+    - `.staff-badge`
+    - `.scan-wrapper` 系 + `.cancel-btn`（QRスキャン枠共通化）
+  - **HTML移行（第2弾）**:
+    - progress.html: `.status-msg` → 共通 `.status-card`（cleared/success/neutral）
+    - exchange.html: `.verdict` → 共通 `.status-card`、スキャンCSS削除→共通化、STAFF ONLYバッジ追加
+    - start.html: スキャンCSS削除→共通化
+    - stamp.html: `.cleared-banner` → 共通 `.status-card.cleared`
+  - **stamp.js**: 旧キー `prizeThreshold`/`prizeCount` → 新モデル `prizeUnitSize`/`maxPrizes`/`nextThreshold`/`claimableNow` に対応（旧キーフォールバック付き）
+- 理由/背景: 各ページに重複していたステータス表示・スキャン枠CSSを共通コンポーネント化し、企画書モック風デザインへの土台を整備。stamp.js は累積交換モデル刷新時の修正漏れを発見し同時修正
+- 申し送り/注意点:
+  - `.btn` のグローバル統一は exchange.html のローカル `.btn` と衝突するため見送り
+  - `.booth-card`/`.complete-card` は CSS のみ追加（stamp.html への適用は第3弾候補）
+  - GAS 変更なし（再デプロイ不要）
+
 ## 2026-06-10 景品交換ログ個数列追加・新規イベント作成を新モデル対応・削除ボタン整理
 - 変更ファイル: `app/admin.html`, `js/admin.js`, `docs/gas-patches/api.gs.final.txt`, `docs/gas-patches/admin.gs.final.txt`
 - 変更内容:

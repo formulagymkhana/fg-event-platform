@@ -29,21 +29,7 @@
     .btn-exchange { background: var(--fg-success); color: #fff; }
     .btn-exchange:active { background: #248052; }
 
-    /* QRスキャン */
-    #scan-wrapper { position: relative; width: 100%; aspect-ratio: 1/1; background: #000; overflow: hidden; }
-    #scan-video   { width: 100%; height: 100%; object-fit: cover; }
-    .scan-guide   { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-    .scan-frame   { width: 60%; aspect-ratio: 1/1; position: relative; }
-    .scan-frame::before, .scan-frame::after, .scan-frame-inner::before, .scan-frame-inner::after {
-      content: ''; position: absolute; width: 20px; height: 20px; border-color: #fff; border-style: solid;
-    }
-    .scan-frame::before       { top: 0;    left: 0;  border-width: 3px 0 0 3px; }
-    .scan-frame::after        { top: 0;    right: 0; border-width: 3px 3px 0 0; }
-    .scan-frame-inner::before { bottom: 0; left: 0;  border-width: 0 0 3px 3px; }
-    .scan-frame-inner::after  { bottom: 0; right: 0; border-width: 0 3px 3px 0; }
-    .scan-label { position: absolute; bottom: 12px; left: 0; right: 0; text-align: center; font-size: 13px; color: rgba(255,255,255,0.85); }
-    .cancel-btn { width: 100%; padding: 13px; background: var(--fg-bg); color: var(--fg-muted); border: none; font-size: 13px; cursor: pointer; border-top: 1px solid var(--fg-line); }
-    .cancel-btn:active { background: #D4DBE6; }
+    /* QRスキャン枠・キャンセルボタンは style.css の共通定義を使用 */
 
     /* 学生情報カード */
     .student-name { font-size: 22px; font-weight: 700; color: var(--fg-navy); margin-bottom: 4px; }
@@ -53,12 +39,8 @@
     .stamp-box .unit  { font-size: 15px; color: var(--fg-muted); }
     .stamp-box .label { font-size: 12px; color: var(--fg-muted); margin-top: 2px; }
 
-    /* 判定バッジ */
-    .verdict { padding: 14px; border-radius: 10px; font-size: 15px; font-weight: 600; margin-bottom: 18px; }
-    .verdict.ok   { background: var(--fg-success-bg);  color: var(--fg-success); border: 1px solid var(--fg-success-border); }
-    .verdict.ng   { background: #FBEAEA; color: #9A2A2A; }
-    .verdict.done { background: var(--fg-bg);           color: var(--fg-muted);  border: 1px solid var(--fg-line); }
-    .verdict .sub { font-size: 12px; font-weight: 400; margin-top: 4px; opacity: 0.9; }
+    /* 判定バッジは style.css の .status-card を使用（配置のみ調整） */
+    .status-card { margin-bottom: 18px; }
   </style>
 </head>
 <body>
@@ -83,6 +65,7 @@
       <div class="fg-page-name">景品交換 / スタッフ</div>
     </div>
     <div class="card-body">
+      <span class="staff-badge">STAFF ONLY</span>
       <div class="state-icon">🎁</div>
       <p class="state-title">景品交換</p>
       <p class="state-msg">学生のQR名刺をスキャンして<br>景品引換状況を確認します。</p>
@@ -96,8 +79,8 @@
       <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
       <div class="fg-page-name">QR読み取り中</div>
     </div>
-    <div id="scan-wrapper">
-      <video id="scan-video" playsinline muted></video>
+    <div id="scan-wrapper" class="scan-wrapper">
+      <video id="scan-video" class="scan-video" playsinline muted></video>
       <div class="scan-guide">
         <div class="scan-frame"><div class="scan-frame-inner"></div></div>
       </div>
@@ -135,7 +118,7 @@
 
       <!-- 引換可能 -->
       <div id="r-can-exchange" style="display:none">
-        <div class="verdict ok">
+        <div class="status-card success">
           ✓ 引換可能
           <div class="sub">景品を <b id="r-claimable-count">1</b> 個 渡してください</div>
           <div class="sub" id="r-exchanged-note" style="font-size:11px;margin-top:3px;opacity:.8"></div>
@@ -145,7 +128,7 @@
 
       <!-- 未達成 -->
       <div id="r-not-cleared" style="display:none">
-        <div class="verdict ng">
+        <div class="status-card error">
           ✗ 未達成
           <div class="sub" id="r-remaining"></div>
         </div>
@@ -153,7 +136,7 @@
 
       <!-- 一部交換済み・追加収集中 -->
       <div id="r-collecting" style="display:none">
-        <div class="verdict done">
+        <div class="status-card neutral">
           📦 追加収集中
           <div class="sub" id="r-collecting-msg"></div>
         </div>
@@ -161,7 +144,7 @@
 
       <!-- 全景品交換済み -->
       <div id="r-all-done" style="display:none">
-        <div class="verdict done">
+        <div class="status-card neutral">
           ✅ 全景品交換済み
           <div class="sub" id="r-all-done-msg"></div>
         </div>
