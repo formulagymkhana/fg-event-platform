@@ -42,6 +42,7 @@ function dispatch_(e) {
     switch (p.action) {
       case 'getStudent':              return actionGetStudent_(p);
       case 'saveViewLog':             return actionSaveViewLog_(p);
+      case 'resolveViewKey':          return actionResolveViewKey_(p);    // 企業QR登録(cookie方式)
       case 'activateStamp':           return actionActivateStamp_(p);
       case 'saveStamp':               return actionSaveStamp_(p);
       case 'getStampProgress':        return actionGetStampProgress_(p);
@@ -110,10 +111,14 @@ function actionGetStudent_(p) {
 
 // ============================================================
 // アクション: saveViewLog (企業向け)
+// 企業識別は2系統:
+//   vk(viewKey)あり → サーバ側で企業IDに解決して自動記録 (source: company_auto)
+//   companyあり     → 従来のメール手動登録等          (source: manual_email)
+// VIEW_LOG 6列目に source を記録して両者を区別する。
 // ============================================================
 
 function actionSaveViewLog_(p) {
-  if (!p.token || !p.company) return err_('missing_params');
+  if (!p.token) return err_('missing_token');
   if (!p.event) return err_('missing_event');
 
   const cfg = getConfig_(p.event);
@@ -122,11 +127,54 @@ function actionSaveViewLog_(p) {
   const student = findStudentByCardToken_(p.token, p.event);
   if (!student) return err_('invalid_token');
 
-  eventSs_(p.event).getSheetByName(SHEET.VIEW_LOG).appendRow([
-    new Date(), p.event, student.studentId, p.company, p.email || '',
+  let companyId = p.company || '';
+  let source    = 'manual_email';
+  if (p.vk) {
+    const company = findCompanyByViewKey_(p.vk, p.event);
+    if (!company) return err_('invalid_key');
+    companyId = company.companyId;
+    source    = 'company_auto';
+  }
+  if (!companyId) return err_('missing_params');
+
+  const sheet = eventSs_(p.event).getSheetByName(SHEET.VIEW_LOG);
+
+  // 自動記録の軽い重複抑制:
+  // 同一イベント×同一学生×同一企業の行が既にあれば時刻のみ更新(行は増やさない)
+  if (source === 'company_auto' && sheet.getLastRow() > 1) {
+    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues();
+    const idx = rows.findIndex(r =>
+      String(r[1]) === String(p.event) &&
+      String(r[2]) === String(student.studentId) &&
+      String(r[3]) === String(companyId)
+    );
+    if (idx >= 0) {
+      sheet.getRange(idx + 2, 1).setValue(new Date());
+      return ok_({ logged: true, updated: true });
+    }
+  }
+
+  sheet.appendRow([
+    new Date(), p.event, student.studentId, companyId, p.email || '', source,
   ]);
 
   return ok_({ logged: true });
+}
+
+// ============================================================
+// アクション: resolveViewKey (企業QR登録)
+// 企業QR(card.html?viewkey=...)読み取り時に viewKey の有効性を確認し、
+// 企業名を返す。cookie には viewKey を保存する(企業IDはサーバ解決)。
+// ============================================================
+
+function actionResolveViewKey_(p) {
+  if (!p.key)   return err_('missing_key');
+  if (!p.event) return err_('missing_event');
+
+  const company = findCompanyByViewKey_(p.key, p.event);
+  if (!company) return err_('invalid_key');
+
+  return ok_({ companyId: company.companyId, companyName: company.companyName });
 }
 
 // ============================================================
@@ -375,7 +423,7 @@ function actionGetCompanyView_(p) {
     : [];
 
   const visitors = rows
-    .filter(r => r[1] === p.event && r[3] === company.companyId)
+    .filter(r => String(r[1]) === String(p.event) && String(r[3]) === String(company.companyId))
     .map(r => {
       const s = findStudentById_(r[2], p.event);
       if (!s) return null;

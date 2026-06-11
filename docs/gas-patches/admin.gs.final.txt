@@ -118,7 +118,7 @@ function setupEventSpreadsheet_(ss, eventId, eventName, startDate, endDate) {
     ],
     [SHEET.STUDENTS]:           [STUDENT_COLS],
     [SHEET.COMPANIES]:          [['companyId','企業名','stampKey','viewKey','表示順','hasNfc']],
-    [SHEET.VIEW_LOG]:           [['時刻','eventId','studentId','companyId','companyEmail']],
+    [SHEET.VIEW_LOG]:           [['時刻','eventId','studentId','companyId','companyEmail','source']],
     [SHEET.STAMP_LOG]:          [['時刻','eventId','studentId','氏名','大学名','属性','企業名','companyId','nfcCounter']],
     [SHEET.STAMP_PARTICIPANTS]: [['時刻','eventId','studentId','stampToken','activatedAt','status']],
     [SHEET.PRIZE_LOG]:          [['時刻','eventId','studentId','氏名','スタンプ数','対応者','claimedCount']],

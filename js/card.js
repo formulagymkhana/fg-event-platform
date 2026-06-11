@@ -24,14 +24,46 @@ const CAT_COLORS = {
 
 let _d = null;
 
+// ── イベントリスナー(CSP対応: onclickは使わない) ──
+document.getElementById('email-row')?.addEventListener('click', copyEmail);
+document.getElementById('copy-all-btn')?.addEventListener('click', copyAll);
+document.getElementById('acc-toggle')?.addEventListener('click', toggleAcc);
+document.getElementById('view-email')?.addEventListener('input', e => onViewEmail(e.target.value));
+document.getElementById('view-btn')?.addEventListener('click', saveView);
+document.getElementById('btn-company-scan')?.addEventListener('click', openCompanyScan);
+document.getElementById('btn-scan-cancel')?.addEventListener('click', closeCompanyScan);
+
 (async () => {
-  const token = FG_API.getParam('token');
+  const token   = FG_API.getParam('token');
+  const vkParam = FG_API.getParam('viewkey');
+
+  // ── 企業QR登録モード(card.html?viewkey=...) ──
+  // 企業QRを通常カメラで読むとここに入る。viewKeyをcookieへ保存し、
+  // 以降の学生QR閲覧を自動記録できるようにする。
+  if (vkParam) {
+    const res = await FG_API.resolveViewKey(vkParam);
+    if (res.ok) {
+      FG_API.saveCompanyViewKey(vkParam);
+      try { localStorage.setItem('fg_company_name', res.data.companyName); } catch (e) {}
+      if (!token) {
+        $('state-loading').style.display = 'none';
+        $('company-done-name').textContent = res.data.companyName;
+        $('state-company').style.display = 'flex';
+        return;
+      }
+      // token併記の場合は登録だけ済ませて通常の学生表示へ続行
+    } else if (!token) {
+      showError('企業QRが無効です。', '配布された企業QRを再度ご確認ください。');
+      return;
+    }
+  }
+
   if (!token) {
     showError('URLが正しくありません。', 'QRコードを再度スキャンしてください。');
     return;
   }
 
-  // ⚠ cookieへの保存は行わない(企業の端末で開くため)
+  // ⚠ cardTokenのcookie保存は行わない(企業の端末で開くため)
 
   const res = await FG_API.getStudent(token);
   if (!res.ok) {
@@ -47,7 +79,35 @@ let _d = null;
 
   _d = res.data;
   render(_d);
+  autoViewLog_(token);
 })();
+
+/**
+ * 企業cookie(viewKey)があれば閲覧ログを自動記録し、
+ * なければ企業QR読み取りの案内を表示する。
+ * 記録は裏で実行し、学生情報の表示は妨げない。
+ */
+function autoViewLog_(token) {
+  const vk = FG_API.getCompanyViewKey();
+  if (vk) {
+    FG_API.saveViewLogAuto(token, vk);  // fire-and-forget(失敗しても表示は維持)
+    showCompanyRegistered_();
+  } else {
+    $('company-section').style.display = 'block';
+  }
+}
+
+function showCompanyRegistered_() {
+  let name = '';
+  try { name = localStorage.getItem('fg_company_name') || ''; } catch (e) {}
+  const el = $('company-registered');
+  el.textContent = name
+    ? `✓ ${name} の閲覧リストに自動記録されています`
+    : '✓ 閲覧リストに自動記録されています';
+  el.style.display = 'block';
+  $('company-box').style.display = 'none';
+  $('company-section').style.display = 'block';
+}
 
 function render(d) {
   const col = CAT_COLORS[d.category] || { bg:'#0B2545', tx:'#E8F0FF' };
@@ -148,6 +208,103 @@ async function saveView() {
   const saved = $('view-saved');
   saved.textContent   = '✓ ' + email + ' で記録しました';
   saved.style.display = 'block';
+}
+
+// ── 企業QR読み取りオーバーレイ ─────────────────────
+// ★学生情報を画面に残したままカメラを起動する(ページ遷移禁止)。
+//   読み取り成功・キャンセルのいずれでも元の学生情報表示に戻る。
+
+let _scanStream = null;
+let _scanRafId  = null;
+let _scanCanvas = null;
+let _scanCtx    = null;
+let _scanPaused = false;
+
+async function openCompanyScan() {
+  const overlay = $('scan-overlay');
+  overlay.style.display = 'flex';
+  setOverlayMsg_('', '');
+  _scanPaused = false;
+  _scanCanvas = document.createElement('canvas');
+  _scanCtx    = _scanCanvas.getContext('2d');
+
+  try {
+    _scanStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+    });
+    const video = $('scan-video');
+    video.srcObject = _scanStream;
+    await video.play();
+    _scanCanvas.width  = video.videoWidth  || 640;
+    _scanCanvas.height = video.videoHeight || 480;
+    scanLoop_(video);
+  } catch (err) {
+    setOverlayMsg_('カメラを起動できませんでした。カメラのアクセスを許可してください。', 'err');
+  }
+}
+
+function closeCompanyScan() {
+  stopScanCamera_();
+  $('scan-overlay').style.display = 'none';
+  // 学生情報はそのまま残っている(オーバーレイを閉じるだけ)
+}
+
+function stopScanCamera_() {
+  if (_scanRafId)  { cancelAnimationFrame(_scanRafId); _scanRafId = null; }
+  if (_scanStream) { _scanStream.getTracks().forEach(t => t.stop()); _scanStream = null; }
+}
+
+function scanLoop_(video) {
+  if (!_scanStream) return;
+  if (!_scanPaused && video.readyState === video.HAVE_ENOUGH_DATA) {
+    _scanCtx.drawImage(video, 0, 0, _scanCanvas.width, _scanCanvas.height);
+    const img  = _scanCtx.getImageData(0, 0, _scanCanvas.width, _scanCanvas.height);
+    const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+    if (code) {
+      onCompanyQR_(code.data);
+    }
+  }
+  _scanRafId = requestAnimationFrame(() => scanLoop_(video));
+}
+
+async function onCompanyQR_(qrData) {
+  // 企業QR = card.html?viewkey=<viewKey> のURL
+  let vk = null;
+  try { vk = new URL(qrData).searchParams.get('viewkey'); } catch (e) { /* URLでない */ }
+
+  if (!vk) {
+    setOverlayMsg_('企業QRではありません。配布された企業QRを読み取ってください。', 'err');
+    return; // スキャン継続
+  }
+
+  _scanPaused = true;
+  setOverlayMsg_('確認中...', '');
+
+  const res = await FG_API.resolveViewKey(vk);
+  if (!res.ok) {
+    setOverlayMsg_('無効な企業QRです。もう一度お試しください。', 'err');
+    _scanPaused = false; // スキャン再開
+    return;
+  }
+
+  // cookie保存 → 今表示中の学生を記録 → オーバーレイを閉じる
+  FG_API.saveCompanyViewKey(vk);
+  try { localStorage.setItem('fg_company_name', res.data.companyName); } catch (e) {}
+
+  const token = FG_API.getParam('token');
+  if (token) FG_API.saveViewLogAuto(token, vk);  // 今表示中の学生を記録
+
+  setOverlayMsg_(`✓ ${res.data.companyName} として登録しました`, 'ok');
+  setTimeout(() => {
+    closeCompanyScan();
+    showCompanyRegistered_();  // 案内をやめて記録中表示へ(学生情報はそのまま)
+  }, 1200);
+}
+
+function setOverlayMsg_(text, kind) {
+  const el = $('overlay-msg');
+  el.textContent = text;
+  el.className = 'overlay-msg' + (kind ? ' ' + kind : '');
 }
 
 const $ = id => document.getElementById(id);

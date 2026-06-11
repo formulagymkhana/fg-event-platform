@@ -295,6 +295,11 @@ async function handleSaveConfig_() {
 }
 
 // ── Companies ─────────────────────────────────────
+
+/** 企業QR(cookie登録用)のURL: card.html?viewkey=<viewKey> */
+function companyQrUrl_(viewKey) {
+  return new URL(`card.html?viewkey=${viewKey}`, location.href).toString();
+}
 async function loadCompanies_(gen = null, ev = null) {
   ev = ev ?? curEvent_;
   updateWalkInUrl_();
@@ -321,6 +326,7 @@ async function loadCompanies_(gen = null, ev = null) {
         <span class="key-lbl">閲覧キー</span>
         <span class="key-val">${c.viewKey || '未発行'}</span>
         ${c.viewKey ? `<button class="copy-btn" data-copy="${esc_(c.viewKey)}">コピー</button>` : ''}
+        ${c.viewKey ? `<button class="copy-btn" data-copy="${esc_(companyQrUrl_(c.viewKey))}">QR用URL</button>` : ''}
       </div>
     </div>`).join('');
   container.querySelectorAll('.copy-btn[data-copy]').forEach(b =>

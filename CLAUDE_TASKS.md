@@ -64,10 +64,20 @@ FG Event Platform（Formula Gymkhana のイベント管理基盤）の改修。
 - T11: 学生マスター token 列を cardToken にリネーム＋関連修正 ✅
 - T12: 管理パネル実装・簡素化・ADMIN_KEY 変更機能 ✅
 
+完了済み（追加分）:
+- 企業特定によるQR閲覧ログの企業別記録（cookie方式）✅（2026-06-11）
+  - 企業QR形式: `card.html?viewkey=<viewKey>`。cookie `fg_company_view` に viewKey 保存（60日）。
+  - card.js: cookie有→自動記録 / cookie無→オーバーレイ式企業QR読み取り（学生情報を消さない）。
+  - GAS: saveViewLog に vk 対応・source列・軽い重複抑制、resolveViewKey 新設。要再デプロイ。
+  - 区別方法・重複抑制の詳細は NOTES.md（2026-06-11）参照。
+
 進行中／残タスク:
 - 当日参加者フォーム: 入力規則の整合（見学・応援パス準拠）まで完了 ✅（2026-06-08）。
   - 残: LIVE学生マスターの列ズレ修正（`性別`・`所属校出場`・`規則誓約同意` の列追加。NOTES参照）。
   - 将来スコープ（郵便番号/住所詳細・来場日・弁当・サービス作業/保険）は未着手。
+- T-E: company.html 本体（企業別の閲覧学生リスト/スタンプ来訪者の表示）。
+  データ蓄積側（QR閲覧ログの企業ID付き記録）は 2026-06-11 完了。getCompanyView / getCompanyStampVisitors の2系統が利用可能。
+- 既存イベントの QR閲覧ログ シートに `source` 列ヘッダーを手動追記（推奨）。
 - 将来構想: 脱Googleフォーム化（NOTES.md 参照。計画段階）。
 - 任意: eventId 比較の String() 統一（下記「任意（おまけ）」参照。NOTES.md にも記録）。
 

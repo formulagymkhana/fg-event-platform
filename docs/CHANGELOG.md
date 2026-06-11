@@ -16,6 +16,25 @@
 
 ---
 
+## 2026-06-11 企業特定によるQR閲覧ログの企業別記録（cookie方式）
+- 変更ファイル: `app/card.html`, `js/card.js`, `js/api.js`, `js/admin.js`, `docs/gas-patches/api.gs.final.txt`, `docs/gas-patches/admin.gs.final.txt`
+- 変更内容:
+  - **企業QRのURL形式（決定）**: `card.html?viewkey=<viewKey>`（企業ごとに1つ。viewKey流用・新規キーなし）
+  - **企業登録モード**: 企業QRを通常カメラで読むと viewKey を GAS で検証し、cookie `fg_company_view`（60日）に保存。tokenなしなら「企業登録完了」画面を表示
+  - **自動記録（A）**: cookie がある状態で学生QR（card.html?token=...）を開くと、学生情報表示と同時に裏で `saveViewLog`（vk付き）を実行し、QR閲覧ログへ企業ID付きで自動記録
+  - **オーバーレイ企業QR読み取り（B）**: cookie がない場合は案内＋[企業QRを読み取る]ボタンを表示。押すと**ページ遷移せず**カメラをオーバーレイ起動（ローカルjsQR使用）。読み取り成功で cookie 保存＋今表示中の学生を記録しオーバーレイを閉じる。キャンセル時も学生情報は画面に残り続ける
+  - **メール再閲覧（C）**: 既存のメール登録フォームは従来通り併存（`'manual'` 渡しの挙動維持）
+  - **GAS（api.gs）**: `actionSaveViewLog_` に `vk` パラメータ追加（viewKey→企業IDをサーバ側解決）、VIEW_LOG 6列目に `source`（company_auto/manual_email）を記録、company_auto は同一イベント×学生×企業の重複時に時刻のみ更新。新アクション `resolveViewKey` 追加。`getCompanyView` のフィルタを String() 比較に統一
+  - **GAS（admin.gs）**: 新規イベントの VIEW_LOG ヘッダーに `source` 列追加
+  - **admin.js**: 企業リストの閲覧キー行に「QR用URL」コピーボタン追加（企業QR作成用）
+  - **既存バグ修正**: card.html の inline onclick が CSP でブロックされていた問題を addEventListener 化で解消（NOTES参照）。CSP に `media-src blob:` を追加（カメラ用）
+- 理由/背景: 前回運用で「当日話した学生の情報が欲しい」という企業要望が複数あり、企業別のQR閲覧学生リストを提供するため。スタンプ層（広い来訪）とQR閲覧層（濃い興味）は別物として維持し、本タスクはQR閲覧層のみ
+- 申し送り/注意点:
+  - **GAS 再デプロイが必要**（api.gs / admin.gs）
+  - 既存イベントの QR閲覧ログ シートに6列目ヘッダー `source` を手動追記推奨
+  - company.html 本体の実装は別タスク（T-E）。データは getCompanyView で取得可能なことを確認済み
+  - スタンプ系（saveStamp / スタンプログ）には一切変更なし
+
 ## 2026-06-11 共通デザイン体系の拡充（第1弾・第2弾）
 - 変更ファイル: `js/style.css`, `app/progress.html`, `app/exchange.html`, `app/start.html`, `app/stamp.html`, `js/stamp.js`
 - 変更内容:

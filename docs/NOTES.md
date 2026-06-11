@@ -16,6 +16,30 @@
 
 ---
 
+## [記録] QR閲覧ログの自動記録/手動登録の区別方法と重複抑制（2026-06-11 記録）
+- 状況: 企業QR(cookie方式)による閲覧ログ自動記録を実装（card.html?viewkey=<viewKey>）。
+- **区別方法**: VIEW_LOG の6列目 `source` で区別する。
+  - `company_auto` … 企業cookie(viewKey)による自動記録。companyId列には GAS が viewKey から解決した企業IDが入る。
+  - `manual_email` … 従来のメール手動登録。companyId列は従来通り `'manual'`。
+  - 旧データ（source列なし・5列）は manual 扱い相当。getCompanyView は companyId 一致で
+    フィルタするため、`'manual'` 行が企業リストに混ざることはない（従来から同じ構造）。
+- **重複抑制（軽量実装）**: `company_auto` のみ、同一イベント×同一学生×同一企業の既存行が
+  あれば時刻のみ更新して行を増やさない（VIEW_LOG全行を線形走査。イベント規模では問題ない）。
+  `manual_email` は従来通り毎回 append（メールアドレスを変えて再登録する可能性があるため）。
+- **cookie 設計**: `fg_company_view` に viewKey のみ保存（60日・SameSite=Lax）。企業IDは
+  毎回 GAS 側で解決するため、クライアントから企業IDを直接信用しない。企業名表示用に
+  localStorage `fg_company_name` を併用（個人情報ではないため許容）。
+- 既存シートへの申し送り: 既存イベントの QR閲覧ログ シートに6列目ヘッダー `source` を
+  手動で追記推奨（なくても appendRow は6列目に書き込むため動作には支障なし）。
+
+## [解決] card.html の inline onclick が CSP でブロックされていた（2026-06-11 記録）
+- 状況: card.html は CSP `script-src 'self'`（unsafe-inline なし）なのに、
+  `onclick="copyEmail()"` 等の inline ハンドラを使用していた。inline イベントハンドラは
+  この CSP でブロックされるため、メールコピー・一覧コピー・アコーディオン・メール登録の
+  各ボタンが**本番で動作していなかった可能性が高い**。
+- 結論: 企業QR実装と同時に全て addEventListener 方式へ変更して解消。
+  他ページ（progress/exchange/start等）は元から addEventListener 方式で問題なし。
+
 ## [未解決] 準備ステップ②③の「準備中」機能の実装（2026-06-09 記録）
 - 状況: admin.html の準備ステップガイドに「準備中」として枠だけ設置した機能が3つ。
   - ② 学生マスター取込（importStudents の UI 化）

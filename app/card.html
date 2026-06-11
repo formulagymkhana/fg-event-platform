@@ -8,7 +8,8 @@
              script-src 'self';
              connect-src https://script.google.com
                          https://script.googleusercontent.com;
-             style-src 'self' 'unsafe-inline';">
+             style-src 'self' 'unsafe-inline';
+             media-src blob:;">
   <title>FORMULA GYMKHANA — 学生情報</title>
   <link rel="stylesheet" href="../js/style.css">
   <style>
@@ -91,6 +92,37 @@
     .view-saved    { display: none; padding-top: 12px; text-align: center; font-size: 13px; color: var(--fg-success); }
 
     .privacy-note { padding: 20px 20px 32px; font-size: 11px; color: #A0AEBB; text-align: center; line-height: 1.8; }
+
+    /* ── 企業QR登録（cookie方式） ── */
+    .company-section { padding: 12px 16px 0; }
+    .company-box     { background: #fff; border-radius: 10px; border: 1px solid var(--fg-line); padding: 14px 16px; }
+    .company-note    { font-size: 12px; color: var(--fg-muted); line-height: 1.7; margin-bottom: 10px; }
+    .company-scan-btn { width: 100%; padding: 12px; background: var(--fg-blue-soft); color: var(--fg-blue); border: 1px solid var(--fg-blue-border); border-radius: var(--radius-ui); font-size: 13px; font-weight: 600; cursor: pointer; }
+    .company-scan-btn:active { background: #DCEEFF; }
+    .company-registered { font-size: 12px; color: var(--fg-success); text-align: center; padding: 12px 14px; background: var(--fg-success-bg); border: 1px solid var(--fg-success-border); border-radius: 10px; }
+
+    /* 企業登録完了画面（viewkeyのみで開いた場合） */
+    #state-company { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+    #state-company .card { max-width: 380px; }
+
+    /* ── 企業QR読み取りオーバーレイ ──
+       学生情報を画面に残したまま最前面でカメラを起動する。
+       ページ遷移は行わない（学生情報が消えない）ことが必須要件。 */
+    #scan-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(11, 37, 69, 0.78);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .overlay-card { width: 100%; max-width: 340px; background: #fff; border-radius: 16px; overflow: hidden; }
+    .overlay-head { padding: 14px 16px; font-size: 14px; font-weight: 700; color: var(--fg-navy); text-align: center; border-bottom: 1px solid var(--fg-line); }
+    .overlay-msg  { padding: 10px 16px; font-size: 12px; text-align: center; color: var(--fg-muted); min-height: 38px; line-height: 1.6; }
+    .overlay-msg.ok  { color: var(--fg-success); font-weight: 600; }
+    .overlay-msg.err { color: var(--fg-error); font-weight: 600; }
   </style>
 </head>
 <body>
@@ -142,7 +174,7 @@
           <span class="info-label">生年月日</span>
           <span class="info-value" id="birthday"></span>
         </div>
-        <div class="email-row" id="email-row" onclick="copyEmail()">
+        <div class="email-row" id="email-row">
           <span class="email-label">メールアドレス</span>
           <span class="email-value" id="email"></span>
           <span class="copy-badge" id="copy-badge">コピー</span>
@@ -150,14 +182,23 @@
       </div>
 
       <div class="action-section">
-        <button class="copy-all-btn" id="copy-all-btn" onclick="copyAll()">一覧をコピー（全項目）</button>
+        <button class="copy-all-btn" id="copy-all-btn">一覧をコピー（全項目）</button>
         <pre class="copy-preview" id="copy-preview"></pre>
         <p class="copy-note">閲覧ログは自動保存されます。<br>後日、企業別リストとして出力できます。</p>
       </div>
 
+      <!-- 企業QR登録（cookie未保存時のみ表示 / card.js が制御） -->
+      <div class="company-section" id="company-section" style="display:none">
+        <div class="company-box" id="company-box">
+          <p class="company-note">再閲覧リストへの自動記録には、貴社配布の<b>企業QR</b>の読み取りが必要です（初回のみ）。</p>
+          <button class="company-scan-btn" id="btn-company-scan">📷 企業QRを読み取る</button>
+        </div>
+        <div class="company-registered" id="company-registered" style="display:none"></div>
+      </div>
+
       <div class="view-section">
         <div class="accordion">
-          <button class="acc-toggle" onclick="toggleAcc()">
+          <button class="acc-toggle" id="acc-toggle">
             <div>
               <div class="acc-title">後日再閲覧したい場合</div>
               <div class="acc-sub">メールを登録すると公開期限後も閲覧できます</div>
@@ -167,9 +208,8 @@
           <div class="acc-body" id="acc-body">
             <div id="view-form">
               <input type="email" class="view-input" id="view-email"
-                placeholder="example@company.co.jp"
-                oninput="onViewEmail(this.value)">
-              <button class="view-btn" id="view-btn" onclick="saveView()" disabled>
+                placeholder="example@company.co.jp">
+              <button class="view-btn" id="view-btn" disabled>
                 このメールで記録を残す
               </button>
               <p class="view-deadline" id="view-deadline"></p>
@@ -186,6 +226,39 @@
     </div>
   </div>
 
+  <!-- 企業登録完了画面（card.html?viewkey=... で開いた場合） -->
+  <div id="state-company">
+    <div class="card">
+      <div class="fg-header" style="display:block;padding:24px 26px 8px;">
+        <div class="fg-logo" style="font-size:18px;">FORMULA <span>GYMKHANA</span></div>
+        <div class="fg-page-name" style="margin-top:6px;font-size:13px;">企業QR登録</div>
+      </div>
+      <div class="card-body" style="padding:28px 26px 32px;text-align:center;">
+        <div class="state-icon">🏢</div>
+        <p class="state-title" id="company-done-name"></p>
+        <p class="state-msg">企業登録が完了しました。<br>今後この端末で学生のQR名刺を読み取ると、<br>閲覧記録が自動で保存されます。</p>
+        <div class="status-card info" style="font-size:12px;font-weight:400;">記録された学生リストは後日、<br>企業別リストとして提供されます。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 企業QR読み取りオーバーレイ（学生情報を残したまま起動） -->
+  <div id="scan-overlay">
+    <div class="overlay-card">
+      <div class="overlay-head">企業QRを読み取り</div>
+      <div class="scan-wrapper">
+        <video id="scan-video" class="scan-video" playsinline muted></video>
+        <div class="scan-guide">
+          <div class="scan-frame"><div class="scan-frame-inner"></div></div>
+        </div>
+        <div class="scan-label">企業QRコードを枠内に合わせてください</div>
+      </div>
+      <div class="overlay-msg" id="overlay-msg"></div>
+      <button class="cancel-btn" id="btn-scan-cancel">キャンセル</button>
+    </div>
+  </div>
+
+  <script src="../js/vendor/jsQR.js"></script>
   <script src="../js/config.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/card.js"></script>

@@ -77,9 +77,19 @@ const FG_API = (() => {
     return call_('getStudent', { token: cardToken });
   }
 
-  /** 企業が学生QRを閲覧したログを記録 */
+  /** 企業が学生QRを閲覧したログを記録(メール手動登録用) */
   function saveViewLog(cardToken, companyId, email) {
     return call_('saveViewLog', { token: cardToken, company: companyId, email });
+  }
+
+  /** 企業cookie(viewKey)による閲覧ログ自動記録。企業IDはGAS側で解決 */
+  function saveViewLogAuto(cardToken, viewKey) {
+    return call_('saveViewLog', { token: cardToken, vk: viewKey });
+  }
+
+  /** 企業QR登録: viewKeyの有効性を確認し企業名を取得 */
+  function resolveViewKey(viewKey) {
+    return call_('resolveViewKey', { key: viewKey });
   }
 
   // ── 学生向けAPI ───────────────────────────────
@@ -167,6 +177,31 @@ const FG_API = (() => {
     return match ? match.split('=')[1] : null;
   }
 
+  // ── 企業viewKey Cookie操作 ────────────────────
+  // cookieName: fg_company_view (企業のQR閲覧自動記録用)
+  // ⚠ 保存するのは viewKey のみ。個人情報・企業IDは保存しない。
+
+  /** 企業viewKeyをcookieに保存(card.htmlの企業QR登録) */
+  function saveCompanyViewKey(viewKey, days = 60) {
+    const expires = new Date();
+    expires.setDate(expires.getDate() + days);
+    document.cookie = [
+      `fg_company_view=${viewKey}`,
+      `expires=${expires.toUTCString()}`,
+      'path=/',
+      'SameSite=Lax',
+      location.protocol === 'https:' ? 'Secure' : '',
+    ].filter(Boolean).join('; ');
+  }
+
+  /** cookieから企業viewKeyを取得 */
+  function getCompanyViewKey() {
+    const match = document.cookie
+      .split('; ')
+      .find(c => c.startsWith('fg_company_view='));
+    return match ? match.split('=')[1] : null;
+  }
+
   // ── URLヘルパー ───────────────────────────────
 
   /** URLクエリパラメータから値を取得 */
@@ -181,6 +216,8 @@ const FG_API = (() => {
     // 企業向け
     getStudent,
     saveViewLog,
+    saveViewLogAuto,
+    resolveViewKey,
     // 学生向け
     activateStamp,
     saveStamp,
@@ -197,6 +234,8 @@ const FG_API = (() => {
     // Cookie
     saveStampToken,
     getStampToken,
+    saveCompanyViewKey,
+    getCompanyViewKey,
     // URL
     getParam,
   };
