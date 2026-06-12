@@ -70,11 +70,16 @@ FG Event Platform（Formula Gymkhana のイベント管理基盤）の改修。
   - card.js: cookie有→自動記録 / cookie無→オーバーレイ式企業QR読み取り（学生情報を消さない）。
   - GAS: saveViewLog に vk 対応・source列・軽い重複抑制、resolveViewKey 新設。要再デプロイ。
   - 区別方法・重複抑制の詳細は NOTES.md（2026-06-11）参照。
+  - 企業QR用URLのUI改善＋eventId埋め込み（会期外/複数大会の取り違え解消）✅（2026-06-11）。
+- 共通デザイン体系の拡充（status-card / スキャン枠共通化 / 色変数）✅（2026-06-11）。
+- admin.html / exchange.html を共通デザイン体系へ統一（白ヘッダー・大会カラー・トークン化。見た目のみ）✅（2026-06-12。CHANGELOG/NOTES 参照）。
+- LIVE学生マスターの列ズレ: LIVEシート19列化で解消 ✅（2026-06-12。NOTES参照）。
 
 進行中／残タスク:
 - 当日参加者フォーム: 入力規則の整合（見学・応援パス準拠）まで完了 ✅（2026-06-08）。
-  - 残: LIVE学生マスターの列ズレ修正（`性別`・`所属校出場`・`規則誓約同意` の列追加。NOTES参照）。
   - 将来スコープ（郵便番号/住所詳細・来場日・弁当・サービス作業/保険）は未着手。
+- 未着手の管理機能（管理画面で「準備中」タグ）: 学生QR URL一括発行 / 企業NFC URL発行 /
+  ラベル用CSV出力 / importStudents の管理画面化。
 - T-E: company.html 本体（企業別の閲覧学生リスト/スタンプ来訪者の表示）。
   データ蓄積側（QR閲覧ログの企業ID付き記録）は 2026-06-11 完了。getCompanyView / getCompanyStampVisitors の2系統が利用可能。
 - 既存イベントの QR閲覧ログ シートに `source` 列ヘッダーを手動追記（推奨）。

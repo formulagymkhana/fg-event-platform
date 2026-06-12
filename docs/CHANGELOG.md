@@ -16,6 +16,17 @@
 
 ---
 
+## 2026-06-12 admin.html / exchange.html を共通デザイン体系に統一（見た目のみ）
+- 変更ファイル: `app/admin.html`, `app/exchange.html`, `js/style.css`
+- 変更内容（機能・DOM・ID・JS・GAS呼び出しは一切変更なし）:
+  - **style.css**: `--shadow-sm`(小カード用の軽い影)を追加。`.staff-badge` を赤茶→大会ブルー(blue-soft)に変更。未使用化した `.fg-header-staff` 一式と `--fg-staff` トークンを削除
+  - **exchange.html**: 旧スタッフ用「赤茶ヘッダー」(`fg-header-staff`)を全て白ヘッダー(`fg-header`)に統一。スタッフ用スピナー色上書きを廃止。`.btn-staff` を赤茶→大会ブルーに。判定バッジは既に `.status-card` 化済み
+  - **admin.html**: 濃紺帯ヘッダー(ログイン/共通/サブページ/モーダル)を**白ヘッダー＋下罫線**に統一。ロゴは黒字＋青スパン。主要ボタン(primary-btn/save-btn/btn-gen-keys)を大会ブルーに。直書き配色(`#C0392B`/`#27AE60`/`#1A4A80`/`#8BA3C4`/`#B0BAC8`/`#FEF3C7`系/`#1A2733`等)を共通トークンへ集約。小カードの影を `--shadow-sm` に、主要カード角丸を `--radius-ui`/`--radius-card` に。テーブルヘッダ・トーストは濃色面として `--fg-navy` 維持
+- 理由/背景: 学生画面とデザイン体系を揃え、システム全体の統一感・完成度を出すため。色による画面区別を撤廃
+- 申し送り/注意点:
+  - 情報密度維持のため、admin の微小コントロール角丸(≤10px: stat-card/company-item/copy-btn 等)は数値のまま据え置き（NOTES 参照）。色・影は全てトークン化済み
+  - GAS 変更なし（再デプロイ不要）
+
 ## 2026-06-11 企業QR用URLのUI改善＋イベントID埋め込み（前項の追補）
 - 変更ファイル: `js/admin.js`, `app/admin.html`, `js/card.js`, `js/api.js`
 - 変更内容:
