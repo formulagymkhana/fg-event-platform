@@ -5,13 +5,19 @@
 
 /* ── CSS変数 ────────────────────────────────────── */
 :root {
-  --fg-blue:         #0057B8;
+  --fg-blue:         #004ECC;   /* 公式サイト寄せ（旧 #0057B8） */
+  --fg-blue-light:   #1361E0;
   --fg-navy:         #0B2545;
-  --fg-bg:           #EEF2F7;
+  --fg-black:        #141617;   /* 黒ヘッダー背景 */
+  --fg-dark:         #212326;   /* 濃色テキスト */
+  --fg-gray:         #434549;   /* 中間グレー */
+  --fg-white:        #ffffff;
+  --fg-bg:           #F2F3F5;   /* 公式サイト寄せ（旧 #EEF2F7） */
+  --fg-bg-soft:      #F9F9FB;
   --fg-card:         #ffffff;
   --fg-text:         #1A2733;
   --fg-muted:        #6B7280;
-  --fg-line:         #E2E8F0;
+  --fg-line:         #DDE1E7;   /* 統一（旧 #E2E8F0） */
   --fg-blue-soft:    #EEF7FF;
   --fg-blue-border:  #D8EAFB;
   --fg-success-bg:   #EAF8F0;
@@ -24,9 +30,9 @@
   --fg-error:        #9A2A2A;
   --fg-error-border: #F1C2C2;
   --fg-disabled:     #B0BAC8;
-  --radius-card:     20px;
-  --radius-ui:       12px;
-  --shadow-card:     0 8px 32px rgba(11,37,69,0.12);
+  --radius-card:     18px;      /* 角丸を少し締める（旧 20px） */
+  --radius-ui:       8px;       /* ボタン等をシャープに（旧 12px） */
+  --shadow-card:     0 12px 32px rgba(20,22,23,0.10);
   --shadow-sm:       0 1px 4px rgba(11,37,69,0.08);
 }
 
@@ -55,33 +61,54 @@ body {
   overflow: hidden;
 }
 
-/* ── 学生向けヘッダー（白背景・モック風） ─────────── */
+/* ── 学生向けヘッダー（黒背景・公式サイト寄せ） ─────── */
 .fg-header {
-  background: #fff;
-  padding: 24px 26px 8px;
+  background: var(--fg-black);
+  color: var(--fg-white);
+  padding: 18px 24px 14px;
   display: block;
-  border-bottom: 1px solid var(--fg-line);
+  border-bottom: 3px solid var(--fg-blue);
 }
 
 .fg-logo {
   font-size: 18px;
   font-weight: 800;
   letter-spacing: 0.04em;
-  color: #111827;
+  color: #fff;
 }
 
 .fg-logo span {
   background: var(--fg-blue);
   color: #fff;
   padding: 3px 8px;
-  border-radius: 3px;
+  border-radius: 2px;
   margin-left: 4px;
 }
 
 .fg-page-name {
   margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.65);
+}
+
+/* ── セクション見出し（英字大見出し＋日本語） ───────── */
+.section-label {
+  text-align: left;
+  margin-bottom: 20px;
+}
+.section-en {
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: var(--fg-black);
+  line-height: 1;
+}
+.section-ja {
+  margin-top: 6px;
   font-size: 13px;
-  color: var(--fg-muted);
+  font-weight: 700;
+  color: var(--fg-blue);
 }
 
 /* ── カードボディ ────────────────────────────────── */
@@ -128,9 +155,9 @@ body {
   border: none;
   border-radius: var(--radius-ui);
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 800;
   cursor: pointer;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   transition: background 0.15s;
   text-decoration: none;
   text-align: center;
@@ -455,4 +482,155 @@ body {
 
 .cancel-btn:active {
   background: #D4DBE6;
+}
+
+/* ── スタンプグリッド（progress.html・スタンプ帳スタイル） ── */
+.stamp-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 16px 20px;
+}
+.stamp-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.stamp-circle {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+.stamp-circle.got {
+  border: 2.5px solid var(--fg-blue);
+  background: #fff;
+}
+.stamp-circle.empty {
+  border: 2px dashed var(--fg-line);
+  background: var(--fg-bg);
+}
+.stamp-circle img {
+  width: 80%;
+  height: 80%;
+  object-fit: contain;
+}
+.stamp-initial {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--fg-blue);
+}
+.stamp-num {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--fg-line);
+}
+.stamp-check-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 22px;
+  height: 22px;
+  background: var(--fg-blue);
+  border-radius: 50%;
+  border: 2px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #fff;
+  font-weight: 700;
+}
+.stamp-name {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--fg-dark);
+  text-align: center;
+  line-height: 1.3;
+  max-width: 68px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stamp-name.empty {
+  color: var(--fg-muted);
+}
+
+/* ── マイルストーンバー ───────────────────────────── */
+.milestone-bar-section {
+  padding: 0 20px 20px;
+}
+.milestone-track {
+  position: relative;
+  height: 8px;
+  background: var(--fg-line);
+  border-radius: 100px;
+  margin: 16px 0 40px;
+}
+.milestone-fill {
+  height: 100%;
+  background: var(--fg-blue);
+  border-radius: 100px;
+  transition: width 0.6s ease;
+}
+.milestone-marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px var(--fg-line);
+}
+.milestone-marker.reached {
+  background: var(--fg-blue);
+  box-shadow: 0 0 0 2px var(--fg-blue);
+}
+.milestone-marker.unreached {
+  background: var(--fg-bg);
+}
+.milestone-label {
+  text-align: center;
+  transform: translateX(-50%);
+  position: absolute;
+  top: 18px;
+  white-space: nowrap;
+}
+.milestone-label .m-count {
+  font-weight: 800;
+  color: var(--fg-blue);
+  font-size: 11px;
+}
+.milestone-label .m-remain {
+  color: var(--fg-muted);
+  font-size: 10px;
+  display: block;
+  margin-top: 1px;
+}
+
+/* ── fg-list（進捗リスト・公式サイト日程表スタイル） ── */
+.fg-list {
+  border-top: 1px solid var(--fg-line);
+  margin: 0 20px;
+}
+.fg-list-item {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--fg-line);
+  text-align: left;
+}
+.fg-list-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--fg-dark);
+}
+.fg-list-meta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--fg-muted);
 }

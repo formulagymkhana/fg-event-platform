@@ -8,6 +8,7 @@
              script-src 'self';
              connect-src https://script.google.com
                          https://script.googleusercontent.com;
+             img-src 'self' https: data:;
              style-src 'self' 'unsafe-inline';">
   <title>FORMULA GYMKHANA — スタンプ進捗</title>
   <link rel="stylesheet" href="../js/style.css">
@@ -21,6 +22,15 @@
     /* ローディングスピナー位置 */
     .spinner { margin: 32px auto 16px; }
 
+    /* ── 進捗画面：固定ヘッダー／スクロール／固定フッターのアプリ型レイアウト ── */
+    #state-progress { display: flex; flex-direction: column;
+      height: calc(100dvh - 48px); max-height: calc(100dvh - 48px); }
+    .pg-top { flex-shrink: 0; padding: 12px 20px; display: flex; align-items: baseline;
+      justify-content: center; gap: 8px; border-bottom: 1px solid var(--fg-line); }
+    .pg-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .pg-bottom { flex-shrink: 0; padding: 14px 0 12px; border-top: 1px solid var(--fg-line); background: #fff; }
+    .pg-bottom .reload-btn { width: auto; margin: 4px 20px 0; padding: 8px 16px; }
+
     /* ステータスカードの配置（カード直下なので左右マージンが必要） */
     .status-card { margin: 18px 24px 0; }
 
@@ -33,15 +43,9 @@
     .confirm-text { font-size: 14px; color: var(--fg-text); text-align: center; margin-bottom: 12px; font-weight: 600; line-height: 1.6; }
     .cancel-link  { display: block; width: 100%; padding: 10px; margin-top: 8px; background: none; border: none; color: var(--fg-muted); font-size: 13px; cursor: pointer; text-decoration: underline; }
 
-    /* スタンプ履歴 */
-    .stamp-list-section { padding: 22px 24px 0; }
-    .section-label { font-size: 11px; font-weight: 600; color: var(--fg-muted); letter-spacing: 0.08em; margin-bottom: 12px; }
-    .stamp-list    { border-top: 1px solid var(--fg-line); }
-    .stamp-item    { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--fg-line); }
-    .stamp-check   { width: 26px; height: 26px; border-radius: 50%; background: var(--fg-blue); color: #fff; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .stamp-company { flex: 1; font-size: 14px; font-weight: 500; color: var(--fg-text); }
-    .stamp-time    { font-size: 11px; color: var(--fg-muted); white-space: nowrap; }
-    .no-stamps     { padding: 24px 0; text-align: center; font-size: 13px; color: #A0AEBB; }
+    /* スタンプ履歴は style.css の .fg-list を使用（取得数見出しの余白のみ調整） */
+    .list-heading { padding: 0 20px; margin-bottom: 10px; }
+    .list-heading span { font-size: 11px; font-weight: 700; color: var(--fg-muted); letter-spacing: .08em; }
 
     /* フッター */
     .card-footer { padding: 18px 24px 24px; }
@@ -90,43 +94,61 @@
       <div class="fg-page-name">スタンプ進捗</div>
     </div>
 
-    <!-- 円形ゲージ（--pct は progress.js が setProperty で注入） -->
-    <div class="progress-ring">
-      <div class="ring-inner">
-        <div class="ring-count" id="count-num">0</div>
-        <div class="ring-label" id="bar-label"></div>
-      </div>
-    </div>
-    <!-- bar-fill は JS 参照を壊さないよう非表示で保持 -->
-    <div id="bar-fill" style="display:none"></div>
-
-    <!-- ステータス -->
-    <div class="status-card cleared" id="status-cleared"   style="display:none"></div>
-    <div class="status-card success" id="status-exchanged" style="display:none">✓ 景品引換済み</div>
-    <div class="status-card neutral" id="status-progress"  style="display:none"></div>
-
-    <!-- 景品引換アクション(達成 & 未交換のときだけ表示) -->
-    <div class="exchange-action" id="exchange-action" style="display:none">
-      <div id="exchange-start">
-        <button class="exchange-btn" id="btn-exchange-start">景品を受け取る</button>
-        <p class="exchange-note">※交換所でスタッフの指示があってから<br>押してください</p>
-      </div>
-      <div id="exchange-confirm" style="display:none">
-        <p class="confirm-text">景品を受け取りましたか?<br>確定すると取り消せません。</p>
-        <button class="exchange-btn confirm" id="btn-exchange-confirm">はい、受け取りました</button>
-        <button class="cancel-link" id="btn-exchange-cancel">キャンセル</button>
-      </div>
+    <!-- 固定ヘッダー：現在の取得数（X / Y社） -->
+    <div class="pg-top">
+      <span style="font-size:12px;color:var(--fg-muted)">取得ブース</span>
+      <span style="font-size:26px;font-weight:900;color:var(--fg-black);line-height:1">
+        <span id="count-num">0</span><span id="bar-label" style="font-size:15px;font-weight:700;color:var(--fg-muted)"></span>
+      </span>
     </div>
 
-    <!-- スタンプ履歴 -->
-    <div class="stamp-list-section">
-      <p class="section-label">取得済みスタンプ</p>
-      <div class="stamp-list" id="stamp-list"></div>
+    <!-- スクロール領域：スタンプ帳＋取得履歴 -->
+    <div class="pg-scroll">
+      <div style="padding:16px 20px 0">
+        <div class="section-label">
+          <div class="section-en">STAMP BOOK</div>
+          <div class="section-ja">スタンプ帳</div>
+        </div>
+      </div>
+
+      <!-- スタンプグリッド（progress.js が動的生成・4×3でスクロール） -->
+      <div class="stamp-grid" id="stamp-grid"></div>
+
+      <!-- 取得履歴（fg-list 形式） -->
+      <div style="padding:6px 0 16px">
+        <div class="list-heading"><span>取得済みスタンプ</span></div>
+        <div class="fg-list" id="stamp-list"></div>
+      </div>
     </div>
 
-    <div class="card-footer">
+    <!-- 固定フッター：到達バー＋ステータス＋交換アクション -->
+    <div class="pg-bottom">
+      <!-- マイルストーン（到達）バー（progress.js が動的生成） -->
+      <div class="milestone-bar-section" id="milestone-bar-section"></div>
+
+      <!-- ステータス -->
+      <div class="status-card cleared" id="status-cleared"   style="display:none;margin:0 20px 8px"></div>
+      <div class="status-card success" id="status-exchanged" style="display:none;margin:0 20px 8px">✓ 景品引換済み</div>
+      <div class="status-card neutral" id="status-progress"  style="display:none;margin:0 20px 8px"></div>
+
+      <!-- 景品引換アクション(達成 & 未交換のときだけ表示) -->
+      <div class="exchange-action" id="exchange-action" style="display:none">
+        <div id="exchange-start">
+          <button class="exchange-btn" id="btn-exchange-start">景品を受け取る</button>
+          <p class="exchange-note">※交換所でスタッフの指示があってから<br>押してください</p>
+        </div>
+        <div id="exchange-confirm" style="display:none">
+          <p class="confirm-text">景品を受け取りましたか?<br>確定すると取り消せません。</p>
+          <button class="exchange-btn confirm" id="btn-exchange-confirm">はい、受け取りました</button>
+          <button class="cancel-link" id="btn-exchange-cancel">キャンセル</button>
+        </div>
+      </div>
+
       <button class="reload-btn" id="btn-reload">↺ 更新</button>
     </div>
+
+    <!-- bar-fill は progress.js の参照を壊さないよう非表示で保持 -->
+    <div id="bar-fill" style="display:none"></div>
   </div>
 
   <!-- エラー -->

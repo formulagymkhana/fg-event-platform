@@ -335,11 +335,28 @@ async function loadCompanies_(gen = null, ev = null) {
         <span class="url-val">${esc_(companyQrUrl_(c.viewKey))}</span>
         <button class="copy-btn" data-copy="${esc_(companyQrUrl_(c.viewKey))}">コピー</button>
       </div>` : ''}
+      <div class="logo-row">
+        <span class="logo-lbl">ロゴURL</span>
+        <input class="logo-url-input" type="url" placeholder="https://… または logos/xxx.png"
+          data-logo-id="${esc_(c.companyId)}" value="${esc_(c.logoUrl || '')}">
+        <div class="logo-preview">${c.logoUrl ? `<img src="${esc_(c.logoUrl)}" alt="" onerror="this.parentNode.textContent='?'">` : '?'}</div>
+        <button class="copy-btn logo-save-btn" data-logo-save="${esc_(c.companyId)}">保存</button>
+      </div>
     </div>`).join('');
   container.querySelectorAll('.copy-btn[data-copy]').forEach(b =>
     b.addEventListener('click', () => copyText_(b.dataset.copy)));
   container.querySelectorAll('.del-btn[data-del-company]').forEach(b =>
     b.addEventListener('click', () => handleDeleteCompany_(b.dataset.delCompany)));
+  container.querySelectorAll('.logo-url-input').forEach(inp =>
+    inp.addEventListener('input', () => {
+      const pv = inp.closest('.logo-row').querySelector('.logo-preview');
+      const url = inp.value.trim();
+      pv.innerHTML = url
+        ? `<img src="${esc_(url)}" alt="" onerror="this.parentNode.textContent='?'">`
+        : '?';
+    }));
+  container.querySelectorAll('.logo-save-btn[data-logo-save]').forEach(b =>
+    b.addEventListener('click', () => handleSaveLogo_(b)));
   updateStepBadges_();
 }
 
@@ -371,6 +388,21 @@ async function handleAddCompany_() {
     errEl.textContent = msg;
     errEl.style.display = 'block';
   }
+}
+
+async function handleSaveLogo_(btn) {
+  if (!curEvent_) return;
+  const companyId = btn.dataset.logoSave;
+  const input = btn.closest('.logo-row').querySelector('.logo-url-input');
+  const logoUrl = input.value.trim();
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '保存中...';
+  const res = await adminCall_('adminUpdateCompany', { event: curEvent_, companyId, logoUrl });
+  btn.disabled = false;
+  btn.textContent = res.ok ? '✓' : 'エラー';
+  if (res.ok) showToast_('✓ ロゴURLを保存しました');
+  else showToast_('⚠ 保存失敗: ' + (res.message || ''));
+  setTimeout(() => { btn.textContent = orig; }, 1500);
 }
 
 async function handleDeleteCompany_(companyId) {

@@ -67,7 +67,6 @@ function dispatch_(e) {
       case 'adminClearCache':   return actionAdminClearCache_(p);
       case 'adminGetCompanies': return actionAdminGetCompanies_(p);
       case 'adminAddCompany':   return actionAdminAddCompany_(p);
-      case 'adminUpdateCompany':return actionAdminUpdateCompany_(p);
       case 'adminDeleteCompany':return actionAdminDeleteCompany_(p);
       case 'adminGenerateKeys': return actionAdminGenerateKeys_(p);
       case 'adminUpdateKey':    return actionAdminUpdateKey_(p);
@@ -294,8 +293,7 @@ function actionGetStampProgress_(p) {
   const myStamps = rows
     .filter(r => r[1] === p.event && r[2] === student.studentId)
     .map(r => ({
-      company:   r[6],
-      companyId: String(r[7] || ''),   // スタンプ帳グリッドのID突合用
+      company: r[6],
       time: r[0] instanceof Date
         ? Utilities.formatDate(r[0], Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm')
         : String(r[0]),
@@ -303,26 +301,7 @@ function actionGetStampProgress_(p) {
 
   return ok_(buildStampResult_(p.event, student.studentId, myStamps.length, {
     stamps: myStamps,
-    companies: getCompaniesForEvent_(p.event),  // スタンプ帳の全ブース（ロゴ含む）
   }));
-}
-
-// イベントの全企業（スタンプ帳グリッド用・表示順）
-function getCompaniesForEvent_(eventId) {
-  const sheet = eventSs_(eventId).getSheetByName(SHEET.COMPANIES);
-  if (!sheet || sheet.getLastRow() < 2) return [];
-  const data    = sheet.getDataRange().getValues();
-  const headers = data[0].map(String);
-  const g       = (row, name) => { const i = headers.indexOf(name); return i >= 0 ? row[i] : ''; };
-  const orderCol = headers.indexOf('表示順');
-  const rows = data.slice(1).map(row => ({
-    companyId: String(g(row, 'companyId')),
-    name:      String(g(row, '企業名')),
-    logoUrl:   String(g(row, 'logoUrl') || ''),
-    _order:    orderCol >= 0 ? Number(row[orderCol]) || 0 : 0,
-  }));
-  rows.sort((a, b) => a._order - b._order);
-  return rows.map(({ _order, ...c }) => c);
 }
 
 // ============================================================
@@ -1147,7 +1126,6 @@ function actionAdminGetCompanies_(p) {
     stampKey:  g(row, 'stampKey'),
     viewKey:   g(row, 'viewKey'),
     hasNfc:    g(row, 'hasNfc'),
-    logoUrl:   String(g(row, 'logoUrl') || ''),
   }));
   return ok_({ companies });
 }
@@ -1175,37 +1153,9 @@ function actionAdminAddCompany_(p) {
 
   // 表示順: 既存行数 + 1
   const displayOrder = data.length; // ヘッダ含む行数 = 既存企業数 + 1
-  // schema: companyId, 企業名, stampKey, viewKey, 表示順, hasNfc[, logoUrl]
-  // logoUrl 列は header 駆動で後から読むため、ここでは付与しない（後から
-  // adminUpdateCompany が列を作成・設定する。新規イベントは createEvent_ が列を持つ）
+  // schema: companyId, 企業名, stampKey, viewKey, 表示順, hasNfc
   sheet.appendRow([companyId, String(p.name), '', '', displayOrder, false]);
   return ok_({ companyId, name: String(p.name) });
-}
-
-// 企業ロゴURLの登録・更新（logoUrl 列が無ければ末尾に作成）
-function actionAdminUpdateCompany_(p) {
-  const e = validateAdmin_(p);
-  if (e) return e;
-  if (!p.event || !p.companyId) return err_('missing_params');
-
-  const sheet   = eventSs_(p.event).getSheetByName(SHEET.COMPANIES);
-  const data    = sheet.getDataRange().getValues();
-  const headers = data[0].map(String);
-  const idCol   = headers.indexOf('companyId');
-  let   logoCol = headers.indexOf('logoUrl');
-
-  const rowIdx = data.slice(1).findIndex(r => String(r[idCol]) === String(p.companyId));
-  if (rowIdx < 0) return err_('not_found');
-
-  // logoUrl 列が無ければヘッダ末尾に作成
-  if (logoCol < 0) {
-    sheet.getRange(1, headers.length + 1).setValue('logoUrl');
-    logoCol = headers.length;
-  }
-  sheet.getRange(rowIdx + 2, logoCol + 1).setValue(String(p.logoUrl || ''));
-
-  CacheService.getScriptCache().remove('cfg_' + p.event);
-  return ok_({ companyId: p.companyId, logoUrl: String(p.logoUrl || '') });
 }
 
 // 企業を削除

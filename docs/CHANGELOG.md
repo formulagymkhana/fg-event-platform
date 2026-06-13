@@ -16,6 +16,22 @@
 
 ---
 
+## 2026-06-12 公式サイト寄せUIリデザイン＋progressスタンプ帳化＋企業ロゴ登録
+- 変更ファイル: `js/style.css`, `app/admin.html`, `js/admin.js`, `app/progress.html`, `js/progress.js`, `docs/gas-patches/api.gs.final.txt`, `docs/gas-patches/admin.gs.final.txt`
+- 変更内容（handoff_ui_stamp_redesign.md ベース。導線・スタンプ/景品ロジックは不変）:
+  - **style.css トークン更新**: `--fg-blue` #0057B8→#004ECC、`--fg-bg`/`--fg-line` 微調整、`--radius-card` 20→18 / `--radius-ui` 12→8、`--shadow-card` 更新。新規 `--fg-blue-light/--fg-black/--fg-dark/--fg-gray/--fg-white/--fg-bg-soft`
+  - **黒ヘッダー化**: 共通 `.fg-header` を黒背景＋青下線に。学生(start/stamp/progress)＋exchange に自動適用。**card.html はローカル白ヘッダー維持**。admin も独自ヘッダー(app-hd/page-hd/login-hd/modal-hd)を黒に統一
+  - **新コンポーネント**: `.section-label/.section-en/.section-ja`、`.stamp-grid` 一式、`.milestone-*`、`.fg-list`
+  - **progress リデザイン**: 円形ゲージ→アプリ型レイアウトに再構成。**固定ヘッダー（取得ブース X/Y社）＋スクロールするスタンプ帳グリッド（企業ロゴ/頭文字＋チェック、4×3）＋固定フッター（到達バー＋ステータス＋交換アクション）**。取得履歴は fg-list でスクロール領域に。`#state-progress` を `height:calc(100dvh-48px)` の縦フレックスにし pg-top/pg-scroll/pg-bottom で構成。progress.js に renderStampGrid/renderMilestoneBar/renderStampList とフォールバックを追加（既存スタンプ/景品ロジックは保持。ヘッダーは「取得ブース数/全ブース数」表記に変更）
+  - **企業ロゴ登録**: admin の企業カードに「ロゴURL」入力＋プレビュー＋保存を追加。GAS に `adminUpdateCompany`(logoUrl列を必要時に作成)、`getStampProgress` に companies(ロゴ含む)返却、`adminGetCompanies` に logoUrl、新規イベントの COMPANIES スキーマに logoUrl 列を追加
+  - **CSP**: progress.html / admin.html に `img-src 'self' https: data:` を追加（外部/同梱ロゴ画像の表示用）
+- 方針判断（ユーザー確認済み）: exchange は**中立色のまま維持**（handoff の赤アクセント復活は不採用）。admin も黒ヘッダーに統一。ロゴは同一オリジン同梱が最速・最安定で `'self'` だけで足りるが、URL貼り付け運用も両立するため `https: data:` も許可
+- 申し送り/注意点:
+  - **GAS 再デプロイ必須**（companies/ logoUrl/ adminUpdateCompany）。未再デプロイでも progress はフォールバックで動作（取得済み企業のみ表示・ロゴ無し）
+  - グリッドの取得突合は **companyId 優先**（handoff の企業名突合より堅牢化）
+  - start/stamp/exchange は黒ヘッダー適用のみ（セクション見出しは progress のみ。必要なら後日追加）
+  - マイルストーン両端ラベルが端で僅かに見切れる可能性（NOTES 記録・要実機確認）
+
 ## 2026-06-12 admin.html / exchange.html を共通デザイン体系に統一（見た目のみ）
 - 変更ファイル: `app/admin.html`, `app/exchange.html`, `js/style.css`
 - 変更内容（機能・DOM・ID・JS・GAS呼び出しは一切変更なし）:

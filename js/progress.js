@@ -56,14 +56,19 @@ function renderProgress(d) {
   const cleared        = d.cleared        || false;  // claimableNow > 0
   const exchanged      = d.exchanged      || false;  // exchangedCount >= maxPrizes
 
-  setText('count-num', String(count));
+  // 固定ヘッダー: 取得ブース数 / 全ブース数（スタンプ帳の枠組み）
+  const companies = d.companies || fallbackCompanies_(stamps);
+  const gotSet  = new Set(stamps.map(s => String(s.companyId || s.company)));
+  const visited = companies.filter(co => gotSet.has(String(co.companyId || co.name))).length;
+  const total   = companies.length || visited;
+  setText('count-num', String(visited));
+  setText('bar-label', ` / ${total}社`);
 
-  // ゲージ: 次の交換閾値に向けた進捗
+  // ゲージ: 次の交換閾値に向けた進捗（bar-fill は非表示保持・参照のみ維持）
   const gaugeTarget = nextThreshold || (maxPrizes * prizeUnitSize);
   const pct = Math.min(100, Math.round((count / gaugeTarget) * 100));
   document.getElementById('bar-fill').style.width = pct + '%';
   document.querySelector('.progress-ring')?.style.setProperty('--pct', pct);
-  setText('bar-label', `${count} / ${gaugeTarget} 個`);
 
   // ステータス表示をリセット
   hide('status-cleared'); hide('status-exchanged'); hide('status-progress');
@@ -95,23 +100,133 @@ function renderProgress(d) {
     show('status-progress');
   }
 
-  // スタンプ履歴
+  // スタンプ帳グリッド・マイルストーンバー・取得履歴リスト
+  renderStampGrid(stamps, companies);
+  renderMilestoneBar(count, buildMilestones_(prizeUnitSize, maxPrizes));
+  renderStampList(stamps);
+}
+
+// ── スタンプ帳グリッド ──
+function renderStampGrid(stamps, companies) {
+  const grid = document.getElementById('stamp-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  // 取得済み判定は companyId 優先・無ければ企業名で突合
+  const gotSet = new Set(stamps.map(s => String(s.companyId || s.company)));
+
+  companies.forEach((co, idx) => {
+    const key   = String(co.companyId || co.name);
+    const isGot = gotSet.has(key);
+
+    const cell = document.createElement('div');
+    cell.className = 'stamp-cell';
+
+    const circle = document.createElement('div');
+    circle.className = 'stamp-circle ' + (isGot ? 'got' : 'empty');
+
+    if (isGot) {
+      const badge = document.createElement('div');
+      badge.className = 'stamp-check-badge';
+      badge.textContent = '✓';
+      circle.appendChild(badge);
+
+      if (co.logoUrl) {
+        const img = document.createElement('img');
+        img.src = co.logoUrl;
+        img.alt = co.name || '';
+        img.loading = 'lazy';
+        img.onerror = () => {
+          img.remove();
+          const init = document.createElement('div');
+          init.className = 'stamp-initial';
+          init.textContent = (co.name || '?').charAt(0);
+          circle.appendChild(init);
+        };
+        circle.appendChild(img);
+      } else {
+        const init = document.createElement('div');
+        init.className = 'stamp-initial';
+        init.textContent = (co.name || '?').charAt(0);
+        circle.appendChild(init);
+      }
+    } else {
+      const num = document.createElement('div');
+      num.className = 'stamp-num';
+      num.textContent = idx + 1;
+      circle.appendChild(num);
+    }
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'stamp-name' + (isGot ? '' : ' empty');
+    nameEl.textContent = isGot ? (co.name || '') : String(idx + 1);
+
+    cell.appendChild(circle);
+    cell.appendChild(nameEl);
+    grid.appendChild(cell);
+  });
+}
+
+// ── マイルストーンバー ──
+function renderMilestoneBar(count, milestones) {
+  const section = document.getElementById('milestone-bar-section');
+  if (!section || !milestones || milestones.length === 0) return;
+
+  const maxThreshold = milestones[milestones.length - 1].threshold;
+  const pct = Math.min(100, Math.round((count / maxThreshold) * 100));
+
+  section.innerHTML = `
+    <div style="position:relative">
+      <div class="milestone-track">
+        <div class="milestone-fill" style="width:${pct}%"></div>
+        ${milestones.map(m => {
+          const pos     = Math.round((m.threshold / maxThreshold) * 100);
+          const reached = count >= m.threshold;
+          const remain  = Math.max(0, m.threshold - count);
+          return `
+            <div class="milestone-marker ${reached ? 'reached' : 'unreached'}" style="left:${pos}%"></div>
+            <div class="milestone-label" style="left:${pos}%">
+              <span class="m-count">${m.threshold}個</span>
+              <span class="m-remain">${remain === 0 ? '達成！' : 'あと' + remain}</span>
+            </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+// ── 取得履歴（fg-list 形式） ──
+function renderStampList(stamps) {
   const list = document.getElementById('stamp-list');
+  if (!list) return;
   list.innerHTML = '';
-  if (stamps.length === 0) {
-    list.innerHTML = '<p class="no-stamps">まだスタンプがありません</p>';
-  } else {
-    stamps.forEach(s => {
-      const item = document.createElement('div');
-      item.className = 'stamp-item';
-      item.innerHTML = `
-        <div class="stamp-check">✓</div>
-        <div class="stamp-company">${escHtml(s.company)}</div>
-        <div class="stamp-time">${escHtml(s.time)}</div>
-      `;
-      list.appendChild(item);
-    });
+  if (!stamps.length) {
+    list.innerHTML = '<p style="padding:20px;text-align:center;font-size:13px;color:var(--fg-muted)">まだスタンプがありません</p>';
+    return;
   }
+  stamps.forEach(s => {
+    const item = document.createElement('div');
+    item.className = 'fg-list-item';
+    item.innerHTML = `
+      <div class="fg-list-title">${escHtml(s.company)}</div>
+      <div class="fg-list-meta">${escHtml(s.time)} · NFC Stamp</div>`;
+    list.appendChild(item);
+  });
+}
+
+// ── フォールバック・マイルストーン生成 ──
+function fallbackCompanies_(stamps) {
+  // GAS が companies を返さない場合（旧デプロイ互換）は取得済み企業のみ表示
+  const seen = new Map();
+  stamps.forEach(s => {
+    const key = String(s.companyId || s.company);
+    if (!seen.has(key)) seen.set(key, { name: s.company, companyId: s.companyId || '', logoUrl: '' });
+  });
+  return [...seen.values()];
+}
+
+function buildMilestones_(unitSize, maxPrizes) {
+  const result = [];
+  for (let i = 1; i <= maxPrizes; i++) result.push({ threshold: unitSize * i });
+  return result;
 }
 
 // ── 景品交換(学生側確定) ──

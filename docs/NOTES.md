@@ -16,6 +16,13 @@
 
 ---
 
+## [記録] 公式サイト寄せリデザイン（黒ヘッダー/スタンプ帳/ロゴ）の設計メモ（2026-06-12）
+- **exchange の配色判断**: handoff は赤アクセント復活を指定したが、直前タスクの「色で画面区別しない」方針と矛盾するため、ユーザー確認のうえ**中立色維持**を採用（赤は不採用）。`--fg-staff` は復活させない。
+- **logoUrl 列の後方互換**: 既存イベントの COMPANIES に logoUrl 列が無くても、read 側は header 駆動(`g('logoUrl')`)で空を返すため壊れない。列は `adminUpdateCompany` が初回保存時に末尾へ自動作成。新規イベントは createEvent_ がスキーマに含む。`adminAddCompany` は logoUrl を付与しない（列ズレ回避）。→ **GAS 再デプロイ必須**。
+- **グリッド突合は companyId 優先**: handoff は企業名突合だったが、同名・表記ゆれに弱いので stamps/companies 双方に companyId を載せて ID 突合（名前はフォールバック）。
+- **ロゴ配信の推奨**: 最速・最安定は同一オリジン同梱（`app/logos/<companyId>.png`、CSP `'self'` のみで可）。URL貼り付け運用も両立するため CSP は `img-src 'self' https: data:`。Drive 共有リンクは `<img>` 直リンクに弱く非推奨（`lh3.googleusercontent.com`/`i.imgur.com`/自前を推奨）。
+- **未対応（必要なら後日）**: start/stamp/exchange へのセクション見出し追加（現状は黒ヘッダーのみ）。マイルストーン両端ラベルが端で僅かに見切れる可能性（要実機確認、必要なら左右端だけ transform 調整）。
+
 ## [記録] admin/exchange デザイン統一での角丸の扱い（2026-06-12 記録）
 - admin/exchange を共通 style.css 体系へ統一する際、**色・影は全て CSS 変数化**したが、
   admin の微小コントロール角丸(≤10px: stat-card=10 / company-item=9 / add-co-form=9 /
