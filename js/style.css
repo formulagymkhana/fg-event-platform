@@ -61,10 +61,10 @@ body {
   overflow: hidden;
 }
 
-/* ── 学生向けヘッダー（黒背景・公式サイト寄せ） ─────── */
+/* ── 学生向けヘッダー（白背景・青下線アクセント） ───── */
 .fg-header {
-  background: var(--fg-black);
-  color: var(--fg-white);
+  background: #fff;
+  color: var(--fg-text);
   padding: 18px 24px 14px;
   display: block;
   border-bottom: 3px solid var(--fg-blue);
@@ -74,7 +74,7 @@ body {
   font-size: 18px;
   font-weight: 800;
   letter-spacing: 0.04em;
-  color: #fff;
+  color: #111827;
 }
 
 .fg-logo span {
@@ -89,7 +89,7 @@ body {
   margin-top: 6px;
   font-size: 12px;
   font-weight: 600;
-  color: rgba(255,255,255,0.65);
+  color: var(--fg-muted);
 }
 
 /* ── セクション見出し（英字大見出し＋日本語） ───────── */
