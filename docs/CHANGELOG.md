@@ -16,6 +16,14 @@
 
 ---
 
+## 2026-06-12 progressにevent明示指定＋アセットのキャッシュバスティング
+- 変更ファイル: `js/api.js`, `js/progress.js`, `app/progress.html`
+- 変更内容:
+  - **event 明示指定**: `getStampProgress`/`exchangePrize` に任意の event 引数を追加し、progress.js は `?event=` を読んで渡す。会期外・複数大会・テスト時に当日自動判定をバイパスして対象イベントを直接表示できる（例 `progress.html?st=…&event=2026_rd_test`）。省略時は従来どおり自動判定
+  - **キャッシュバスティング**: progress.html の style.css / config.js / api.js / progress.js 参照に `?v=20260612c` を付与。HTMLだけ更新されてもJS/CSSが古いキャッシュのままUIが変わらない問題に対処
+- 理由/背景: 実機で「更新してもUIが変わらない」報告。原因は(1)JS/CSSの個別キャッシュ、(2)トークンが2026_rd_testなのに当日判定が2026_testでデータ取得失敗、の2点
+- 申し送り/注意点: 他ページのアセットにも順次バージョン付与すると、今後の更新反映が安定する（必要なら一括対応）
+
 ## 2026-06-12 progress固定ヘッダー/フッターの不具合修正＋到達ゲージ調整
 - 変更ファイル: `app/progress.html`, `js/style.css`, `js/progress.js`
 - 変更内容:

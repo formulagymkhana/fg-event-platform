@@ -114,14 +114,19 @@ const FG_API = (() => {
     return call_('saveStamp', { st: stampToken, ct: companyStampKey, nc: nfcCounter });
   }
 
-  /** stampTokenでスタンプ取得状況を取得(個人情報を含まない) */
-  function getStampProgress(stampToken) {
-    return call_('getStampProgress', { token: stampToken });
+  /** stampTokenでスタンプ取得状況を取得(個人情報を含まない)
+   *  event 省略時は当日の自動判定。テスト/会期外は event 明示で対象イベントを指定可。 */
+  function getStampProgress(stampToken, event) {
+    const p = { token: stampToken };
+    if (event) p.event = event;
+    return call_('getStampProgress', p);
   }
 
   /** 学生が自分で景品交換を確定する(スタッフ指示に従って操作) */
-  function exchangePrize(stampToken) {
-    return call_('exchangePrize', { token: stampToken });
+  function exchangePrize(stampToken, event) {
+    const p = { token: stampToken };
+    if (event) p.event = event;
+    return call_('exchangePrize', p);
   }
 
   // ── 企業閲覧API ───────────────────────────────

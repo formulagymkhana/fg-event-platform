@@ -21,13 +21,14 @@ loadProgress();
 
 async function loadProgress() {
   const token = FG_API.getParam('st') || FG_API.getStampToken();
+  const eventOverride = FG_API.getParam('event') || null;  // テスト/会期外用の明示指定
   if (!token) {
     showState('no-token');
     return;
   }
 
   showState('loading');
-  const res = await FG_API.getStampProgress(token);
+  const res = await FG_API.getStampProgress(token, eventOverride);
 
   if (!res.ok) {
     showState('error');
@@ -236,12 +237,13 @@ function buildMilestones_(unitSize, maxPrizes) {
 async function doExchange() {
   const token = FG_API.getParam('st') || FG_API.getStampToken();
   if (!token) return;
+  const eventOverride = FG_API.getParam('event') || null;
 
   const btn = document.getElementById('btn-exchange-confirm');
   btn.disabled = true;
   btn.textContent = '記録中...';
 
-  const res = await FG_API.exchangePrize(token);
+  const res = await FG_API.exchangePrize(token, eventOverride);
 
   btn.disabled = false;
   btn.textContent = 'はい、受け取りました';
