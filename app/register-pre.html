@@ -42,6 +42,8 @@
     .consent-box label { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: var(--fg-text); line-height: 1.6; cursor: pointer; }
     .consent-box input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; accent-color: var(--fg-blue); cursor: pointer; }
     .consent-box.error { border: 1.5px solid var(--fg-error); }
+    .doc-links { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 10px 0 0 28px; }
+    .doc-links a { font-size: 12px; font-weight: 600; color: var(--fg-blue); text-decoration: underline; }
 
     .event-badge { background: var(--fg-blue-soft); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--fg-navy); font-weight: 600; display: flex; align-items: center; gap: 8px; margin-bottom: 20px; border: 1px solid var(--fg-blue-border); }
     .event-badge .label { font-size: 11px; color: var(--fg-muted); font-weight: 400; }
@@ -153,7 +155,7 @@
         <div class="form-row-half">
           <div class="form-row">
             <label>学部・学科<span class="req">*</span></label>
-            <input type="text" id="f-department" placeholder="例：工学部">
+            <input type="text" id="f-department" placeholder="例：工学部機械工学科">
             <p class="field-err" id="err-department">入力してください</p>
           </div>
           <div class="form-row">
@@ -180,7 +182,7 @@
           <select id="f-club-years">
             <option value="">選択</option>
             <option>1年目</option><option>2年目</option><option>3年目</option>
-            <option>4年目</option><option>5年目</option>
+            <option>4年目</option><option>5年以上</option>
             <option>その他・自動車部所属ではない</option>
           </select>
           <p class="field-err" id="err-club-years">選択してください</p>
@@ -272,6 +274,10 @@
             <input type="checkbox" id="cb-rules">
             <span>私は、大会規則書や誓約書をよく読み、理解し、同意した上で大会に参加致します。</span>
           </label>
+          <p class="doc-links">
+            <a href="https://drive.google.com/file/d/1XWqw4kGrJXHtw5Ol5IWhOaF8piN1Sn8r/view?usp=sharing" target="_blank" rel="noopener">📄 大会規則書を読む</a>
+            <a href="https://drive.google.com/file/d/1KWatO4XD43D64I4_wd5xs_do1kFl_lTn/view?usp=sharing" target="_blank" rel="noopener">📄 誓約書を読む</a>
+          </p>
         </div>
         <p class="field-err" id="err-rules" style="margin-top:-8px">同意が必要です</p>
         <div class="consent-box" id="cb-wrap-privacy">
