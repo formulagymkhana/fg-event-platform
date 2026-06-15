@@ -63,6 +63,29 @@ const FG_API = (() => {
     }
   }
 
+  // POST 送信（事前登録・将来のファイルアップロード用）。
+  // Content-Type を付けない＝CORSプリフライト回避（GAS doPost が JSON を読む）。
+  async function postCall_(action, params = {}) {
+    const body = JSON.stringify({ action, ...params });
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 30000);
+      const res = await fetch(FG_CONFIG.API_BASE_URL, {
+        method: 'POST',
+        body,
+        redirect: 'follow',
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      return await res.json();
+    } catch (e) {
+      if (e.name === 'AbortError') {
+        return { ok: false, error: 'timeout', message: 'タイムアウトしました。再度お試しください。' };
+      }
+      return { ok: false, error: 'network_error', message: '通信エラーが発生しました' };
+    }
+  }
+
   // ── イベント自動判定API ───────────────────────
 
   /** 今日の日付に合致するアクティブなイベントを取得 */
@@ -152,6 +175,14 @@ const FG_API = (() => {
     return call_('registerWalkIn', params);
   }
 
+  /**
+   * 事前学生登録（会期前・公開）。POST送信。
+   * params に event を必ず含めること（会期前は自動判定が効かないため）。
+   */
+  function registerPreStudent(params) {
+    return postCall_('registerPreStudent', params);
+  }
+
   // ── 景品交換API(スタッフ用) ──────────────────
 
   /** 学生cardTokenとスタッフキーで景品交換状況を取得 */
@@ -236,6 +267,8 @@ const FG_API = (() => {
     exchangePrize,
     // 飛び込み登録
     registerWalkIn,
+    // 事前登録
+    registerPreStudent,
     // 企業閲覧
     getCompanyView,
     getCompanyStampVisitors,

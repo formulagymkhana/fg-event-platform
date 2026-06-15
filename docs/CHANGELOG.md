@@ -16,6 +16,18 @@
 
 ---
 
+## 2026-06-12 事前学生登録フォーム Phase 0（共通セクション・脱Googleフォーム化）
+- 変更ファイル: `app/register-pre.html`(新規), `js/register-pre.js`(新規), `js/api.js`, `docs/gas-patches/api.gs.final.txt`, `docs/gas-patches/admin.gs.final.txt`
+- 変更内容:
+  - **GAS**: `doPost` エントリ新設（CORSプリフライト回避のJSON POST受け口。将来のファイルUL兼用）。`registerPreStudent` アクション追加＝STUDENTSへ本人確認サブセットを upsert（`登録種別=事前`・`cardToken`発行・stampTokenは発行しない）、「事前登録」シート（`PRE_REG_COLS` フル列）へ記録、**確認メール送信**（MailApp＝オーナーGmail／QR名刺は載せない）。`SHEET.PRE_REG`・`PRE_REG_COLS`・`PRE_CLASS_CODES`・`preAttr_`/`appendPreRegRow_`/`sendPreRegMail_` 追加。createEvent_ の新規イベントに「事前登録」シートを追加
+  - **api.js**: `postCall_`（POST/Content-Type無し）と `registerPreStudent(params)` を追加・エクスポート
+  - **フロント**: `register-pre.html?event=<eventId>`（公開）＝共通①②③（氏名/ふりがな/大学/学部学科/学年/部歴/性別/生年月日/メール/電話/郵便番号/都道府県/住所詳細）＋参加区分＋規則同意＋個人情報同意。仕様書のバリデーション（氏名スペース・電話10-11桁・郵便7桁・メール・「大学」必須）を実装。完了画面は「登録完了＋確認メール送信」表示
+- 方針: スコープは全区分フル再現／ファイルはDrive保存／メールはオーナーGmail（QR名刺は載せず、後日 admin で一覧出力→入場パスを作成・受付配布）。本コミットは **Phase 0（共通セクション）** まで
+- 申し送り/注意点:
+  - **GAS 再デプロイ必須**（doPost/registerPreStudent/事前登録シート/メール権限）。初回送信時に MailApp のメール送信許可（OAuth同意）が要求される
+  - 残: **Phase 1** 区分別分岐項目（FG/女子/補欠/見学応援・メディア同意）、**Phase 2** ファイルUL→Drive、**Phase 3** admin 事前登録一覧/メールリスト出力
+  - 会期前は当日自動判定が効かないため、事前登録URLは必ず `?event=` 付き（admin発行想定）
+
 ## 2026-06-12 progressにevent明示指定＋アセットのキャッシュバスティング
 - 変更ファイル: `js/api.js`, `js/progress.js`, `app/progress.html`
 - 変更内容:

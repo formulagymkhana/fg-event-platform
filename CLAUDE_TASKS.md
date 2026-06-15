@@ -77,6 +77,11 @@ FG Event Platform（Formula Gymkhana のイベント管理基盤）の改修。
 - 公式サイト寄せUIリデザイン（黒ヘッダー化）＋progressのスタンプ帳グリッド化＋企業ロゴURL登録 ✅（2026-06-12。CHANGELOG/NOTES参照。**GAS再デプロイ必須**）。
 
 進行中／残タスク:
+- 事前学生登録フォーム（脱Googleフォーム化）:
+  - Phase 0 共通セクション＋registerPreStudent＋確認メール ✅（2026-06-12。**GAS再デプロイ必須**）
+  - Phase 1 区分別分岐（FG/女子/補欠/見学応援・メディア同意）= 未着手
+  - Phase 2 ファイルUL→Drive（doPost/base64）= 未着手
+  - Phase 3 admin 事前登録一覧・メールリスト出力（cardToken/QR URL含む）= 未着手
 - 企業ロゴ運用: 各企業の logoUrl を admin で登録（未登録は頭文字フォールバック）。同梱配信(app/logos/)の採否は運用判断。
 - 任意: start/stamp/exchange へのセクション見出し追加（現状は黒ヘッダーのみ）。
 - 当日参加者フォーム: 入力規則の整合（見学・応援パス準拠）まで完了 ✅（2026-06-08）。

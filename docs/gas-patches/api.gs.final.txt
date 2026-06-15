@@ -23,6 +23,27 @@ const SHEET = {
   PRIZE_LOG:          '景品交換ログ',
   EVENT_LIST:         'イベント一覧',
   UNI_MASTER:         '大学マスター',
+  PRE_REG:            '事前登録',
+};
+
+// 事前登録シートのフル列（共通＋区分別＋同意＋ファイルURL）
+const PRE_REG_COLS = [
+  '時刻','eventId','studentId','cardToken','参加区分',
+  '大学名','学年','学部学科','氏名','ふりがな','性別','生年月日',
+  'メールアドレス','電話番号','郵便番号','都道府県','住所詳細',
+  'ドライバー登録区分','自動車部在籍年数',
+  'シムアタック受験日','シムアタックタイム','意気込み',
+  '宿泊希望','夕食希望',
+  '来場予定日','弁当_土','弁当_日','サービス作業クラス','予選会出場',
+  '規則誓約同意','個人情報同意','メディア同意',
+  '誓約書URL','免許証URL','保険証明URL','承諾書URL',
+];
+
+// 参加区分(＋ドライバー登録区分) → 属性 / studentId クラスコード
+const PRE_CLASS_CODES = {
+  'Aドライバー':'A','Bドライバー':'B','Cドライバー':'C',
+  '女子クラスドライバー':'W','補欠ドライバー':'K',
+  'メカニック':'M','応援学生':'S','一般参加学生':'V',
 };
 
 // ============================================================
@@ -31,6 +52,22 @@ const SHEET = {
 
 function doGet(e) {
   const result = dispatch_(e);
+  return ContentService
+    .createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// POST エントリ（事前登録・ファイルアップロード等。
+// CORSプリフライト回避のためフロントは Content-Type を付けず JSON文字列を body で送る）
+function doPost(e) {
+  let p = (e && e.parameter) ? e.parameter : {};
+  try {
+    if (e && e.postData && e.postData.contents) {
+      const j = JSON.parse(e.postData.contents);
+      p = Object.assign({}, p, j);
+    }
+  } catch (err) { /* JSONでなければ parameter のみ使用 */ }
+  const result = dispatch_({ parameter: p });
   return ContentService
     .createTextOutput(JSON.stringify(result))
     .setMimeType(ContentService.MimeType.JSON);
@@ -54,6 +91,7 @@ function dispatch_(e) {
       case 'getEventList':            return actionGetEventList_(p);
       case 'getCurrentEvent':         return actionGetCurrentEvent_(p);   // T6 追加
       case 'registerWalkIn':          return actionRegisterWalkIn_(p);    // T6 追加
+      case 'registerPreStudent':      return actionRegisterPreStudent_(p); // 事前登録(脱Googleフォーム)
       // ── admin (T12) ───────────────────────────────────────────────────
       case 'adminGetEvents':    return actionAdminGetEvents_(p);
       case 'adminGetConfig':    return actionAdminGetConfig_(p);
@@ -891,6 +929,139 @@ function actionRegisterWalkIn_(p) {
   ]);
 
   return ok_(buildStampResult_(p.event, studentId, 0, { stampToken, isNew: true }));
+}
+
+// ============================================================
+// アクション: registerPreStudent (事前登録 / 脱Googleフォーム)
+// 会期前に学生を事前登録する。公開（codeなし）。
+// - STUDENTS に本人確認サブセットを upsert（登録種別=事前・cardToken発行）
+// - 「事前登録」シートにフル記録（区分別項目・ファイルURLは後フェーズ）
+// - 確認メールを送信（QR名刺は載せない）
+// stampToken は発行しない（当日 activateStamp で発行）。
+// ============================================================
+
+function actionRegisterPreStudent_(p) {
+  if (!p.event) return err_('missing_event');
+  if (!p.name || !p.school || !p.email) return err_('missing_params');
+
+  const ss           = eventSs_(p.event);
+  const studentSheet = ss.getSheetByName(SHEET.STUDENTS);
+  const sData        = studentSheet.getDataRange().getValues();
+  const sHeaders     = sData[0].map(String);
+  const idx          = n => sHeaders.indexOf(n);
+
+  // 重複（氏名+大学名+登録種別=事前）→ 既存 cardToken を返す
+  const existing = sData.slice(1).find(r =>
+    String(r[idx('氏名')])     === String(p.name).trim() &&
+    String(r[idx('大学名')])   === String(p.school).trim() &&
+    String(r[idx('登録種別')]) === '事前'
+  );
+  if (existing) {
+    return { ok: false, error: 'already_registered',
+      data: { studentId: String(existing[idx('studentId')]), cardToken: String(existing[idx('cardToken')]) },
+      message: 'すでに事前登録済みです' };
+  }
+
+  // 参加区分 → 属性
+  const attr      = preAttr_(p.category, p.driverClass);
+  const classCode = PRE_CLASS_CODES[attr] || 'V';
+
+  // studentId 生成
+  const yearMatch  = String(p.event).match(/(\d{4})/);
+  const yearSuffix = yearMatch ? yearMatch[1].slice(-1) : String(new Date().getFullYear()).slice(-1);
+  const { uniMap }  = loadUniversityMaster_();
+  const uniCode     = uniMap.get(String(p.school).trim()) || '0000';
+  const seq         = sData.slice(1).filter(r => String(r[idx('属性')]) === attr).length + 1;
+  const studentId   = yearSuffix + uniCode + classCode + String(seq).padStart(2, '0');
+  const cardToken   = Utilities.getUuid();
+
+  // STUDENTS upsert（本人確認サブセット）
+  const newRow = sHeaders.map(h => {
+    const map = {
+      'studentId': studentId, 'cardToken': cardToken,
+      '氏名': String(p.name).trim(), 'ふりがな': String(p.furigana || '').trim(),
+      '大学名': String(p.school).trim(), '学部学科': p.department || '',
+      '学年': p.year || '', '属性': attr, '自動車部在籍年数': p.clubYears || '',
+      '住所(都道府県)': p.prefecture || '', '生年月日': p.birthday || '',
+      '性別': p.gender || '', 'メールアドレス': p.email || '', '電話番号': p.phone || '',
+      '所属校出場': p.competing || '',
+      '規則誓約同意': p.rulesConsent   === 'true' ? 'true' : 'false',
+      'SNS同意':     p.mediaConsent    === 'true' ? 'true' : 'false',
+      '個人情報同意': p.privacyConsent  === 'true' ? 'true' : 'false',
+      '登録種別': '事前',
+    };
+    return map[h] !== undefined ? map[h] : '';
+  });
+  studentSheet.appendRow(newRow);
+
+  // 事前登録シート（フル記録）
+  appendPreRegRow_(ss, p, studentId, cardToken);
+
+  // 確認メール（QR名刺は載せない）
+  sendPreRegMail_(p.email, p.name, p.event);
+
+  return ok_({ studentId, cardToken, registered: true });
+}
+
+// 参加区分(＋ドライバー登録区分) → 属性
+function preAttr_(category, driverClass) {
+  switch (String(category || '')) {
+    case '出場選手(FGクラスドライバー)': return String(driverClass || 'Aドライバー'); // Aドライバー等
+    case '出場選手(女子クラスドライバー)': return '女子クラスドライバー';
+    case '補欠ドライバー':                 return '補欠ドライバー';
+    case '見学・応援学生(メカニック登録含む)': return '応援学生';
+    default: return '応援学生';
+  }
+}
+
+// 事前登録シートにフル行を追加（無ければヘッダ付きで作成）
+function appendPreRegRow_(ss, p, studentId, cardToken) {
+  let sheet = ss.getSheetByName(SHEET.PRE_REG);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET.PRE_REG);
+    sheet.getRange(1, 1, 1, PRE_REG_COLS.length).setValues([PRE_REG_COLS]);
+  }
+  const val = {
+    '時刻': new Date(), 'eventId': p.event, 'studentId': studentId, 'cardToken': cardToken,
+    '参加区分': p.category || '',
+    '大学名': p.school || '', '学年': p.year || '', '学部学科': p.department || '',
+    '氏名': p.name || '', 'ふりがな': p.furigana || '', '性別': p.gender || '', '生年月日': p.birthday || '',
+    'メールアドレス': p.email || '', '電話番号': p.phone || '', '郵便番号': p.postal || '',
+    '都道府県': p.prefecture || '', '住所詳細': p.address || '',
+    'ドライバー登録区分': p.driverClass || '', '自動車部在籍年数': p.clubYears || '',
+    'シムアタック受験日': p.simDate || '', 'シムアタックタイム': p.simTime || '', '意気込み': p.comment || '',
+    '宿泊希望': p.hotel || '', '夕食希望': p.dinner || '',
+    '来場予定日': p.visitDays || '', '弁当_土': p.lunchSat || '', '弁当_日': p.lunchSun || '',
+    'サービス作業クラス': p.serviceClass || '', '予選会出場': p.competing || '',
+    '規則誓約同意': p.rulesConsent === 'true' ? 'true' : 'false',
+    '個人情報同意': p.privacyConsent === 'true' ? 'true' : 'false',
+    'メディア同意': p.mediaConsent === 'true' ? 'true' : 'false',
+    '誓約書URL': p.pledgeUrl || '', '免許証URL': p.licenseUrl || '',
+    '保険証明URL': p.insuranceUrl || '', '承諾書URL': p.approvalUrl || '',
+  };
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+  sheet.appendRow(headers.map(h => (val[h] !== undefined ? val[h] : '')));
+}
+
+// 確認メール送信（GASオーナーGmailから。失敗しても登録は成立させる）
+function sendPreRegMail_(to, name, eventId) {
+  if (!to) return;
+  try {
+    const cfg    = getConfig_(eventId);
+    const evName = cfg.eventName || eventId;
+    MailApp.sendEmail({
+      to: String(to),
+      subject: '【' + evName + '】学生参加 事前登録を受け付けました',
+      body:
+        (name || '') + ' 様\n\n' +
+        evName + ' の学生参加 事前登録を受け付けました。\n\n' +
+        '当日は受付でご本人確認のうえ、入場パスをお渡しします。\n' +
+        '登録内容に変更がある場合は事務局までご連絡ください。\n\n' +
+        '── FORMULA GYMKHANA 事務局',
+    });
+  } catch (err) {
+    console.error('sendPreRegMail_ error:', err);
+  }
 }
 
 // ============================================================
