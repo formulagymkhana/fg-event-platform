@@ -166,15 +166,17 @@ function renderStampGrid(stamps, companies) {
   });
 }
 
-// ── マイルストーンバー ──
+// ── マイルストーンバー（MAX交換量=100%のゲージ） ──
 function renderMilestoneBar(count, milestones) {
   const section = document.getElementById('milestone-bar-section');
   if (!section || !milestones || milestones.length === 0) return;
 
+  // MAX交換量（最終マイルストーン＝maxPrizes×unitSize）を 100% とみなす
   const maxThreshold = milestones[milestones.length - 1].threshold;
   const pct = Math.min(100, Math.round((count / maxThreshold) * 100));
 
   section.innerHTML = `
+    <div class="milestone-title">マイルストーン</div>
     <div style="position:relative">
       <div class="milestone-track">
         <div class="milestone-fill" style="width:${pct}%"></div>
@@ -185,8 +187,8 @@ function renderMilestoneBar(count, milestones) {
           return `
             <div class="milestone-marker ${reached ? 'reached' : 'unreached'}" style="left:${pos}%"></div>
             <div class="milestone-label" style="left:${pos}%">
-              <span class="m-count">${m.threshold}個</span>
-              <span class="m-remain">${remain === 0 ? '達成！' : 'あと' + remain}</span>
+              <span class="m-count">${m.threshold}個達成</span>
+              <span class="m-remain">${reached ? '達成！' : 'あと' + remain + '個'}</span>
             </div>`;
         }).join('')}
       </div>

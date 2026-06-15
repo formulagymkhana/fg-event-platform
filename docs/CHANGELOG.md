@@ -16,6 +16,14 @@
 
 ---
 
+## 2026-06-12 progress固定ヘッダー/フッターの不具合修正＋到達ゲージ調整
+- 変更ファイル: `app/progress.html`, `js/style.css`, `js/progress.js`
+- 変更内容:
+  - **固定レイアウトの不具合修正**: `.pg-scroll` に `min-height:0` を付与（flex子が縮まずカードが内容高まで伸び、ヘッダー固定が崩れ・フッターがはみ出して見えなくなっていた根本原因）。`#state-progress` の高さに `100vh` フォールバックを追加（`100dvh` 非対応ブラウザ対策）。`.fg-header` に `flex-shrink:0`
+  - **到達ゲージ（フッター）**: 「マイルストーン」見出しを追加し、ラベルを「N個達成／あとN個・達成！」に。**最終マイルストーン(=maxPrizes×unitSize)を100%とみなすゲージ**であることを明確化（fill = count / MAX交換量）
+- 理由/背景: 実機で固定ヘッダー/フッターが効かない不具合の報告。フッター到達バーをコンセプト画像（MAX=100%ゲージ）に合わせる
+- 申し送り/注意点: マイルストーン最終ラベル（右端100%位置）が端で僅かに見切れる可能性は残（要実機確認・必要なら右端ラベルのみ寄せ調整）。GAS変更なし
+
 ## 2026-06-12 公式サイト寄せUIリデザイン＋progressスタンプ帳化＋企業ロゴ登録
 - 変更ファイル: `js/style.css`, `app/admin.html`, `js/admin.js`, `app/progress.html`, `js/progress.js`, `docs/gas-patches/api.gs.final.txt`, `docs/gas-patches/admin.gs.final.txt`
 - 変更内容（handoff_ui_stamp_redesign.md ベース。導線・スタンプ/景品ロジックは不変）:

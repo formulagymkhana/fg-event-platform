@@ -24,10 +24,13 @@
 
     /* ── 進捗画面：固定ヘッダー／スクロール／固定フッターのアプリ型レイアウト ── */
     #state-progress { display: flex; flex-direction: column;
-      height: calc(100dvh - 48px); max-height: calc(100dvh - 48px); }
+      height: calc(100vh - 48px); height: calc(100dvh - 48px);          /* dvh 非対応は vh にフォールバック */
+      max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); }
+    #state-progress .fg-header { flex-shrink: 0; }
     .pg-top { flex-shrink: 0; padding: 12px 20px; display: flex; align-items: baseline;
       justify-content: center; gap: 8px; border-bottom: 1px solid var(--fg-line); }
-    .pg-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    /* min-height:0 が無いと flex 子が縮まずカード全体が伸びて固定が崩れる */
+    .pg-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .pg-bottom { flex-shrink: 0; padding: 14px 0 12px; border-top: 1px solid var(--fg-line); background: #fff; }
     .pg-bottom .reload-btn { width: auto; margin: 4px 20px 0; padding: 8px 16px; }
 
