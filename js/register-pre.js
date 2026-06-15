@@ -34,17 +34,121 @@ let _event = null;
 
 $('btn-submit')?.addEventListener('click', submitForm);
 
+// ── 参加区分による分岐表示 ──────────────────────
+const BRANCH_BY_CAT = {
+  '出場選手(FGクラスドライバー)':       'sec-fg',
+  '出場選手(女子クラスドライバー)':     'sec-women',
+  '補欠ドライバー':                     'sec-backup',
+  '見学・応援学生(メカニック登録含む)': 'sec-spectator',
+};
+document.querySelectorAll('input[name="category"]').forEach(r =>
+  r.addEventListener('change', () => showBranch(r.value)));
+
+function showBranch(cat) {
+  const target = BRANCH_BY_CAT[cat];
+  document.querySelectorAll('.branch').forEach(sec => {
+    sec.style.display = (sec.id === target) ? 'block' : 'none';
+  });
+}
+
+// 宿泊→夕食の表示連動（FG/女子）
+['fg', 'w'].forEach(pfx => {
+  document.querySelectorAll(`input[name="${pfx}Hotel"]`).forEach(r =>
+    r.addEventListener('change', () => {
+      const row = $('row-' + pfx + 'Dinner');
+      if (row) row.style.display = (r.value === 'はい' && r.checked) ? 'block' : 'none';
+    }));
+});
+
 // ── バリデーション ──────────────────────────────
 const NAME_RE  = /.+[ 　].+/;        // 姓と名の間にスペース
 const PHONE_RE = /^[0-9]{10,11}$/;
 const POSTAL_RE = /^[0-9]{7}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const SIM_RE   = /^[0-9]{1,2}:[0-5][0-9]\.[0-9]{3}$/;  // 1:15.001
 
 function setErr(id, on) {
   const err = $('err-' + id);
   const field = $('f-' + id);
   if (err) err.classList.toggle('show', on);
   if (field) field.classList.toggle('error', on);
+}
+function errToggle(id, on) {
+  const err = $('err-' + id);
+  if (err) err.classList.toggle('show', on);
+}
+function radioVal(name) {
+  const el = document.querySelector(`input[name="${name}"]:checked`);
+  return el ? el.value : '';
+}
+function checkedVals(name) {
+  return [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(e => e.value);
+}
+
+// 参加区分ごとの追加項目を収集
+function collectBranch(cat) {
+  const b = {};
+  if (cat === '出場選手(FGクラスドライバー)') {
+    b.driverClass = radioVal('driverClass');
+    b.simDate = $('f-fg-simdate').value;
+    b.simTime = $('f-fg-simtime').value.trim();
+    b.comment = $('f-fg-comment').value.trim();
+    b.hotel   = radioVal('fgHotel');
+    b.dinner  = radioVal('fgDinner');
+  } else if (cat === '出場選手(女子クラスドライバー)') {
+    b.simDate = $('f-w-simdate').value;
+    b.simTime = $('f-w-simtime').value.trim();
+    b.comment = $('f-w-comment').value.trim();
+    b.hotel   = radioVal('wHotel');
+    b.dinner  = radioVal('wDinner');
+  } else if (cat === '補欠ドライバー') {
+    b.simDate      = $('f-b-simdate').value;
+    b.simTime      = $('f-b-simtime').value.trim();
+    b.comment      = $('f-b-comment').value.trim();
+    b.visitDays    = radioVal('bVisit');
+    b.lunchSat     = radioVal('bLunchSat');
+    b.lunchSun     = radioVal('bLunchSun');
+    b.serviceClass = radioVal('bService');
+  } else if (cat === '見学・応援学生(メカニック登録含む)') {
+    b.visitDays    = checkedVals('sVisit').join(',');
+    b.lunchSat     = radioVal('sLunchSat');
+    b.lunchSun     = radioVal('sLunchSun');
+    b.competing    = radioVal('sCompeting');
+    b.mediaConsent = $('cb-media').checked ? 'true' : 'false';
+  }
+  return b;
+}
+
+function validateBranch(cat, b) {
+  let ok = true;
+  const need = (id, cond) => { errToggle(id, cond); if (cond) ok = false; };
+  if (cat === '出場選手(FGクラスドライバー)') {
+    need('driverClass', !b.driverClass);
+    need('fg-simdate',  !b.simDate);
+    need('fg-simtime',  !SIM_RE.test(b.simTime));
+    need('fgHotel',     !b.hotel);
+  } else if (cat === '出場選手(女子クラスドライバー)') {
+    need('w-simdate', !b.simDate);
+    need('w-simtime', !SIM_RE.test(b.simTime));
+    need('wHotel',    !b.hotel);
+  } else if (cat === '補欠ドライバー') {
+    need('b-simdate',  !b.simDate);
+    need('b-simtime',  !SIM_RE.test(b.simTime));
+    need('bVisit',     !b.visitDays);
+    need('bLunchSat',  !b.lunchSat);
+    need('bLunchSun',  !b.lunchSun);
+    need('bService',   !b.serviceClass);
+  } else if (cat === '見学・応援学生(メカニック登録含む)') {
+    need('sVisit',     !b.visitDays);
+    need('sLunchSat',  !b.lunchSat);
+    need('sLunchSun',  !b.lunchSun);
+    need('sCompeting', !b.competing);
+    const mediaBad = b.mediaConsent !== 'true';
+    $('cb-wrap-media').classList.toggle('error', mediaBad);
+    errToggle('media', mediaBad);
+    if (mediaBad) ok = false;
+  }
+  return ok;
 }
 
 function collect() {
@@ -92,6 +196,9 @@ function validate(d) {
   if (!d.category) { catErr.classList.add('show'); ok = false; }
   else catErr.classList.remove('show');
 
+  // 区分別の追加項目
+  if (d.category && !validateBranch(d.category, d._branch || {})) ok = false;
+
   // 同意
   const rulesErr = $('err-rules'), privErr = $('err-privacy');
   $('cb-wrap-rules').classList.toggle('error', !d.rules);
@@ -109,6 +216,7 @@ async function submitForm() {
   banner.classList.remove('show');
 
   const d = collect();
+  d._branch = collectBranch(d.category);
   if (!validate(d)) {
     banner.textContent = '未入力・不正な項目があります。赤色の箇所をご確認ください。';
     banner.classList.add('show');
@@ -138,6 +246,19 @@ async function submitForm() {
     category:       d.category,
     rulesConsent:   'true',
     privacyConsent: 'true',
+    // 区分別の追加項目（未使用キーはGAS側で空欄）
+    driverClass:    d._branch.driverClass  || '',
+    simDate:        d._branch.simDate       || '',
+    simTime:        d._branch.simTime       || '',
+    comment:        d._branch.comment       || '',
+    hotel:          d._branch.hotel         || '',
+    dinner:         d._branch.dinner        || '',
+    visitDays:      d._branch.visitDays     || '',
+    lunchSat:       d._branch.lunchSat      || '',
+    lunchSun:       d._branch.lunchSun      || '',
+    serviceClass:   d._branch.serviceClass  || '',
+    competing:      d._branch.competing     || '',
+    mediaConsent:   d._branch.mediaConsent  || 'false',
   });
 
   btn.disabled = false;

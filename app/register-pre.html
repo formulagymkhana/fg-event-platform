@@ -11,7 +11,7 @@
              img-src 'self' https: data:;
              style-src 'self' 'unsafe-inline';">
   <title>FORMULA GYMKHANA — 学生 事前登録</title>
-  <link rel="stylesheet" href="../js/style.css?v=20260612d">
+  <link rel="stylesheet" href="../js/style.css?v=20260612e">
   <style>
     body { display: flex; flex-direction: column; align-items: center; padding: 24px 16px 48px; }
     .card { width: 100%; max-width: 420px; }
@@ -262,8 +262,190 @@
             <label><input type="radio" name="category" value="見学・応援学生(メカニック登録含む)"> 見学・応援学生（メカニック登録含む）</label>
           </div>
           <p class="field-err" id="err-category">参加区分を選択してください</p>
-          <p class="hint">区分ごとの詳細（タイム申告・書類提出など）は、後日ご案内します。</p>
+          <p class="hint">区分を選ぶと追加項目が表示されます。誓約書・免許証などの書類提出は後日ご案内します。</p>
         </div>
+      </div>
+
+      <!-- 区分別：出場選手(FGクラス) -->
+      <div class="form-section branch" id="sec-fg" style="display:none">
+        <p class="section-label">出場選手（FGクラスドライバー）</p>
+        <div class="form-row">
+          <label>ドライバー登録区分<span class="req">*</span></label>
+          <div class="radio-group" id="rg-driverClass">
+            <label><input type="radio" name="driverClass" value="Aドライバー"> Aドライバー</label>
+            <label><input type="radio" name="driverClass" value="Bドライバー"> Bドライバー</label>
+            <label><input type="radio" name="driverClass" value="Cドライバー"> Cドライバー</label>
+          </div>
+          <p class="hint">A→B→Cの順で出走します</p>
+          <p class="field-err" id="err-driverClass">選択してください</p>
+        </div>
+        <div class="form-row">
+          <label>シミュレーションアタック受験日<span class="req">*</span></label>
+          <input type="date" id="f-fg-simdate">
+          <p class="field-err" id="err-fg-simdate">入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>シミュレーションアタックのタイム<span class="req">*</span></label>
+          <input type="text" id="f-fg-simtime" placeholder="例：1:15.001" inputmode="decimal">
+          <p class="hint">分:秒.ミリ秒（半角）</p>
+          <p class="field-err" id="err-fg-simtime">1:15.001 の形式で入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>大会への意気込み（任意）</label>
+          <input type="text" id="f-fg-comment" placeholder="任意">
+        </div>
+        <div class="form-row">
+          <label>大会側が用意するホテルへの宿泊を希望しますか？<span class="req">*</span></label>
+          <div class="radio-group" id="rg-fgHotel">
+            <label><input type="radio" name="fgHotel" value="はい"> はい</label>
+            <label><input type="radio" name="fgHotel" value="いいえ"> いいえ</label>
+          </div>
+          <p class="field-err" id="err-fgHotel">選択してください</p>
+        </div>
+        <div class="form-row" id="row-fgDinner" style="display:none">
+          <label>※宿泊希望の方のみ：土曜日の夕食手配を希望しますか？</label>
+          <div class="radio-group" id="rg-fgDinner">
+            <label><input type="radio" name="fgDinner" value="はい"> はい</label>
+            <label><input type="radio" name="fgDinner" value="いいえ"> いいえ</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 区分別：出場選手(女子クラス) -->
+      <div class="form-section branch" id="sec-women" style="display:none">
+        <p class="section-label">出場選手（女子クラスドライバー）</p>
+        <div class="form-row">
+          <label>シミュレーションアタック受験日<span class="req">*</span></label>
+          <input type="date" id="f-w-simdate">
+          <p class="field-err" id="err-w-simdate">入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>シミュレーションアタックのタイム<span class="req">*</span></label>
+          <input type="text" id="f-w-simtime" placeholder="例：1:15.001" inputmode="decimal">
+          <p class="hint">分:秒.ミリ秒（半角）</p>
+          <p class="field-err" id="err-w-simtime">1:15.001 の形式で入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>大会への意気込み（任意）</label>
+          <input type="text" id="f-w-comment" placeholder="任意">
+        </div>
+        <div class="form-row">
+          <label>大会側が用意するホテルへの宿泊を希望しますか？<span class="req">*</span></label>
+          <div class="radio-group" id="rg-wHotel">
+            <label><input type="radio" name="wHotel" value="はい"> はい</label>
+            <label><input type="radio" name="wHotel" value="いいえ"> いいえ</label>
+          </div>
+          <p class="field-err" id="err-wHotel">選択してください</p>
+        </div>
+        <div class="form-row" id="row-wDinner" style="display:none">
+          <label>※宿泊希望の方のみ：土曜日の夕食手配を希望しますか？</label>
+          <div class="radio-group" id="rg-wDinner">
+            <label><input type="radio" name="wDinner" value="はい"> はい</label>
+            <label><input type="radio" name="wDinner" value="いいえ"> いいえ</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 区分別：補欠ドライバー -->
+      <div class="form-section branch" id="sec-backup" style="display:none">
+        <p class="section-label">補欠ドライバー</p>
+        <div class="form-row">
+          <label>シミュレーションアタック受験日<span class="req">*</span></label>
+          <input type="date" id="f-b-simdate">
+          <p class="field-err" id="err-b-simdate">入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>シミュレーションアタックのタイム<span class="req">*</span></label>
+          <input type="text" id="f-b-simtime" placeholder="例：1:15.001" inputmode="decimal">
+          <p class="hint">分:秒.ミリ秒（半角）</p>
+          <p class="field-err" id="err-b-simtime">1:15.001 の形式で入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>大会への意気込み（任意）</label>
+          <input type="text" id="f-b-comment" placeholder="任意">
+        </div>
+        <div class="form-row">
+          <label>ドライバーとして出場しない場合、会場に来られますか？<span class="req">*</span></label>
+          <div class="radio-group col" id="rg-bVisit">
+            <label><input type="radio" name="bVisit" value="土曜日、日曜日の両日"> 土曜日、日曜日の両日</label>
+            <label><input type="radio" name="bVisit" value="土曜日のみ"> 土曜日のみ</label>
+            <label><input type="radio" name="bVisit" value="日曜日のみ"> 日曜日のみ</label>
+            <label><input type="radio" name="bVisit" value="来場予定なし"> 来場予定なし</label>
+          </div>
+          <p class="field-err" id="err-bVisit">選択してください</p>
+        </div>
+        <div class="form-row">
+          <label>土曜日の昼食のお弁当配布を希望しますか？<span class="req">*</span></label>
+          <div class="radio-group" id="rg-bLunchSat">
+            <label><input type="radio" name="bLunchSat" value="はい"> はい</label>
+            <label><input type="radio" name="bLunchSat" value="いいえ"> いいえ</label>
+          </div>
+          <p class="field-err" id="err-bLunchSat">選択してください</p>
+        </div>
+        <div class="form-row">
+          <label>日曜日の昼食のお弁当配布を希望しますか？<span class="req">*</span></label>
+          <div class="radio-group" id="rg-bLunchSun">
+            <label><input type="radio" name="bLunchSun" value="はい"> はい</label>
+            <label><input type="radio" name="bLunchSun" value="いいえ"> いいえ</label>
+          </div>
+          <p class="field-err" id="err-bLunchSun">選択してください</p>
+        </div>
+        <div class="form-row">
+          <label>サービス作業をする場合、どのクラスを担当しますか？<span class="req">*</span></label>
+          <div class="radio-group col" id="rg-bService">
+            <label><input type="radio" name="bService" value="FGクラス"> FGクラス</label>
+            <label><input type="radio" name="bService" value="女子クラス"> 女子クラス</label>
+            <label><input type="radio" name="bService" value="FG/女子クラス"> FG/女子クラス</label>
+            <label><input type="radio" name="bService" value="サービス作業は実施しない/来場予定はない"> 実施しない／来場予定なし</label>
+          </div>
+          <p class="field-err" id="err-bService">選択してください</p>
+        </div>
+      </div>
+
+      <!-- 区分別：見学・応援学生 -->
+      <div class="form-section branch" id="sec-spectator" style="display:none">
+        <p class="section-label">見学・応援学生（メカニック登録含む）</p>
+        <div class="form-row">
+          <label>来場予定日<span class="req">*</span></label>
+          <div class="radio-group" id="cg-sVisit">
+            <label><input type="checkbox" name="sVisit" value="土曜日"> 土曜日</label>
+            <label><input type="checkbox" name="sVisit" value="日曜日"> 日曜日</label>
+          </div>
+          <p class="hint">1日以上選択してください</p>
+          <p class="field-err" id="err-sVisit">来場予定日を1日以上選択してください</p>
+        </div>
+        <div class="form-row">
+          <label>土曜日の昼食のお弁当配布を希望しますか？<span class="req">*</span></label>
+          <div class="radio-group" id="rg-sLunchSat">
+            <label><input type="radio" name="sLunchSat" value="はい"> はい</label>
+            <label><input type="radio" name="sLunchSat" value="いいえ"> いいえ</label>
+          </div>
+          <p class="field-err" id="err-sLunchSat">選択してください</p>
+        </div>
+        <div class="form-row">
+          <label>日曜日の昼食のお弁当配布を希望しますか？<span class="req">*</span></label>
+          <div class="radio-group" id="rg-sLunchSun">
+            <label><input type="radio" name="sLunchSun" value="はい"> はい</label>
+            <label><input type="radio" name="sLunchSun" value="いいえ"> いいえ</label>
+          </div>
+          <p class="field-err" id="err-sLunchSun">選択してください</p>
+        </div>
+        <div class="form-row">
+          <label>所属する学校は、予選会 Rd.1に出場しますか？<span class="req">*</span></label>
+          <div class="radio-group" id="rg-sCompeting">
+            <label><input type="radio" name="sCompeting" value="はい"> はい</label>
+            <label><input type="radio" name="sCompeting" value="いいえ"> いいえ</label>
+          </div>
+          <p class="field-err" id="err-sCompeting">選択してください</p>
+        </div>
+        <div class="consent-box" id="cb-wrap-media">
+          <label>
+            <input type="checkbox" id="cb-media">
+            <span>私は、大会期間中に撮影された映像・画像の肖像権が大会運営のMSC株式会社に帰属することに同意します。</span>
+          </label>
+        </div>
+        <p class="field-err" id="err-media" style="margin-top:-8px">同意が必要です</p>
+        <p class="hint">※サービス作業（車両に触れる作業）を行う方は、後日 保険加入証明の提出をご案内します。</p>
       </div>
 
       <!-- 同意 -->
@@ -322,8 +504,8 @@
     </div>
   </div>
 
-  <script src="../js/config.js?v=20260612d"></script>
-  <script src="../js/api.js?v=20260612d"></script>
-  <script src="../js/register-pre.js?v=20260612d"></script>
+  <script src="../js/config.js?v=20260612e"></script>
+  <script src="../js/api.js?v=20260612e"></script>
+  <script src="../js/register-pre.js?v=20260612e"></script>
 </body>
 </html>
