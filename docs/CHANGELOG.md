@@ -16,6 +16,16 @@
 
 ---
 
+## 2026-06-12 スタンプ帳(progress)の視覚リファイン
+- 変更ファイル: `js/style.css`, `app/progress.html`
+- 変更内容（改善提案より、実行可能範囲）:
+  - 空マス: `var(--fg-bg)`地→**白地＋薄い破線(#CBD5E1)**で軽く
+  - チェックバッジ: `--fg-blue`→**`--fg-blue-light`**で視認性UP
+  - グリッド余白: `gap:12px/padding:16px 20px`→`gap:10px 8px/padding:18px 16px 24px`
+  - スタンプ帳上部に注意文（`.pg-note`「スタンプ数は目安」）を追加
+  - cache-bust `?v=20260612g`
+- 補足: 固定ヘッダー/スクロール/固定フッターのアプリ型レイアウトは既存実装済みのため構造は据え置き（提案の `.stamp-app` 新規外枠は重複のため見送り）。stamp.html は取得結果画面のまま（役割分担維持）
+
 ## 2026-06-12 事前学生登録フォーム Phase 3（admin 一覧・CSV出力）
 - 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `app/admin.html`, `js/admin.js`
 - 変更内容:

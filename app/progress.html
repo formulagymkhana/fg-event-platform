@@ -11,7 +11,7 @@
              img-src 'self' https: data:;
              style-src 'self' 'unsafe-inline';">
   <title>FORMULA GYMKHANA — スタンプ進捗</title>
-  <link rel="stylesheet" href="../js/style.css?v=20260612c">
+  <link rel="stylesheet" href="../js/style.css?v=20260612g">
   <style>
     body { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; padding: 24px; }
 
@@ -33,6 +33,7 @@
     .pg-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .pg-bottom { flex-shrink: 0; padding: 14px 0 12px; border-top: 1px solid var(--fg-line); background: #fff; }
     .pg-bottom .reload-btn { width: auto; margin: 4px 20px 0; padding: 8px 16px; }
+    .pg-note { margin: 8px 20px 0; padding: 10px 12px; border-radius: 10px; background: var(--fg-blue-soft); color: var(--fg-muted); font-size: 11px; line-height: 1.6; }
 
     /* ステータスカードの配置（カード直下なので左右マージンが必要） */
     .status-card { margin: 18px 24px 0; }
@@ -113,6 +114,7 @@
           <div class="section-ja">スタンプ帳</div>
         </div>
       </div>
+      <p class="pg-note">ブース配置や出展車両は状況により変更される場合があります。スタンプ数は目安としてお楽しみください。</p>
 
       <!-- スタンプグリッド（progress.js が動的生成・4×3でスクロール） -->
       <div class="stamp-grid" id="stamp-grid"></div>
@@ -167,8 +169,8 @@
     </div>
   </div>
 
-  <script src="../js/config.js?v=20260612c"></script>
-  <script src="../js/api.js?v=20260612c"></script>
-  <script src="../js/progress.js?v=20260612c"></script>
+  <script src="../js/config.js?v=20260612g"></script>
+  <script src="../js/api.js?v=20260612g"></script>
+  <script src="../js/progress.js?v=20260612g"></script>
 </body>
 </html>
