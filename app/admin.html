@@ -322,18 +322,7 @@
           <span class="section-toggle" id="toggle-step4">▼</span>
         </div>
         <div class="section-body" id="body-step4">
-          <div class="wip-row">
-            <button class="wip-btn" data-wip>📱 学生QR URL 一括発行</button>
-            <span class="wip-tag">準備中</span>
-          </div>
-          <div class="wip-row">
-            <button class="wip-btn" data-wip>📡 企業NFC URL 発行</button>
-            <span class="wip-tag">準備中</span>
-          </div>
-          <div class="wip-row">
-            <button class="wip-btn" data-wip>📄 ラベル用CSV 出力</button>
-            <span class="wip-tag">準備中</span>
-          </div>
+          <button class="save-btn" id="btn-nfc-csv" style="width:100%;background:var(--navy-mid);margin-bottom:8px">📡 企業NFC URL を発行（CSV）</button>
           <div class="cfg-group" style="margin-top:16px">
             <div class="cfg-group-title">当日参加登録URL</div>
             <div class="url-box">
@@ -531,17 +520,8 @@
         <div class="stat-card"><div class="stat-val" id="student-stamp-step3">—</div><div class="stat-lbl">スタンプ参加</div></div>
       </div>
 
-      <div class="wip-row">
-        <button class="wip-btn" data-wip>📋 学生マスター取込（importStudents）</button>
-        <span class="wip-tag">準備中</span>
-      </div>
-      <div class="wip-row">
-        <button class="wip-btn" data-wip>👥 登録済み学生を確認</button>
-        <span class="wip-tag">準備中</span>
-      </div>
-
-      <p class="step-note" style="margin-top:16px">
-        GASエディタで <code>importStudents('イベントID')</code> を実行すると取り込みができます。
+      <p class="step-note" style="margin-top:8px">
+        事前登録フォームからの申込データは「📝 事前登録」セクションのCSVで確認できます。
       </p>
     </div>
   </div><!-- /page-students -->

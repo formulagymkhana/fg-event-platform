@@ -48,6 +48,9 @@ window.addEventListener('DOMContentLoaded', () => {
   // イベント削除（ダッシュボード設定内）
   id_('btn-delete-event')?.addEventListener('click', () => handleDeleteEvent_(curEvent_));
 
+  // 企業NFC URL発行
+  id_('btn-nfc-csv')?.addEventListener('click', downloadNfcCsv_);
+
   // 事前登録CSVダウンロード（QRパス用・区分別）
   id_('btn-prereg-csv-driver')?.addEventListener('click', () => downloadPreRegCsv_('driver'));
   id_('btn-prereg-csv-spectator')?.addEventListener('click', () => downloadPreRegCsv_('spectator'));
@@ -405,6 +408,36 @@ async function handleSaveConfig_() {
 }
 
 // ── Companies ─────────────────────────────────────
+
+/** 企業NFCタグ用URL: stamp.html?ct=<stampKey>（会期中は当日自動判定でイベント解決） */
+function nfcUrl_(stampKey) {
+  return new URL(`stamp.html?ct=${encodeURIComponent(stampKey)}`, location.href).toString();
+}
+
+/** CSV文字列をBOM付きでダウンロード */
+function downloadCsv_(body, filename) {
+  const blob = new Blob(['﻿' + body], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** 企業NFC URL を CSV 出力（企業ID/企業名/stampKey/NFC用URL） */
+async function downloadNfcCsv_() {
+  if (!curEvent_) { showToast_('イベントが選択されていません'); return; }
+  const res = await adminCall_('adminGetCompanies', { event: curEvent_ });
+  if (!res.ok) { showToast_('企業の取得に失敗しました'); return; }
+  const list = (res.data.companies || []).filter(c => c.stampKey);
+  if (!list.length) { showToast_('スタンプキー発行済みの企業がありません'); return; }
+  const esc = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const head  = ['企業ID', '企業名', 'stampKey', 'NFC用URL'];
+  const lines = [head.join(',')].concat(list.map(c =>
+    [c.companyId, c.name, c.stampKey, nfcUrl_(c.stampKey)].map(esc).join(',')));
+  downloadCsv_(lines.join('\r\n'), `企業NFC_URL_${curEvent_}_${new Date().toISOString().slice(0, 10)}.csv`);
+  showToast_(`✓ ${list.length}社のNFC URLを出力しました`);
+}
 
 /** 企業QR(cookie登録用)のURL: card.html?viewkey=<viewKey>&event=<eventId>
  *  eventId を埋めることで、会期外や複数大会でも正しいイベントに解決される。 */

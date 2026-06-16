@@ -45,6 +45,11 @@
 - 補足: 管理パネルの `admin◯◯` 系は全て `api.gs`（Web API）側。`admin.gs`（手動実行スクリプト）は本フェーズでは変更なし
 - 申し送り/注意点: **api.gs 再デプロイ必須**（admin.html/js はプッシュのみで反映）。これで事前登録フォーム Phase 0–3 が一通り完了
 
+## 2026-06-12 admin: 企業NFC URL発行（CSV）
+- 変更ファイル: `app/admin.html`, `js/admin.js`
+- 変更内容: 「QR・NFC URL発行」の「企業NFC URL」を実装。`adminGetCompanies` の stampKey から `stamp.html?ct=<stampKey>` を生成し、`企業ID/企業名/stampKey/NFC用URL` のCSVを出力（BOM付き）。`nfcUrl_`/`downloadCsv_`/`downloadNfcCsv_` 追加
+- 申し送り: フロントのみ・GAS再デプロイ不要。NFCタグは会期中スキャン前提で event は当日自動判定（URLに event は付けない）
+
 ## 2026-06-12 事前登録: 提出ファイルをDriveで階層フォルダ分け
 - 変更ファイル: `docs/gas-patches/api.gs.final.txt`
 - 変更内容: `savePreRegFiles_` を階層保存に変更。**マイドライブ/FG事前登録書類/<eventId>/<書類種別>/** に格納（イベント・書類種別で混在防止）。ファイル名は `studentId_氏名_元ファイル名`。`getPreRegEventFolder_`／`getOrCreateChildFolder_` を追加（旧 `getPreRegFolder_` のフラット構造を置換）
