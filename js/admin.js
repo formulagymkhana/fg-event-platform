@@ -606,8 +606,8 @@ async function loadStudents_(gen, ev) {
     filter?.addEventListener('change', renderStudentList_);
   }
   // 統計カードを更新
-  const pre    = studentData_.filter(s => s.regType === '事前登録').length;
-  const walkin = studentData_.filter(s => s.regType !== '事前登録').length;
+  const pre    = studentData_.filter(s => s.regType === '事前').length;
+  const walkin = studentData_.filter(s => s.regType !== '事前').length;
   setText_('student-count-step3',  studentData_.length);
   setText_('student-prereg-step3', pre);
   setText_('student-walkin-step3', walkin);
@@ -632,7 +632,7 @@ function renderStudentList_() {
       ${rows.map((s, i) => `
         <div style="display:grid;grid-template-columns:1fr auto;align-items:center;
           padding:9px 12px;${i ? 'border-top:1px solid var(--border)' : ''};
-          background:${s.regType === '事前登録' ? '#F0F9FF' : '#fff'}">
+          background:${s.regType === '事前' ? '#F0F9FF' : '#fff'}">
           <div>
             <div style="font-size:13px;font-weight:600;color:var(--navy)">${esc_(s.name)}
               <span style="font-size:10px;font-weight:400;color:var(--gray);margin-left:4px">${esc_(s.furigana)}</span>
@@ -640,9 +640,9 @@ function renderStudentList_() {
             <div style="font-size:10px;color:var(--gray);margin-top:2px">${esc_(s.school)} · ${esc_(s.category || '—')} · ${esc_(s.year ? s.year + '年' : '—')}</div>
           </div>
           <span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;
-            background:${s.regType === '事前登録' ? '#DBEAFE' : '#F3F4F6'};
-            color:${s.regType === '事前登録' ? '#1E40AF' : '#6B7280'}">
-            ${s.regType === '事前登録' ? '事前' : '当日'}
+            background:${s.regType === '事前' ? '#DBEAFE' : '#F3F4F6'};
+            color:${s.regType === '事前' ? '#1E40AF' : '#6B7280'}">
+            ${s.regType === '事前' ? '事前登録' : '当日'}
           </span>
         </div>`).join('')}
     </div>`;
