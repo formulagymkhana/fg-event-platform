@@ -11,34 +11,24 @@
              img-src 'self' https: data:;
              style-src 'self' 'unsafe-inline';">
   <title>FORMULA GYMKHANA — スタンプ進捗</title>
-  <link rel="stylesheet" href="../js/style.css?v=20260612g">
+  <link rel="stylesheet" href="../js/style.css?v=20260616a">
   <style>
-    body { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; padding: 24px; }
+    html, body { height: 100%; }
+    body { margin: 0; padding: 0; min-height: 100dvh; display: flex; align-items: center; justify-content: center; background: var(--fg-bg); }
 
     .card { width: 100%; max-width: 420px; }
-
     .card-body { padding: 28px 24px; }
-
-    /* ローディングスピナー位置 */
     .spinner { margin: 32px auto 16px; }
 
-    /* ── 進捗画面：固定ヘッダー／スクロール／固定フッターのアプリ型レイアウト ── */
-    #state-progress { display: flex; flex-direction: column;
-      height: calc(100vh - 48px); height: calc(100dvh - 48px);          /* dvh 非対応は vh にフォールバック */
-      max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); }
-    #state-progress .fg-header { flex-shrink: 0; }
+    /* progress画面は .app-fixed（style.css）でアプリ型レイアウト */
     .pg-top { flex-shrink: 0; padding: 12px 20px; display: flex; align-items: baseline;
       justify-content: center; gap: 8px; border-bottom: 1px solid var(--fg-line); }
-    /* min-height:0 が無いと flex 子が縮まずカード全体が伸びて固定が崩れる */
-    .pg-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .pg-bottom { flex-shrink: 0; padding: 14px 0 12px; border-top: 1px solid var(--fg-line); background: #fff; }
     .pg-bottom .reload-btn { width: auto; margin: 4px 20px 0; padding: 8px 16px; }
     .pg-note { margin: 8px 20px 0; padding: 10px 12px; border-radius: 10px; background: var(--fg-blue-soft); color: var(--fg-muted); font-size: 11px; line-height: 1.6; }
-
-    /* ステータスカードの配置（カード直下なので左右マージンが必要） */
     .status-card { margin: 18px 24px 0; }
 
-    /* 景品引換アクション */
+    /* 景品引換 */
     .exchange-action { padding: 14px 24px 0; }
     .exchange-btn { width: 100%; padding: 15px; border: none; border-radius: var(--radius-ui); font-size: 15px; font-weight: 700; cursor: pointer; background: var(--fg-success); color: #fff; }
     .exchange-btn:active { background: #248052; }
@@ -47,14 +37,15 @@
     .confirm-text { font-size: 14px; color: var(--fg-text); text-align: center; margin-bottom: 12px; font-weight: 600; line-height: 1.6; }
     .cancel-link  { display: block; width: 100%; padding: 10px; margin-top: 8px; background: none; border: none; color: var(--fg-muted); font-size: 13px; cursor: pointer; text-decoration: underline; }
 
-    /* スタンプ履歴は style.css の .fg-list を使用（取得数見出しの余白のみ調整） */
     .list-heading { padding: 0 20px; margin-bottom: 10px; }
     .list-heading span { font-size: 11px; font-weight: 700; color: var(--fg-muted); letter-spacing: .08em; }
 
-    /* フッター */
     .card-footer { padding: 18px 24px 24px; }
     .reload-btn  { width: 100%; padding: 12px; background: var(--fg-bg); color: var(--fg-muted); border: 1px solid var(--fg-line); border-radius: 8px; font-size: 13px; cursor: pointer; }
     .reload-btn:active { background: #D4DBE6; }
+
+    /* 取得数カウンター：大きく */
+    #count-num { font-size: 46px; font-weight: 900; color: var(--fg-blue); line-height: 1; }
   </style>
 </head>
 <body>
@@ -92,8 +83,8 @@
   </div>
 
   <!-- 進捗メイン -->
-  <div class="card" id="state-progress" style="display:none">
-    <div class="fg-header">
+  <div class="card app-fixed" id="state-progress" style="display:none">
+    <div class="fg-header app-fixed-header">
       <div class="fg-logo">FORMULA <span>GYMKHANA</span></div>
       <div class="fg-page-name">スタンプ進捗</div>
     </div>
@@ -101,13 +92,11 @@
     <!-- 固定ヘッダー：現在の取得数（X / Y社） -->
     <div class="pg-top">
       <span style="font-size:12px;color:var(--fg-muted)">取得ブース</span>
-      <span style="font-size:26px;font-weight:900;color:var(--fg-black);line-height:1">
-        <span id="count-num">0</span><span id="bar-label" style="font-size:15px;font-weight:700;color:var(--fg-muted)"></span>
-      </span>
+      <span id="count-num">0</span><span id="bar-label" style="font-size:15px;font-weight:700;color:var(--fg-muted)"></span>
     </div>
 
     <!-- スクロール領域：スタンプ帳＋取得履歴 -->
-    <div class="pg-scroll">
+    <div class="pg-scroll app-fixed-scroll">
       <div style="padding:16px 20px 0">
         <div class="section-label">
           <div class="section-en">STAMP BOOK</div>
@@ -127,7 +116,7 @@
     </div>
 
     <!-- 固定フッター：到達バー＋ステータス＋交換アクション -->
-    <div class="pg-bottom">
+    <div class="pg-bottom app-fixed-footer">
       <!-- マイルストーン（到達）バー（progress.js が動的生成） -->
       <div class="milestone-bar-section" id="milestone-bar-section"></div>
 
@@ -169,8 +158,8 @@
     </div>
   </div>
 
-  <script src="../js/config.js?v=20260612g"></script>
-  <script src="../js/api.js?v=20260612g"></script>
-  <script src="../js/progress.js?v=20260612g"></script>
+  <script src="../js/config.js?v=20260616a"></script>
+  <script src="../js/api.js?v=20260616a"></script>
+  <script src="../js/progress.js?v=20260616a"></script>
 </body>
 </html>

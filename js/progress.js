@@ -266,7 +266,9 @@ async function doExchange() {
 function showState(state) {
   ['loading', 'no-token', 'progress', 'error'].forEach(s => {
     const el = document.getElementById('state-' + s);
-    if (el) el.style.display = s === state ? 'block' : 'none';
+    if (!el) return;
+    if (s !== state) { el.style.display = 'none'; return; }
+    el.style.display = s === 'progress' ? 'flex' : 'block';
   });
 }
 function setText(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
