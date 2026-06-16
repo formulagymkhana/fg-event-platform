@@ -994,6 +994,13 @@ function actionRegisterPreStudent_(p) {
   });
   studentSheet.appendRow(newRow);
 
+  // ファイル（Drive保存・非公開）→ URLを p に設定
+  const fileUrls = savePreRegFiles_(p.event, studentId, p.files);
+  p.pledgeUrl    = fileUrls.pledgeUrl    || '';
+  p.licenseUrl   = fileUrls.licenseUrl   || '';
+  p.insuranceUrl = fileUrls.insuranceUrl || '';
+  p.approvalUrl  = fileUrls.approvalUrl  || '';
+
   // 事前登録シート（フル記録）
   appendPreRegRow_(ss, p, studentId, cardToken);
 
@@ -1062,6 +1069,34 @@ function sendPreRegMail_(to, name, eventId) {
   } catch (err) {
     console.error('sendPreRegMail_ error:', err);
   }
+}
+
+// 事前登録の提出ファイルをDriveに保存（非公開＝オーナー/組織のみ閲覧）。URLを返す。
+function savePreRegFiles_(eventId, studentId, files) {
+  const urls = {};
+  if (!files || typeof files !== 'object') return urls;
+  const folder = getPreRegFolder_(eventId);
+  const map = { pledge: '誓約書', license: '免許証', insurance: '保険証明', approval: '承諾書' };
+  Object.keys(map).forEach(k => {
+    const f = files[k];
+    if (f && f.b64) {
+      try {
+        const bytes   = Utilities.base64Decode(f.b64);
+        const blob    = Utilities.newBlob(bytes, f.mime || 'application/octet-stream',
+                          studentId + '_' + map[k] + '_' + (f.name || 'file'));
+        const created = folder.createFile(blob); // 既定の権限＝非公開（個人情報のため共有しない）
+        urls[k + 'Url'] = created.getUrl();
+      } catch (err) { console.error('savePreRegFiles_', k, err); }
+    }
+  });
+  return urls;
+}
+
+// イベント別の書類フォルダを取得（無ければ作成）
+function getPreRegFolder_(eventId) {
+  const name = 'FG事前登録書類_' + eventId;
+  const it = DriveApp.getFoldersByName(name);
+  return it.hasNext() ? it.next() : DriveApp.createFolder(name);
 }
 
 // ============================================================

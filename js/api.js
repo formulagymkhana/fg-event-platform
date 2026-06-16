@@ -69,7 +69,7 @@ const FG_API = (() => {
     const body = JSON.stringify({ action, ...params });
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 30000);
+      const timer = setTimeout(() => controller.abort(), 120000); // ファイルUL考慮
       const res = await fetch(FG_CONFIG.API_BASE_URL, {
         method: 'POST',
         body,

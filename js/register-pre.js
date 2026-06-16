@@ -60,6 +60,61 @@ function showBranch(cat) {
     }));
 });
 
+// 見学：サービス作業有無の表示連動（分岐②）
+document.querySelectorAll('input[name="sService"]').forEach(r =>
+  r.addEventListener('change', () => {
+    const yes = $('sec-spectator-yes'), no = $('sec-spectator-no');
+    if (yes) yes.style.display = (r.value === 'はい'  && r.checked) ? 'block' : 'none';
+    if (no)  no.style.display  = (r.value === 'いいえ' && r.checked) ? 'block' : 'none';
+  }));
+
+// ── ファイル（区分別） ──────────────────────────
+const MAX_FILE = 8 * 1024 * 1024; // 8MB
+
+function fileSpec(cat) {
+  if (cat === '出場選手(FGクラスドライバー)')
+    return [{ key: 'pledge', id: 'f-fg-pledge', req: true }, { key: 'license', id: 'f-fg-license', req: true }];
+  if (cat === '出場選手(女子クラスドライバー)')
+    return [{ key: 'approval', id: 'f-w-approval', req: false }, { key: 'pledge', id: 'f-w-pledge', req: true }, { key: 'license', id: 'f-w-license', req: true }];
+  if (cat === '補欠ドライバー')
+    return [{ key: 'pledge', id: 'f-b-pledge', req: true }, { key: 'license', id: 'f-b-license', req: true }];
+  if (cat === '見学・応援学生(メカニック登録含む)') {
+    const sw = radioVal('sService');
+    if (sw === 'はい')   return [{ key: 'insurance', id: 'f-s-insurance', req: true }, { key: 'pledge', id: 'f-s-pledge-yes', req: true }];
+    if (sw === 'いいえ') return [{ key: 'pledge', id: 'f-s-pledge-no', req: true }];
+  }
+  return [];
+}
+
+function validateFiles(cat) {
+  let ok = true;
+  fileSpec(cat).forEach(s => {
+    const f = ($(s.id).files || [])[0];
+    const bad = (s.req && !f) || (f && f.size > MAX_FILE);
+    setErr(s.id.replace(/^f-/, ''), bad);
+    if (bad) ok = false;
+  });
+  return ok;
+}
+
+function readB64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload  = () => resolve({ name: file.name, mime: file.type || 'application/octet-stream', b64: String(r.result).split(',')[1] || '' });
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+async function readBranchFiles(cat) {
+  const out = {};
+  for (const s of fileSpec(cat)) {
+    const f = ($(s.id).files || [])[0];
+    if (f) out[s.key] = await readB64(f);
+  }
+  return out;
+}
+
 // ── バリデーション ──────────────────────────────
 const NAME_RE  = /.+[ 　].+/;        // 姓と名の間にスペース
 const PHONE_RE = /^[0-9]{10,11}$/;
@@ -143,6 +198,9 @@ function validateBranch(cat, b) {
     need('sLunchSat',  !b.lunchSat);
     need('sLunchSun',  !b.lunchSun);
     need('sCompeting', !b.competing);
+    const sw = radioVal('sService');
+    need('sService', !sw);
+    if (sw === 'はい') need('s-serviceclass', !$('f-s-serviceclass').value);
     const mediaBad = b.mediaConsent !== 'true';
     $('cb-wrap-media').classList.toggle('error', mediaBad);
     errToggle('media', mediaBad);
@@ -196,8 +254,9 @@ function validate(d) {
   if (!d.category) { catErr.classList.add('show'); ok = false; }
   else catErr.classList.remove('show');
 
-  // 区分別の追加項目
+  // 区分別の追加項目＋ファイル
   if (d.category && !validateBranch(d.category, d._branch || {})) ok = false;
+  if (d.category && !validateFiles(d.category)) ok = false;
 
   // 同意
   const rulesErr = $('err-rules'), privErr = $('err-privacy');
@@ -217,6 +276,12 @@ async function submitForm() {
 
   const d = collect();
   d._branch = collectBranch(d.category);
+  // 見学：サービス作業有無 → サービス作業クラスを確定
+  if (d.category === '見学・応援学生(メカニック登録含む)') {
+    const sw = radioVal('sService');
+    d._branch.serviceClass = sw === 'はい' ? $('f-s-serviceclass').value
+                           : sw === 'いいえ' ? '実施しない' : '';
+  }
   if (!validate(d)) {
     banner.textContent = '未入力・不正な項目があります。赤色の箇所をご確認ください。';
     banner.classList.add('show');
@@ -227,6 +292,18 @@ async function submitForm() {
   const btn = $('btn-submit');
   btn.disabled = true;
   btn.textContent = '送信中...';
+
+  // 区分別ファイルを base64 で読み込み
+  let files = {};
+  try {
+    files = await readBranchFiles(d.category);
+  } catch (e) {
+    btn.disabled = false; btn.textContent = '事前登録する';
+    banner.textContent = 'ファイルの読み込みに失敗しました。別のファイルでお試しください。';
+    banner.classList.add('show');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
 
   const res = await FG_API.registerPreStudent({
     event:          _event,
@@ -259,6 +336,7 @@ async function submitForm() {
     serviceClass:   d._branch.serviceClass  || '',
     competing:      d._branch.competing     || '',
     mediaConsent:   d._branch.mediaConsent  || 'false',
+    files,
   });
 
   btn.disabled = false;

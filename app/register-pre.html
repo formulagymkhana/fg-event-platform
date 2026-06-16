@@ -11,7 +11,7 @@
              img-src 'self' https: data:;
              style-src 'self' 'unsafe-inline';">
   <title>FORMULA GYMKHANA — 学生 事前登録</title>
-  <link rel="stylesheet" href="../js/style.css?v=20260612e">
+  <link rel="stylesheet" href="../js/style.css?v=20260612f">
   <style>
     body { display: flex; flex-direction: column; align-items: center; padding: 24px 16px 48px; }
     .card { width: 100%; max-width: 420px; }
@@ -44,6 +44,9 @@
     .consent-box.error { border: 1.5px solid var(--fg-error); }
     .doc-links { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 10px 0 0 28px; }
     .doc-links a { font-size: 12px; font-weight: 600; color: var(--fg-blue); text-decoration: underline; }
+    .file-input { width: 100%; padding: 9px 11px; border: 1.5px dashed var(--fg-line); border-radius: 8px; font-size: 13px; background: var(--fg-bg); color: var(--fg-text); }
+    .file-input:focus { outline: none; border-color: var(--fg-blue); }
+    .file-input.error { border-color: var(--fg-error); }
 
     .event-badge { background: var(--fg-blue-soft); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--fg-navy); font-weight: 600; display: flex; align-items: center; gap: 8px; margin-bottom: 20px; border: 1px solid var(--fg-blue-border); }
     .event-badge .label { font-size: 11px; color: var(--fg-muted); font-weight: 400; }
@@ -309,6 +312,17 @@
             <label><input type="radio" name="fgDinner" value="いいえ"> いいえ</label>
           </div>
         </div>
+        <div class="form-row">
+          <label>誓約書（直筆記入）<span class="req">*</span></label>
+          <input type="file" class="file-input" id="f-fg-pledge" accept="image/*,application/pdf">
+          <p class="hint">画像またはPDF・1ファイル8MBまで</p>
+          <p class="field-err" id="err-fg-pledge">アップロードしてください（8MB以下）</p>
+        </div>
+        <div class="form-row">
+          <label>運転免許証（表面）<span class="req">*</span></label>
+          <input type="file" class="file-input" id="f-fg-license" accept="image/*,application/pdf">
+          <p class="field-err" id="err-fg-license">アップロードしてください（8MB以下）</p>
+        </div>
       </div>
 
       <!-- 区分別：出場選手(女子クラス) -->
@@ -343,6 +357,22 @@
             <label><input type="radio" name="wDinner" value="はい"> はい</label>
             <label><input type="radio" name="wDinner" value="いいえ"> いいえ</label>
           </div>
+        </div>
+        <div class="form-row">
+          <label>学校職員の参加承諾書（任意）</label>
+          <input type="file" class="file-input" id="f-w-approval" accept="image/*,application/pdf">
+          <p class="hint">画像またはPDF・1ファイル8MBまで</p>
+          <p class="field-err" id="err-w-approval">8MB以下のファイルを選択してください</p>
+        </div>
+        <div class="form-row">
+          <label>誓約書（直筆記入）<span class="req">*</span></label>
+          <input type="file" class="file-input" id="f-w-pledge" accept="image/*,application/pdf">
+          <p class="field-err" id="err-w-pledge">アップロードしてください（8MB以下）</p>
+        </div>
+        <div class="form-row">
+          <label>運転免許証（表面）<span class="req">*</span></label>
+          <input type="file" class="file-input" id="f-w-license" accept="image/*,application/pdf">
+          <p class="field-err" id="err-w-license">アップロードしてください（8MB以下）</p>
         </div>
       </div>
 
@@ -400,6 +430,17 @@
           </div>
           <p class="field-err" id="err-bService">選択してください</p>
         </div>
+        <div class="form-row">
+          <label>誓約書（直筆記入）<span class="req">*</span></label>
+          <input type="file" class="file-input" id="f-b-pledge" accept="image/*,application/pdf">
+          <p class="hint">画像またはPDF・1ファイル8MBまで</p>
+          <p class="field-err" id="err-b-pledge">アップロードしてください（8MB以下）</p>
+        </div>
+        <div class="form-row">
+          <label>運転免許証（表面）<span class="req">*</span></label>
+          <input type="file" class="file-input" id="f-b-license" accept="image/*,application/pdf">
+          <p class="field-err" id="err-b-license">アップロードしてください（8MB以下）</p>
+        </div>
       </div>
 
       <!-- 区分別：見学・応援学生 -->
@@ -438,6 +479,49 @@
           </div>
           <p class="field-err" id="err-sCompeting">選択してください</p>
         </div>
+        <div class="form-row">
+          <label>競技車両に対するサービス作業を実施しますか？<span class="req">*</span></label>
+          <div class="radio-group" id="rg-sService">
+            <label><input type="radio" name="sService" value="はい"> はい</label>
+            <label><input type="radio" name="sService" value="いいえ"> いいえ</label>
+          </div>
+          <p class="hint">サービス作業＝タイヤ交換・エア調整等、車両に触れる全作業</p>
+          <p class="field-err" id="err-sService">選択してください</p>
+        </div>
+
+        <!-- サービス作業あり -->
+        <div id="sec-spectator-yes" style="display:none">
+          <div class="form-row">
+            <label>サービス作業をするクラス<span class="req">*</span></label>
+            <select id="f-s-serviceclass">
+              <option value="">選択</option>
+              <option>FGクラス</option><option>女子クラス</option><option>FGクラス/女子クラス</option>
+            </select>
+            <p class="field-err" id="err-s-serviceclass">選択してください</p>
+          </div>
+          <div class="form-row">
+            <label>国内旅行傷害保険の加入証明<span class="req">*</span></label>
+            <input type="file" class="file-input" id="f-s-insurance" accept="image/*,application/pdf">
+            <p class="hint">条件: 大会期間中有効／通院日額5,000円以上／個人賠償3,000万円以上</p>
+            <p class="field-err" id="err-s-insurance">アップロードしてください（8MB以下）</p>
+          </div>
+          <div class="form-row">
+            <label>誓約書（直筆サイン）<span class="req">*</span></label>
+            <input type="file" class="file-input" id="f-s-pledge-yes" accept="image/*,application/pdf">
+            <p class="field-err" id="err-s-pledge-yes">アップロードしてください（8MB以下）</p>
+          </div>
+        </div>
+
+        <!-- サービス作業なし -->
+        <div id="sec-spectator-no" style="display:none">
+          <div class="form-row">
+            <label>誓約書（直筆記入）<span class="req">*</span></label>
+            <input type="file" class="file-input" id="f-s-pledge-no" accept="image/*,application/pdf">
+            <p class="hint">画像またはPDF・1ファイル8MBまで</p>
+            <p class="field-err" id="err-s-pledge-no">アップロードしてください（8MB以下）</p>
+          </div>
+        </div>
+
         <div class="consent-box" id="cb-wrap-media">
           <label>
             <input type="checkbox" id="cb-media">
@@ -445,7 +529,6 @@
           </label>
         </div>
         <p class="field-err" id="err-media" style="margin-top:-8px">同意が必要です</p>
-        <p class="hint">※サービス作業（車両に触れる作業）を行う方は、後日 保険加入証明の提出をご案内します。</p>
       </div>
 
       <!-- 同意 -->
@@ -504,8 +587,8 @@
     </div>
   </div>
 
-  <script src="../js/config.js?v=20260612e"></script>
-  <script src="../js/api.js?v=20260612e"></script>
-  <script src="../js/register-pre.js?v=20260612e"></script>
+  <script src="../js/config.js?v=20260612f"></script>
+  <script src="../js/api.js?v=20260612f"></script>
+  <script src="../js/register-pre.js?v=20260612f"></script>
 </body>
 </html>
