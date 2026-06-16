@@ -343,29 +343,6 @@
         </div>
       </div>
 
-      <!-- 事前登録 -->
-      <div class="area-label">事前登録</div>
-      <div class="section">
-        <div class="section-hd" data-section="prereg">
-          <span class="section-title">📝 事前登録 <span class="section-count" id="prereg-count"></span></span>
-          <span class="section-toggle" id="toggle-prereg">▼</span>
-        </div>
-        <div class="section-body" id="body-prereg">
-          <p class="step-note" style="margin-top:0;margin-bottom:8px">QRパス作成用CSV（学生ID／参加区分／氏名／ふりがな／トークン／QR用URL）。ラベル印刷の都合でドライバーと応援で分割できます。</p>
-          <div class="action-row">
-            <button class="act-btn act-btn-ghost" id="btn-prereg-csv-driver">⬇ ドライバー用CSV</button>
-            <button class="act-btn act-btn-ghost" id="btn-prereg-csv-spectator">⬇ 応援・見学用CSV</button>
-            <button class="act-btn act-btn-ghost" id="btn-prereg-csv-all">⬇ 全員</button>
-          </div>
-          <div class="tbl-wrap">
-            <table class="data-tbl">
-              <thead><tr><th>区分</th><th>氏名</th><th>大学</th><th>メール</th></tr></thead>
-              <tbody id="prereg-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
       <!-- 当日運用 -->
       <div class="area-label">当日運用</div>
 
@@ -379,21 +356,6 @@
             <table class="data-tbl">
               <thead><tr><th>時刻</th><th>氏名</th><th>大学</th><th>企業</th></tr></thead>
               <tbody id="stamp-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-hd" data-section="walkins">
-          <span class="section-title">🏃 当日参加者 <span class="section-count" id="walkin-count"></span></span>
-          <span class="section-toggle" id="toggle-walkins">▼</span>
-        </div>
-        <div class="section-body" id="body-walkins">
-          <div class="tbl-wrap">
-            <table class="data-tbl">
-              <thead><tr><th>氏名</th><th>大学</th><th>学年</th><th>メール</th></tr></thead>
-              <tbody id="walkin-tbody"></tbody>
             </table>
           </div>
         </div>
@@ -496,7 +458,7 @@
 
       <!-- 企業ダッシュボードカード -->
       <div id="co-summary-card" style="display:none;margin-bottom:16px">
-        <div class="stat-grid" id="co-summary-grid" style="grid-template-columns:repeat(2,1fr)"></div>
+        <div id="co-summary-grid" style="display:flex;flex-direction:column;gap:10px"></div>
       </div>
 
       <div class="add-co-form">
@@ -532,6 +494,28 @@
         <div class="stat-card"><div class="stat-val" id="student-prereg-step3">—</div><div class="stat-lbl">事前登録</div></div>
         <div class="stat-card"><div class="stat-val" id="student-walkin-step3">—</div><div class="stat-lbl">当日参加</div></div>
         <div class="stat-card"><div class="stat-val" id="student-stamp-step3">—</div><div class="stat-lbl">スタンプ参加</div></div>
+      </div>
+
+      <!-- 事前登録CSVダウンロード -->
+      <div class="section" style="margin-bottom:12px">
+        <div class="section-hd" data-section="prereg">
+          <span class="section-title">📝 事前登録 <span class="section-count" id="prereg-count"></span></span>
+          <span class="section-toggle" id="toggle-prereg">▼</span>
+        </div>
+        <div class="section-body" id="body-prereg">
+          <p class="step-note" style="margin-top:0;margin-bottom:8px">QRパス作成用CSV（学生ID／参加区分／氏名／ふりがな／トークン／QR用URL）</p>
+          <div class="action-row">
+            <button class="act-btn act-btn-ghost" id="btn-prereg-csv-driver">⬇ ドライバー用</button>
+            <button class="act-btn act-btn-ghost" id="btn-prereg-csv-spectator">⬇ 応援・見学用</button>
+            <button class="act-btn act-btn-ghost" id="btn-prereg-csv-all">⬇ 全員</button>
+          </div>
+          <div class="tbl-wrap">
+            <table class="data-tbl">
+              <thead><tr><th>区分</th><th>氏名</th><th>大学</th><th>メール</th></tr></thead>
+              <tbody id="prereg-tbody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <!-- 絞り込み -->

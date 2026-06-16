@@ -140,7 +140,9 @@ function route_() {
     const n = id_('stat-students')?.textContent;
     setText_('student-count-step3', (n && n !== '—') ? n : '—');
     if (!n || n === '—') loadStats_(++loadGen_, curEvent_);
-    loadStudents_(++loadGen_, curEvent_);
+    const gen = ++loadGen_;
+    loadStudents_(gen, curEvent_);
+    loadPreRegistrations_(gen, curEvent_);
   } else {
     showPage_('dashboard');
     const ev = allEvents_.find(e => e.eventId === curEvent_);
@@ -198,9 +200,7 @@ async function loadAll_() {
   const ev  = curEvent_;
   loadStats_(gen, ev);
   loadStampLog_(gen, ev);
-  loadWalkIns_(gen, ev);
   loadPrizeLog_(gen, ev);
-  loadPreRegistrations_(gen, ev);
   loadConfig_(gen, ev);
   loadCompanies_(gen, ev);
 }
@@ -566,22 +566,17 @@ function renderCoSummary_(list) {
   const card = id_('co-summary-card');
   const grid = id_('co-summary-grid');
   if (!card || !grid) return;
-  const total      = list.length;
-  const booth      = list.filter(c => c.stampRally !== false).length;
-  const noKey      = list.filter(c => !c.stampKey).length;
-  const noLogo     = list.filter(c => !c.logoUrl).length;
-  const items = [
-    { val: total,   lbl: '参加企業' },
-    { val: booth,   lbl: 'ブース出店企業' },
-    { val: total - booth, lbl: '出店なし企業' },
-    { val: noKey,   lbl: 'キー未発行企業' },
-    { val: noLogo,  lbl: 'ロゴ未設定企業' },
-  ];
-  grid.innerHTML = items.map(({ val, lbl }) =>
-    `<div class="stat-card">
-      <div class="stat-val">${val}</div>
-      <div class="stat-lbl">${lbl}</div>
-    </div>`).join('');
+  const total   = list.length;
+  const booth   = list.filter(c => c.stampRally !== false).length;
+  const noBooth = total - booth;
+  const noKey   = list.filter(c => !c.stampKey).length;
+  const noLogo  = list.filter(c => !c.logoUrl).length;
+  const sc = (val, lbl) =>
+    `<div class="stat-card"><div class="stat-val">${val}</div><div class="stat-lbl">${lbl}</div></div>`;
+  grid.innerHTML =
+    `<div class="stat-grid" style="grid-template-columns:1fr;margin-bottom:0">${sc(total, '参加企業')}</div>` +
+    `<div class="stat-grid" style="margin-bottom:0">${sc(booth, 'ブース出店企業')}${sc(noBooth, '出店なし企業')}</div>` +
+    `<div class="stat-grid" style="margin-bottom:0">${sc(noKey, 'キー未発行企業')}${sc(noLogo, 'ロゴ未設定企業')}</div>`;
   card.style.display = '';
 }
 
@@ -632,7 +627,7 @@ function renderStudentList_() {
       ${rows.map((s, i) => `
         <div style="display:grid;grid-template-columns:1fr auto;align-items:center;
           padding:9px 12px;${i ? 'border-top:1px solid var(--border)' : ''};
-          background:${s.regType === '事前' ? '#F0F9FF' : '#fff'}">
+          background:${s.regType === '事前' ? '#fff' : '#EFF6FF'}">
           <div>
             <div style="font-size:13px;font-weight:600;color:var(--navy)">${esc_(s.name)}
               <span style="font-size:10px;font-weight:400;color:var(--gray);margin-left:4px">${esc_(s.furigana)}</span>
@@ -640,8 +635,8 @@ function renderStudentList_() {
             <div style="font-size:10px;color:var(--gray);margin-top:2px">${esc_(s.school)} · ${esc_(s.category || '—')} · ${esc_(s.year ? s.year + '年' : '—')}</div>
           </div>
           <span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;
-            background:${s.regType === '事前' ? '#DBEAFE' : '#F3F4F6'};
-            color:${s.regType === '事前' ? '#1E40AF' : '#6B7280'}">
+            background:${s.regType === '事前' ? '#F3F4F6' : '#DBEAFE'};
+            color:${s.regType === '事前' ? '#6B7280' : '#1E40AF'}">
             ${s.regType === '事前' ? '事前登録' : '当日'}
           </span>
         </div>`).join('')}
