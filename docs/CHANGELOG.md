@@ -16,6 +16,18 @@
 
 ---
 
+## 2026-06-12 事前登録: 提出ファイルをDriveで階層フォルダ分け
+- 変更ファイル: `docs/gas-patches/api.gs.final.txt`
+- 変更内容: `savePreRegFiles_` を階層保存に変更。**マイドライブ/FG事前登録書類/<eventId>/<書類種別>/** に格納（イベント・書類種別で混在防止）。ファイル名は `studentId_氏名_元ファイル名`。`getPreRegEventFolder_`／`getOrCreateChildFolder_` を追加（旧 `getPreRegFolder_` のフラット構造を置換）
+- 理由/背景: イベントごと・書類種別ごとにフォルダ分けして取り違えを防ぎたいとの要望。一括レビューもしやすくなる
+- 申し送り/注意点: **要 GAS 再デプロイ＋Drive権限承認**。書類は引き続き非公開（オーナー/組織のみ閲覧）
+
+## 2026-06-12 事前登録: ファイル/メール失敗を非致命化（サーバーエラー回避）
+- 変更ファイル: `docs/gas-patches/api.gs.final.txt`
+- 変更内容: `registerPreStudent` の Drive保存・メール送信を try/catch で囲み、**権限未承認や一時障害でも登録自体（STUDENTS＋事前登録シート）は成立**するように変更。応答に `filesSaved`/`mailSent` フラグを追加
+- 理由/背景: 実送信で「サーバーエラー」表示・メール未送信・シートには行が入る不整合が発生。原因は Gmail送信/Drive保存の **新規OAuthスコープが未承認**で savePreRegFiles_ が例外→dispatchがserver_error化していたため。承認すれば解消するが、堅牢化として失敗を非致命化
+- 申し送り/注意点: **要・新スコープの承認＋GAS再デプロイ**。GASエディタで `actionRegisterPreStudent_` 相当を一度実行し OAuth 同意（Gmail送信・Drive）を承認すること。承認後はファイル保存・メール送信が動作する
+
 ## 2026-06-12 事前学生登録フォーム Phase 2（ファイル提出→Drive保存）
 - 変更ファイル: `app/register-pre.html`, `js/register-pre.js`, `js/api.js`, `docs/gas-patches/api.gs.final.txt`
 - 変更内容:
