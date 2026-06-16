@@ -466,7 +466,11 @@ async function loadCompanies_(gen = null, ev = null) {
       <div class="company-name">${esc_(c.name)} <span style="font-size:10px;color:var(--gray)">${esc_(c.companyId)}</span></div>
       <div class="key-row">
         <span class="key-lbl">スタンプラリー</span>
-        <button class="rally-toggle ${inRally ? 'on' : 'off'}" data-rally="${esc_(c.companyId)}">${inRally ? '参加中' : '不参加'}</button>
+        <label class="rally-switch">
+          <input type="checkbox" ${inRally ? 'checked' : ''} data-rally="${esc_(c.companyId)}">
+          <span class="rally-track"></span>
+          <span class="rally-lbl">${inRally ? '参加中' : '不参加'}</span>
+        </label>
       </div>
       <div class="key-row">
         <span class="key-lbl">スタンプキー</span>
@@ -507,8 +511,8 @@ async function loadCompanies_(gen = null, ev = null) {
     }));
   container.querySelectorAll('.logo-save-btn[data-logo-save]').forEach(b =>
     b.addEventListener('click', () => handleSaveLogo_(b)));
-  container.querySelectorAll('.rally-toggle[data-rally]').forEach(b =>
-    b.addEventListener('click', () => handleToggleStampRally_(b)));
+  container.querySelectorAll('input[data-rally]').forEach(cb =>
+    cb.addEventListener('change', () => handleToggleStampRally_(cb)));
   updateStepBadges_();
 }
 
@@ -557,21 +561,19 @@ async function handleSaveLogo_(btn) {
   setTimeout(() => { btn.textContent = orig; }, 1500);
 }
 
-async function handleToggleStampRally_(btn) {
+async function handleToggleStampRally_(cb) {
   if (!curEvent_) return;
-  const companyId = btn.dataset.rally;
-  const isOn = btn.classList.contains('on');
-  const newVal = !isOn;
-  btn.disabled = true; btn.textContent = '更新中...';
+  const companyId = cb.dataset.rally;
+  const newVal = cb.checked;
+  const lbl = cb.closest('.rally-switch').querySelector('.rally-lbl');
+  cb.disabled = true;
   const res = await adminCall_('adminUpdateCompany', { event: curEvent_, companyId, stampRally: String(newVal) });
-  btn.disabled = false;
+  cb.disabled = false;
   if (res.ok) {
-    btn.classList.toggle('on', newVal);
-    btn.classList.toggle('off', !newVal);
-    btn.textContent = newVal ? '参加中' : '不参加';
+    if (lbl) lbl.textContent = newVal ? '参加中' : '不参加';
     showToast_(`✓ ${newVal ? 'スタンプラリー参加' : '不参加'}に変更しました`);
   } else {
-    btn.textContent = isOn ? '参加中' : '不参加';
+    cb.checked = !newVal;
     showToast_('⚠ 更新失敗: ' + (res.message || ''));
   }
 }

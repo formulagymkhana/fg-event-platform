@@ -179,10 +179,15 @@
       border-radius:4px;flex:1;overflow:hidden;text-overflow:ellipsis}
     .copy-btn{padding:2px 7px;border:1px solid var(--border);border-radius:4px;
       font-size:10px;cursor:pointer;background:#fff;color:var(--navy);flex-shrink:0}
-    .rally-toggle{padding:2px 10px;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;border:none;flex-shrink:0}
-    .rally-toggle.on{background:#D1FAE5;color:#065F46}
-    .rally-toggle.off{background:#FEE2E2;color:#991B1B}
-    .rally-toggle:disabled{opacity:.6;cursor:default}
+    /* iOS風トグルスイッチ */
+    .rally-switch{position:relative;display:inline-flex;align-items:center;gap:6px;cursor:pointer;flex-shrink:0;user-select:none}
+    .rally-switch input{position:absolute;opacity:0;width:0;height:0}
+    .rally-track{width:40px;height:24px;border-radius:12px;background:#D1D5DB;transition:background .2s;flex-shrink:0;position:relative}
+    .rally-track::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s}
+    .rally-switch input:checked ~ .rally-track{background:#34C759}
+    .rally-switch input:checked ~ .rally-track::after{transform:translateX(16px)}
+    .rally-switch input:disabled ~ .rally-track{opacity:.5;cursor:default}
+    .rally-lbl{font-size:10px;color:var(--gray-dark);min-width:28px}
     /* 企業QR用URL行(キー2行の下にフル幅で配置) */
     .url-row{display:flex;align-items:center;gap:7px;margin-top:7px;
       padding-top:7px;border-top:1px dashed var(--border)}
