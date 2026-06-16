@@ -137,11 +137,10 @@ function route_() {
     loadCompanies_();
   } else if (section === 'students') {
     showPage_('students');
-    // 学生数を stat-students から student-count-step3 に反映
     const n = id_('stat-students')?.textContent;
     setText_('student-count-step3', (n && n !== '—') ? n : '—');
-    // stats が未取得なら読み込む
     if (!n || n === '—') loadStats_(++loadGen_, curEvent_);
+    loadStudents_(++loadGen_, curEvent_);
   } else {
     showPage_('dashboard');
     const ev = allEvents_.find(e => e.eventId === curEvent_);
@@ -452,6 +451,7 @@ async function loadCompanies_(gen = null, ev = null) {
   if (gen !== null && gen !== loadGen_) return;
   if (!res.ok) return;
   const list = res.data.companies || [];
+  renderCoSummary_(list);
   const container = id_('company-list');
   if (!list.length) {
     container.innerHTML = '<p class="empty-msg">企業が未登録です。上のフォームから追加してください。</p>';
@@ -559,6 +559,95 @@ async function handleSaveLogo_(btn) {
   if (res.ok) showToast_('✓ ロゴURLを保存しました');
   else showToast_('⚠ 保存失敗: ' + (res.message || ''));
   setTimeout(() => { btn.textContent = orig; }, 1500);
+}
+
+// ── 企業ダッシュボードサマリー ───────────────────
+function renderCoSummary_(list) {
+  const card = id_('co-summary-card');
+  const grid = id_('co-summary-grid');
+  if (!card || !grid) return;
+  const total    = list.length;
+  const rally    = list.filter(c => c.stampRally !== false).length;
+  const hasStamp = list.filter(c => c.stampKey).length;
+  const hasQr    = list.filter(c => c.viewKey).length;
+  const hasLogo  = list.filter(c => c.logoUrl).length;
+  const items = [
+    { val: total,    lbl: '登録企業' },
+    { val: rally,    lbl: 'スタンプ参加' },
+    { val: hasStamp, lbl: 'スタンプキー' },
+    { val: hasQr,    lbl: 'QR発行済み' },
+    { val: hasLogo,  lbl: 'ロゴ設定済み' },
+    { val: total - rally, lbl: '不参加企業' },
+  ];
+  grid.innerHTML = items.map(({ val, lbl }) =>
+    `<div style="text-align:center;background:var(--gray-light);border-radius:7px;padding:8px 4px">
+      <div style="font-size:22px;font-weight:800;color:var(--navy);line-height:1">${val}</div>
+      <div style="font-size:9px;color:var(--gray);margin-top:3px">${lbl}</div>
+    </div>`).join('');
+  card.style.display = '';
+}
+
+// ── 学生一覧 ─────────────────────────────────────
+let studentData_ = [];
+
+async function loadStudents_(gen, ev) {
+  const wrap = id_('student-list-wrap');
+  if (!wrap || !ev) return;
+  wrap.innerHTML = '<p style="font-size:12px;color:var(--gray);text-align:center;padding:20px 0">読み込み中...</p>';
+  const res = await adminCall_('adminGetStudents', { event: ev });
+  if (gen !== loadGen_) return;
+  if (!res.ok) { wrap.innerHTML = '<p style="font-size:12px;color:var(--red);text-align:center;padding:16px">取得失敗</p>'; return; }
+  studentData_ = res.data.students || [];
+  renderStudentList_();
+  // 検索・絞り込みをここで接続（重複登録防止）
+  const search = id_('student-search');
+  const filter = id_('student-filter-type');
+  if (search && !search.dataset.bound) {
+    search.dataset.bound = '1';
+    search.addEventListener('input', renderStudentList_);
+    filter?.addEventListener('change', renderStudentList_);
+  }
+  // 統計カードを更新
+  const pre    = studentData_.filter(s => s.regType === '事前登録').length;
+  const walkin = studentData_.filter(s => s.regType !== '事前登録').length;
+  setText_('student-count-step3',  studentData_.length);
+  setText_('student-prereg-step3', pre);
+  setText_('student-walkin-step3', walkin);
+}
+
+function renderStudentList_() {
+  const wrap   = id_('student-list-wrap');
+  const q      = (id_('student-search')?.value || '').trim().toLowerCase();
+  const type   = id_('student-filter-type')?.value || '';
+  const rows   = studentData_.filter(s => {
+    if (type && s.regType !== type) return false;
+    if (q && !`${s.name}${s.furigana}${s.school}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  if (!rows.length) {
+    wrap.innerHTML = '<p style="font-size:12px;color:var(--gray);text-align:center;padding:16px 0">該当する学生がいません</p>';
+    return;
+  }
+  wrap.innerHTML = `
+    <div style="font-size:10px;color:var(--gray);margin-bottom:6px">${rows.length}名 表示</div>
+    <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
+      ${rows.map((s, i) => `
+        <div style="display:grid;grid-template-columns:1fr auto;align-items:center;
+          padding:9px 12px;${i ? 'border-top:1px solid var(--border)' : ''};
+          background:${s.regType === '事前登録' ? '#F0F9FF' : '#fff'}">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--navy)">${esc_(s.name)}
+              <span style="font-size:10px;font-weight:400;color:var(--gray);margin-left:4px">${esc_(s.furigana)}</span>
+            </div>
+            <div style="font-size:10px;color:var(--gray);margin-top:2px">${esc_(s.school)} · ${esc_(s.category || '—')} · ${esc_(s.year ? s.year + '年' : '—')}</div>
+          </div>
+          <span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;
+            background:${s.regType === '事前登録' ? '#DBEAFE' : '#F3F4F6'};
+            color:${s.regType === '事前登録' ? '#1E40AF' : '#6B7280'}">
+            ${s.regType === '事前登録' ? '事前' : '当日'}
+          </span>
+        </div>`).join('')}
+    </div>`;
 }
 
 async function handleToggleStampRally_(cb) {

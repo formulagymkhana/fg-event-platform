@@ -100,6 +100,7 @@ function dispatch_(e) {
       case 'adminDeleteEvent':  return actionAdminDeleteEvent_(p);
       case 'adminGetStats':     return actionAdminGetStats_(p);
       case 'adminGetStampLog':  return actionAdminGetStampLog_(p);
+      case 'adminGetStudents':  return actionAdminGetStudents_(p);
       case 'adminGetWalkIns':   return actionAdminGetWalkIns_(p);
       case 'adminGetPrizeLog':  return actionAdminGetPrizeLog_(p);
       case 'adminGetPreRegistrations': return actionAdminGetPreRegistrations_(p);
@@ -1304,6 +1305,34 @@ function actionAdminGetStampLog_(p) {
 }
 
 // 当日参加者一覧
+// 全学生一覧（事前登録 + 当日）
+function actionAdminGetStudents_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.event) return err_('missing_event');
+
+  const sheet = eventSs_(p.event).getSheetByName(SHEET.STUDENTS);
+  if (!sheet || sheet.getLastRow() < 2) return ok_({ students: [] });
+
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const g       = (row, name) => { const i = headers.indexOf(name); return i >= 0 ? row[i] : ''; };
+
+  const students = data.slice(1)
+    .filter(r => String(g(r, 'studentId')) !== '')
+    .map(r => ({
+      studentId: String(g(r, 'studentId')),
+      name:      g(r, '氏名'),
+      furigana:  g(r, 'ふりがな'),
+      school:    g(r, '大学名'),
+      year:      g(r, '学年'),
+      category:  g(r, '属性'),
+      regType:   String(g(r, '登録種別') || '当日'),
+      email:     g(r, 'メールアドレス'),
+    }));
+  return ok_({ students });
+}
+
 function actionAdminGetWalkIns_(p) {
   const e = validateAdmin_(p);
   if (e) return e;

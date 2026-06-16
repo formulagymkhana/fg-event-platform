@@ -494,6 +494,12 @@
     <div class="app-body">
       <p class="step-desc" style="margin-top:4px">参加企業を登録し、スタンプキー・閲覧キーを発行します。</p>
 
+      <!-- 企業ダッシュボードカード -->
+      <div id="co-summary-card" style="display:none;background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:16px">
+        <div style="font-size:10px;font-weight:700;color:var(--gray);letter-spacing:.08em;margin-bottom:10px">企業サマリー</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px" id="co-summary-grid"></div>
+      </div>
+
       <div class="add-co-form">
         <div class="add-co-form-title">＋ 企業を追加</div>
         <div class="add-co-row">
@@ -520,7 +526,7 @@
       <span class="page-title">学生管理</span>
     </header>
     <div class="app-body">
-      <p class="step-desc" style="margin-top:4px">Googleフォームの回答を学生マスターに取り込みます。</p>
+      <p class="step-desc" style="margin-top:4px">事前登録・当日参加の学生を一覧で確認できます。</p>
 
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-val" id="student-count-step3">—</div><div class="stat-lbl">合計</div></div>
@@ -529,9 +535,21 @@
         <div class="stat-card"><div class="stat-val" id="student-stamp-step3">—</div><div class="stat-lbl">スタンプ参加</div></div>
       </div>
 
-      <p class="step-note" style="margin-top:8px">
-        事前登録フォームからの申込データは「📝 事前登録」セクションのCSVで確認できます。
-      </p>
+      <!-- 絞り込み -->
+      <div style="display:flex;gap:8px;margin:14px 0 10px">
+        <input id="student-search" type="search" placeholder="氏名・大学で検索…"
+          style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+        <select id="student-filter-type" style="padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--navy)">
+          <option value="">すべて</option>
+          <option value="事前登録">事前登録</option>
+          <option value="当日">当日</option>
+        </select>
+      </div>
+
+      <!-- 学生一覧テーブル -->
+      <div id="student-list-wrap">
+        <p style="font-size:12px;color:var(--gray);text-align:center;padding:20px 0">読み込み中...</p>
+      </div>
     </div>
   </div><!-- /page-students -->
 
