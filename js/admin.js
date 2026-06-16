@@ -458,10 +458,16 @@ async function loadCompanies_(gen = null, ev = null) {
     updateStepBadges_();
     return;
   }
-  container.innerHTML = list.map(c => `
+  container.innerHTML = list.map(c => {
+    const inRally = c.stampRally !== false;
+    return `
     <div class="company-item">
       <button class="del-btn" data-del-company="${esc_(c.companyId)}" title="削除">×</button>
       <div class="company-name">${esc_(c.name)} <span style="font-size:10px;color:var(--gray)">${esc_(c.companyId)}</span></div>
+      <div class="key-row">
+        <span class="key-lbl">スタンプラリー</span>
+        <button class="rally-toggle ${inRally ? 'on' : 'off'}" data-rally="${esc_(c.companyId)}">${inRally ? '参加中' : '不参加'}</button>
+      </div>
       <div class="key-row">
         <span class="key-lbl">スタンプキー</span>
         <span class="key-val">${c.stampKey || '未発行'}</span>
@@ -485,7 +491,8 @@ async function loadCompanies_(gen = null, ev = null) {
         <div class="logo-preview">${c.logoUrl ? `<img src="${esc_(c.logoUrl)}" alt="" onerror="this.parentNode.textContent='?'">` : '?'}</div>
         <button class="copy-btn logo-save-btn" data-logo-save="${esc_(c.companyId)}">保存</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   container.querySelectorAll('.copy-btn[data-copy]').forEach(b =>
     b.addEventListener('click', () => copyText_(b.dataset.copy)));
   container.querySelectorAll('.del-btn[data-del-company]').forEach(b =>
@@ -500,6 +507,8 @@ async function loadCompanies_(gen = null, ev = null) {
     }));
   container.querySelectorAll('.logo-save-btn[data-logo-save]').forEach(b =>
     b.addEventListener('click', () => handleSaveLogo_(b)));
+  container.querySelectorAll('.rally-toggle[data-rally]').forEach(b =>
+    b.addEventListener('click', () => handleToggleStampRally_(b)));
   updateStepBadges_();
 }
 
@@ -546,6 +555,25 @@ async function handleSaveLogo_(btn) {
   if (res.ok) showToast_('✓ ロゴURLを保存しました');
   else showToast_('⚠ 保存失敗: ' + (res.message || ''));
   setTimeout(() => { btn.textContent = orig; }, 1500);
+}
+
+async function handleToggleStampRally_(btn) {
+  if (!curEvent_) return;
+  const companyId = btn.dataset.rally;
+  const isOn = btn.classList.contains('on');
+  const newVal = !isOn;
+  btn.disabled = true; btn.textContent = '更新中...';
+  const res = await adminCall_('adminUpdateCompany', { event: curEvent_, companyId, stampRally: String(newVal) });
+  btn.disabled = false;
+  if (res.ok) {
+    btn.classList.toggle('on', newVal);
+    btn.classList.toggle('off', !newVal);
+    btn.textContent = newVal ? '参加中' : '不参加';
+    showToast_(`✓ ${newVal ? 'スタンプラリー参加' : '不参加'}に変更しました`);
+  } else {
+    btn.textContent = isOn ? '参加中' : '不参加';
+    showToast_('⚠ 更新失敗: ' + (res.message || ''));
+  }
 }
 
 async function handleDeleteCompany_(companyId) {

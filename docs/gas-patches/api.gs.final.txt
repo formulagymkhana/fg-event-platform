@@ -347,6 +347,7 @@ function actionGetStampProgress_(p) {
 }
 
 // イベントの全企業（スタンプ帳グリッド用・表示順）
+// stampRally が明示的に 'FALSE' の企業はグリッドから除外する
 function getCompaniesForEvent_(eventId) {
   const sheet = eventSs_(eventId).getSheetByName(SHEET.COMPANIES);
   if (!sheet || sheet.getLastRow() < 2) return [];
@@ -354,12 +355,14 @@ function getCompaniesForEvent_(eventId) {
   const headers = data[0].map(String);
   const g       = (row, name) => { const i = headers.indexOf(name); return i >= 0 ? row[i] : ''; };
   const orderCol = headers.indexOf('表示順');
-  const rows = data.slice(1).map(row => ({
-    companyId: String(g(row, 'companyId')),
-    name:      String(g(row, '企業名')),
-    logoUrl:   String(g(row, 'logoUrl') || ''),
-    _order:    orderCol >= 0 ? Number(row[orderCol]) || 0 : 0,
-  }));
+  const rows = data.slice(1)
+    .filter(row => String(g(row, 'stampRally')).toUpperCase() !== 'FALSE')
+    .map(row => ({
+      companyId: String(g(row, 'companyId')),
+      name:      String(g(row, '企業名')),
+      logoUrl:   String(g(row, 'logoUrl') || ''),
+      _order:    orderCol >= 0 ? Number(row[orderCol]) || 0 : 0,
+    }));
   rows.sort((a, b) => a._order - b._order);
   return rows.map(({ _order, ...c }) => c);
 }
@@ -1391,12 +1394,13 @@ function actionAdminGetCompanies_(p) {
   const g       = (row, name) => { const i = headers.indexOf(name); return i >= 0 ? row[i] : ''; };
 
   const companies = data.slice(1).map(row => ({
-    companyId: String(g(row, 'companyId')),
-    name:      g(row, '企業名'),
-    stampKey:  g(row, 'stampKey'),
-    viewKey:   g(row, 'viewKey'),
-    hasNfc:    g(row, 'hasNfc'),
-    logoUrl:   String(g(row, 'logoUrl') || ''),
+    companyId:   String(g(row, 'companyId')),
+    name:        g(row, '企業名'),
+    stampKey:    g(row, 'stampKey'),
+    viewKey:     g(row, 'viewKey'),
+    hasNfc:      g(row, 'hasNfc'),
+    logoUrl:     String(g(row, 'logoUrl') || ''),
+    stampRally:  String(g(row, 'stampRally') || '').toUpperCase() !== 'FALSE',
   }));
   return ok_({ companies });
 }
@@ -1431,30 +1435,37 @@ function actionAdminAddCompany_(p) {
   return ok_({ companyId, name: String(p.name) });
 }
 
-// 企業ロゴURLの登録・更新（logoUrl 列が無ければ末尾に作成）
+// 企業フィールドの更新（logoUrl / stampRally）列が無ければ末尾に自動作成
 function actionAdminUpdateCompany_(p) {
   const e = validateAdmin_(p);
   if (e) return e;
   if (!p.event || !p.companyId) return err_('missing_params');
 
+  const ALLOWED = ['logoUrl', 'stampRally'];
+  const updates = {};
+  ALLOWED.forEach(k => { if (p[k] !== undefined) updates[k] = p[k]; });
+  if (!Object.keys(updates).length) return err_('missing_params');
+
   const sheet   = eventSs_(p.event).getSheetByName(SHEET.COMPANIES);
   const data    = sheet.getDataRange().getValues();
-  const headers = data[0].map(String);
+  let   headers = data[0].map(String);
   const idCol   = headers.indexOf('companyId');
-  let   logoCol = headers.indexOf('logoUrl');
 
   const rowIdx = data.slice(1).findIndex(r => String(r[idCol]) === String(p.companyId));
   if (rowIdx < 0) return err_('not_found');
 
-  // logoUrl 列が無ければヘッダ末尾に作成
-  if (logoCol < 0) {
-    sheet.getRange(1, headers.length + 1).setValue('logoUrl');
-    logoCol = headers.length;
-  }
-  sheet.getRange(rowIdx + 2, logoCol + 1).setValue(String(p.logoUrl || ''));
+  Object.entries(updates).forEach(([key, val]) => {
+    let col = headers.indexOf(key);
+    if (col < 0) {
+      sheet.getRange(1, headers.length + 1).setValue(key);
+      col = headers.length;
+      headers.push(key);
+    }
+    sheet.getRange(rowIdx + 2, col + 1).setValue(String(val));
+  });
 
   CacheService.getScriptCache().remove('cfg_' + p.event);
-  return ok_({ companyId: p.companyId, logoUrl: String(p.logoUrl || '') });
+  return ok_({ companyId: p.companyId, ...updates });
 }
 
 // 企業を削除
