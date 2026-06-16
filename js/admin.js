@@ -48,6 +48,11 @@ window.addEventListener('DOMContentLoaded', () => {
   // イベント削除（ダッシュボード設定内）
   id_('btn-delete-event')?.addEventListener('click', () => handleDeleteEvent_(curEvent_));
 
+  // 事前登録CSVダウンロード（QRパス用・区分別）
+  id_('btn-prereg-csv-driver')?.addEventListener('click', () => downloadPreRegCsv_('driver'));
+  id_('btn-prereg-csv-spectator')?.addEventListener('click', () => downloadPreRegCsv_('spectator'));
+  id_('btn-prereg-csv-all')?.addEventListener('click', () => downloadPreRegCsv_('all'));
+
   // 準備中ボタン: トースト案内
   document.addEventListener('click', e => {
     if (e.target.hasAttribute('data-wip')) {
@@ -193,8 +198,100 @@ async function loadAll_() {
   loadStampLog_(gen, ev);
   loadWalkIns_(gen, ev);
   loadPrizeLog_(gen, ev);
+  loadPreRegistrations_(gen, ev);
   loadConfig_(gen, ev);
   loadCompanies_(gen, ev);
+}
+
+// ── 事前登録一覧 ──────────────────────────────────
+let preRegData_ = { headers: [], rows: [] };
+async function loadPreRegistrations_(gen, ev) {
+  const res = await adminCall_('adminGetPreRegistrations', { event: ev });
+  if (gen !== loadGen_) return;
+  if (!res.ok) return;
+  preRegData_ = { headers: res.data.headers || [], rows: res.data.rows || [] };
+  setText_('prereg-count', `(${res.data.total || 0}名)`);
+
+  const H = preRegData_.headers;
+  const col = n => H.indexOf(n);
+  const tbody = id_('prereg-tbody');
+  if (!preRegData_.rows.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-msg">事前登録はまだありません</td></tr>';
+    return;
+  }
+  const ci = { cat: col('参加区分'), name: col('氏名'), school: col('大学名'), email: col('メールアドレス') };
+  tbody.innerHTML = preRegData_.rows.map(r => `<tr>
+    <td>${esc_(r[ci.cat] || '')}</td>
+    <td>${esc_(r[ci.name] || '')}</td>
+    <td>${esc_(r[ci.school] || '')}</td>
+    <td>${esc_(r[ci.email] || '')}</td>
+  </tr>`).join('');
+}
+
+// 参加区分の表示ラベル（QRパス用：Aドライバー / 女子クラスドライバー / 応援学生 等）
+function passCategory_(category, driverClass) {
+  if (category === '出場選手(FGクラスドライバー)')       return driverClass || 'Aドライバー';
+  if (category === '出場選手(女子クラスドライバー)')     return '女子クラスドライバー';
+  if (category === '補欠ドライバー')                     return '補欠ドライバー';
+  if (category === '見学・応援学生(メカニック登録含む)') return '応援学生';
+  return category || '';
+}
+
+// ドライバー系か（FG/女子/補欠）。見学・応援は false。
+function isDriverCategory_(category) {
+  return category === '出場選手(FGクラスドライバー)'
+      || category === '出場選手(女子クラスドライバー)'
+      || category === '補欠ドライバー';
+}
+
+// QR名刺URL（パス印刷用）
+function cardPassUrl_(cardToken) {
+  const ev = curEvent_ ? `&event=${encodeURIComponent(curEvent_)}` : '';
+  return new URL(`card.html?token=${encodeURIComponent(cardToken)}${ev}`, location.href).toString();
+}
+
+// QRパス作成用CSV（A列から：学生ID/参加区分/氏名/ふりがな/トークン/QR用URL）
+// kind: 'driver' | 'spectator' | 'all'
+function downloadPreRegCsv_(kind) {
+  const { headers, rows } = preRegData_;
+  if (!headers.length) { showToast_('事前登録データがありません'); return; }
+  const c = n => headers.indexOf(n);
+  const ci = {
+    sid: c('studentId'), cat: c('参加区分'), dc: c('ドライバー登録区分'),
+    name: c('氏名'), kana: c('ふりがな'), token: c('cardToken'),
+  };
+
+  const filtered = rows.filter(r => {
+    const cat = r[ci.cat] || '';
+    if (kind === 'driver')    return isDriverCategory_(cat);
+    if (kind === 'spectator') return !isDriverCategory_(cat);
+    return true;
+  });
+  if (!filtered.length) { showToast_('該当する事前登録がありません'); return; }
+
+  const esc = v => {
+    const s = String(v == null ? '' : v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const head = ['学生ID', '参加区分', '氏名', 'ふりがな', 'トークン', 'QR用URL'];
+  const lines = [head.join(',')].concat(filtered.map(r => [
+    r[ci.sid] || '',
+    passCategory_(r[ci.cat] || '', r[ci.dc] || ''),
+    r[ci.name] || '',
+    r[ci.kana] || '',
+    r[ci.token] || '',
+    r[ci.token] ? cardPassUrl_(r[ci.token]) : '',
+  ].map(esc).join(',')));
+
+  const label = kind === 'driver' ? 'ドライバー' : kind === 'spectator' ? '応援見学' : '全員';
+  const csv   = '﻿' + lines.join('\r\n'); // BOM付きでExcel文字化け回避
+  const blob  = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url   = URL.createObjectURL(blob);
+  const a     = document.createElement('a');
+  a.href = url;
+  a.download = `QRパス_${label}_${curEvent_}_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // ── Stats ─────────────────────────────────────────

@@ -16,6 +16,17 @@
 
 ---
 
+## 2026-06-12 事前学生登録フォーム Phase 3（admin 一覧・CSV出力）
+- 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `app/admin.html`, `js/admin.js`
+- 変更内容:
+  - **api.gs**: 管理APIに `adminGetPreRegistrations` を追加（admin認証で「事前登録」シートの全列をヘッダ＋行で返す。日付は整形）。`dispatch_` に case 追加
+  - **admin パネル**: ダッシュボードに「📝 事前登録」セクション（件数・区分/氏名/大学/メールの一覧）を追加
+  - **QRパス作成用CSV**: A列から **学生ID／参加区分／氏名／ふりがな／トークン／QR用URL** の6列固定。参加区分は Aドライバー/Bドライバー/Cドライバー/女子クラスドライバー/補欠ドライバー/応援学生 に解決。QR用URLは `card.html?token=…&event=…`。BOM付きUTF-8（Excel文字化け回避）
+  - **分割出力**: ドライバー用／応援・見学用／全員 の3ボタン（ラベル印刷の負荷分散）
+  - `js/admin.js`: `loadPreRegistrations_`／`downloadPreRegCsv_('driver'|'spectator'|'all')`／`passCategory_`／`cardPassUrl_` を追加し loadAll_ に組込
+- 補足: 管理パネルの `admin◯◯` 系は全て `api.gs`（Web API）側。`admin.gs`（手動実行スクリプト）は本フェーズでは変更なし
+- 申し送り/注意点: **api.gs 再デプロイ必須**（admin.html/js はプッシュのみで反映）。これで事前登録フォーム Phase 0–3 が一通り完了
+
 ## 2026-06-12 事前登録: 提出ファイルをDriveで階層フォルダ分け
 - 変更ファイル: `docs/gas-patches/api.gs.final.txt`
 - 変更内容: `savePreRegFiles_` を階層保存に変更。**マイドライブ/FG事前登録書類/<eventId>/<書類種別>/** に格納（イベント・書類種別で混在防止）。ファイル名は `studentId_氏名_元ファイル名`。`getPreRegEventFolder_`／`getOrCreateChildFolder_` を追加（旧 `getPreRegFolder_` のフラット構造を置換）

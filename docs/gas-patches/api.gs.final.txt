@@ -102,6 +102,7 @@ function dispatch_(e) {
       case 'adminGetStampLog':  return actionAdminGetStampLog_(p);
       case 'adminGetWalkIns':   return actionAdminGetWalkIns_(p);
       case 'adminGetPrizeLog':  return actionAdminGetPrizeLog_(p);
+      case 'adminGetPreRegistrations': return actionAdminGetPreRegistrations_(p);
       case 'adminClearCache':   return actionAdminClearCache_(p);
       case 'adminGetCompanies': return actionAdminGetCompanies_(p);
       case 'adminAddCompany':   return actionAdminAddCompany_(p);
@@ -1345,6 +1346,24 @@ function actionAdminGetPrizeLog_(p) {
     claimedCount: cntCol >= 0 ? (Number(r[cntCol]) || 1) : 1,
   }));
   return ok_({ log, total: log.length });
+}
+
+// 事前登録一覧（admin認証。CSV出力・入場パス作成用に全列を返す）
+function actionAdminGetPreRegistrations_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.event) return err_('missing_event');
+
+  const sheet = eventSs_(p.event).getSheetByName(SHEET.PRE_REG);
+  if (!sheet || sheet.getLastRow() < 2) return ok_({ headers: [], rows: [], total: 0 });
+
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const tz      = Session.getScriptTimeZone();
+  const rows = data.slice(1).map(r => r.map(v =>
+    v instanceof Date ? Utilities.formatDate(v, tz, 'yyyy/MM/dd HH:mm') : v
+  ));
+  return ok_({ headers, rows, total: rows.length });
 }
 
 // キャッシュクリア（全イベント対象）
