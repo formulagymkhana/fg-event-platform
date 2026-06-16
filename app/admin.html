@@ -184,10 +184,10 @@
     .rally-switch input{position:absolute;opacity:0;width:0;height:0}
     .rally-track{width:40px;height:24px;border-radius:12px;background:#D1D5DB;transition:background .2s;flex-shrink:0;position:relative}
     .rally-track::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s}
-    .rally-switch input:checked ~ .rally-track{background:#34C759}
+    .rally-switch input:checked ~ .rally-track{background:var(--navy-mid)}
     .rally-switch input:checked ~ .rally-track::after{transform:translateX(16px)}
     .rally-switch input:disabled ~ .rally-track{opacity:.5;cursor:default}
-    .rally-lbl{font-size:10px;color:var(--gray-dark);min-width:28px}
+    .rally-lbl{font-size:10px;color:var(--fg-text);min-width:36px}
     /* 企業QR用URL行(キー2行の下にフル幅で配置) */
     .url-row{display:flex;align-items:center;gap:7px;margin-top:7px;
       padding-top:7px;border-top:1px dashed var(--border)}
@@ -495,9 +495,8 @@
       <p class="step-desc" style="margin-top:4px">参加企業を登録し、スタンプキー・閲覧キーを発行します。</p>
 
       <!-- 企業ダッシュボードカード -->
-      <div id="co-summary-card" style="display:none;background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:16px">
-        <div style="font-size:10px;font-weight:700;color:var(--gray);letter-spacing:.08em;margin-bottom:10px">企業サマリー</div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px" id="co-summary-grid"></div>
+      <div id="co-summary-card" style="display:none;margin-bottom:16px">
+        <div class="stat-grid" id="co-summary-grid" style="grid-template-columns:repeat(2,1fr)"></div>
       </div>
 
       <div class="add-co-form">

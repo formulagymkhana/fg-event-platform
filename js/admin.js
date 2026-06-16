@@ -465,11 +465,11 @@ async function loadCompanies_(gen = null, ev = null) {
       <button class="del-btn" data-del-company="${esc_(c.companyId)}" title="削除">×</button>
       <div class="company-name">${esc_(c.name)} <span style="font-size:10px;color:var(--gray)">${esc_(c.companyId)}</span></div>
       <div class="key-row">
-        <span class="key-lbl">スタンプラリー</span>
+        <span class="key-lbl">ブース出店</span>
         <label class="rally-switch">
           <input type="checkbox" ${inRally ? 'checked' : ''} data-rally="${esc_(c.companyId)}">
           <span class="rally-track"></span>
-          <span class="rally-lbl">${inRally ? '参加中' : '不参加'}</span>
+          <span class="rally-lbl">${inRally ? '出店中' : '出店なし'}</span>
         </label>
       </div>
       <div class="key-row">
@@ -566,23 +566,21 @@ function renderCoSummary_(list) {
   const card = id_('co-summary-card');
   const grid = id_('co-summary-grid');
   if (!card || !grid) return;
-  const total    = list.length;
-  const rally    = list.filter(c => c.stampRally !== false).length;
-  const hasStamp = list.filter(c => c.stampKey).length;
-  const hasQr    = list.filter(c => c.viewKey).length;
-  const hasLogo  = list.filter(c => c.logoUrl).length;
+  const total      = list.length;
+  const booth      = list.filter(c => c.stampRally !== false).length;
+  const noKey      = list.filter(c => !c.stampKey).length;
+  const noLogo     = list.filter(c => !c.logoUrl).length;
   const items = [
-    { val: total,    lbl: '登録企業' },
-    { val: rally,    lbl: 'スタンプ参加' },
-    { val: hasStamp, lbl: 'スタンプキー' },
-    { val: hasQr,    lbl: 'QR発行済み' },
-    { val: hasLogo,  lbl: 'ロゴ設定済み' },
-    { val: total - rally, lbl: '不参加企業' },
+    { val: total,   lbl: '参加企業' },
+    { val: booth,   lbl: 'ブース出店企業' },
+    { val: total - booth, lbl: '出店なし企業' },
+    { val: noKey,   lbl: 'キー未発行企業' },
+    { val: noLogo,  lbl: 'ロゴ未設定企業' },
   ];
   grid.innerHTML = items.map(({ val, lbl }) =>
-    `<div style="text-align:center;background:var(--gray-light);border-radius:7px;padding:8px 4px">
-      <div style="font-size:22px;font-weight:800;color:var(--navy);line-height:1">${val}</div>
-      <div style="font-size:9px;color:var(--gray);margin-top:3px">${lbl}</div>
+    `<div class="stat-card">
+      <div class="stat-val">${val}</div>
+      <div class="stat-lbl">${lbl}</div>
     </div>`).join('');
   card.style.display = '';
 }
@@ -659,8 +657,8 @@ async function handleToggleStampRally_(cb) {
   const res = await adminCall_('adminUpdateCompany', { event: curEvent_, companyId, stampRally: String(newVal) });
   cb.disabled = false;
   if (res.ok) {
-    if (lbl) lbl.textContent = newVal ? '参加中' : '不参加';
-    showToast_(`✓ ${newVal ? 'スタンプラリー参加' : '不参加'}に変更しました`);
+    if (lbl) lbl.textContent = newVal ? '出店中' : '出店なし';
+    showToast_(`✓ ${newVal ? 'ブース出店' : '出店なし'}に変更しました`);
   } else {
     cb.checked = !newVal;
     showToast_('⚠ 更新失敗: ' + (res.message || ''));
