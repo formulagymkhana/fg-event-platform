@@ -16,6 +16,14 @@
 
 ---
 
+## 2026-06-12 事前登録 確認メールを管理画面で編集可能に
+- 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `app/admin.html`, `js/admin.js`
+- 変更内容:
+  - **GAS** `sendPreRegMail_`: 件名・本文を設定シートの `preRegMailSubject`/`preRegMailBody` から取得（未設定は既定文面）。差し込み `{name}`＝氏名、`{eventName}`＝大会名
+  - **管理パネル**: ダッシュボード設定に「事前登録 確認メール」グループ（件名input＋本文textarea）を追加。`loadConfig_`/`handleSaveConfig_` で読込・保存（既存の保存ボタンに統合）
+- 補足（送信元の仕様）: MailApp の送信元は**GASオーナーのGmail固定**。別アドレス送信元にしたい場合はオーナー変更／Gmailエイリアス（送信元として追加）／外部API のいずれかが必要。宛先はフォームの「メールアドレス」欄の値のみ
+- 申し送り/注意点: **api.gs 再デプロイ必須**（admin.html/js はプッシュのみ）
+
 ## 2026-06-12 スタンプ帳(progress)の視覚リファイン
 - 変更ファイル: `js/style.css`, `app/progress.html`
 - 変更内容（改善提案より、実行可能範囲）:

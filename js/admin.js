@@ -362,7 +362,18 @@ async function loadConfig_(gen, ev) {
   setVal_('cfg-stampEndAt',       toDtLocal_(cfg.stampEndAt));
   setVal_('cfg-exchangeDeadline', toDtLocal_(cfg.exchangeDeadline));
   setVal_('cfg-publicDeadline',   toDtLocal_(cfg.publicDeadline));
+  setVal_('cfg-preRegMailSubject', cfg.preRegMailSubject || PREREG_MAIL_SUBJECT_DEFAULT);
+  setVal_('cfg-preRegMailBody',    cfg.preRegMailBody    || PREREG_MAIL_BODY_DEFAULT);
 }
+
+// 確認メールの既定文面（CONFIG未設定時に表示・保存されるテンプレ）
+const PREREG_MAIL_SUBJECT_DEFAULT = '【{eventName}】学生参加 事前登録を受け付けました';
+const PREREG_MAIL_BODY_DEFAULT =
+  '{name} 様\n\n' +
+  '{eventName} の学生参加 事前登録を受け付けました。\n\n' +
+  '当日は受付でご本人確認のうえ、入場パスをお渡しします。\n' +
+  '登録内容に変更がある場合は事務局までご連絡ください。\n\n' +
+  '── FORMULA GYMKHANA 事務局';
 
 async function handleSaveConfig_() {
   if (!curEvent_) return;
@@ -377,6 +388,8 @@ async function handleSaveConfig_() {
     stampEndAt:       fromDtLocal_(getVal_('cfg-stampEndAt')),
     exchangeDeadline: fromDtLocal_(getVal_('cfg-exchangeDeadline')),
     publicDeadline:   fromDtLocal_(getVal_('cfg-publicDeadline')),
+    preRegMailSubject: getVal_('cfg-preRegMailSubject'),
+    preRegMailBody:    getVal_('cfg-preRegMailBody'),
   };
 
   let failed = false;

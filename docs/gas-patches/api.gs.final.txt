@@ -1071,16 +1071,19 @@ function sendPreRegMail_(to, name, eventId) {
   try {
     const cfg    = getConfig_(eventId);
     const evName = cfg.eventName || eventId;
-    MailApp.sendEmail({
-      to: String(to),
-      subject: '【' + evName + '】学生参加 事前登録を受け付けました',
-      body:
-        (name || '') + ' 様\n\n' +
-        evName + ' の学生参加 事前登録を受け付けました。\n\n' +
-        '当日は受付でご本人確認のうえ、入場パスをお渡しします。\n' +
-        '登録内容に変更がある場合は事務局までご連絡ください。\n\n' +
-        '── FORMULA GYMKHANA 事務局',
-    });
+    // 件名・本文は設定シート(preRegMailSubject/preRegMailBody)で編集可。未設定なら既定文面。
+    const subjTpl = cfg.preRegMailSubject ||
+      '【{eventName}】学生参加 事前登録を受け付けました';
+    const bodyTpl = cfg.preRegMailBody ||
+      ('{name} 様\n\n' +
+       '{eventName} の学生参加 事前登録を受け付けました。\n\n' +
+       '当日は受付でご本人確認のうえ、入場パスをお渡しします。\n' +
+       '登録内容に変更がある場合は事務局までご連絡ください。\n\n' +
+       '── FORMULA GYMKHANA 事務局');
+    const fill = s => String(s)
+      .replace(/\{name\}/g, name || '')
+      .replace(/\{eventName\}/g, evName);
+    MailApp.sendEmail({ to: String(to), subject: fill(subjTpl), body: fill(bodyTpl) });
   } catch (err) {
     console.error('sendPreRegMail_ error:', err);
   }

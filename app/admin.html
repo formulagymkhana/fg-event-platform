@@ -454,6 +454,22 @@
               <label>QR閲覧公開期限</label>
               <input type="datetime-local" class="cfg-input" id="cfg-publicDeadline">
             </div>
+          </div>
+
+          <div class="cfg-group">
+            <div class="cfg-group-title">事前登録 確認メール</div>
+            <div class="cfg-hint" style="margin-bottom:8px">使える差し込み: <code>{name}</code>＝氏名、<code>{eventName}</code>＝大会名</div>
+            <div class="cfg-row">
+              <label>件名</label>
+              <input type="text" class="cfg-input" id="cfg-preRegMailSubject" placeholder="【{eventName}】学生参加 事前登録を受け付けました">
+            </div>
+            <div class="cfg-row">
+              <label>本文</label>
+              <textarea class="cfg-input" id="cfg-preRegMailBody" rows="8" style="resize:vertical;line-height:1.6"></textarea>
+            </div>
+          </div>
+
+          <div class="cfg-group">
             <button class="save-btn" id="btn-save-config">保存</button>
             <span class="save-fb" id="save-feedback"></span>
           </div>
