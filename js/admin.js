@@ -31,6 +31,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // ダッシュボード操作
   id_('btn-reload')?.addEventListener('click', () => loadAll_());
+  id_('btn-save-event-info')?.addEventListener('click', handleSaveEventInfo_);
   id_('btn-save-config')?.addEventListener('click', handleSaveConfig_);
   id_('btn-clear-cache')?.addEventListener('click', handleClearCache_);
   id_('btn-change-key')?.addEventListener('click', handleChangeKey_);
@@ -151,6 +152,7 @@ function route_() {
     const ev = allEvents_.find(e => e.eventId === curEvent_);
     setText_('dash-ev-name', ev ? (ev.name || ev.eventId) : curEvent_);
     updateWalkInUrl_();
+    loadEventInfo_();
     loadAll_();
   }
 }
@@ -838,6 +840,52 @@ async function handleClearCache_() {
   const res = await adminCall_('adminClearCache', {});
   btn.disabled = false; btn.textContent = '⚠ キャッシュクリア';
   showToast_(res.ok ? '✓ キャッシュをクリアしました' : '⚠ 失敗: ' + (res.message || ''));
+}
+
+// ── Edit Event Info ───────────────────────────────
+
+function loadEventInfo_() {
+  const ev = allEvents_.find(e => e.eventId === curEvent_);
+  if (!ev) return;
+  setVal_('edit-event-name', ev.name || '');
+  // yyyy/MM/dd → yyyy-MM-dd (date input形式)
+  const toInputDate = s => s ? String(s).replace(/\//g, '-') : '';
+  setVal_('edit-start-date', toInputDate(ev.startDate));
+  setVal_('edit-end-date',   toInputDate(ev.endDate));
+  const sel = id_('edit-event-status');
+  if (sel) sel.value = ev.status || '準備中';
+}
+
+async function handleSaveEventInfo_() {
+  if (!curEvent_) return;
+  const eventName = getVal_('edit-event-name').trim();
+  const startDate = getVal_('edit-start-date');
+  const endDate   = getVal_('edit-end-date');
+  const status    = getVal_('edit-event-status');
+  const btn = id_('btn-save-event-info');
+  const fb  = id_('save-event-fb');
+  if (!eventName || !startDate || !endDate) {
+    fb.className = 'save-fb save-fb-err'; fb.textContent = '全項目を入力してください'; return;
+  }
+  btn.disabled = true; fb.className = 'save-fb'; fb.textContent = '';
+  const res = await adminCall_('adminUpdateEvent', {
+    eventId: curEvent_,
+    eventName,
+    startDate: startDate.replace(/-/g, '/'),
+    endDate:   endDate.replace(/-/g, '/'),
+    status,
+  });
+  btn.disabled = false;
+  if (res.ok) {
+    // ローカルのイベント情報を更新
+    const ev = allEvents_.find(e => e.eventId === curEvent_);
+    if (ev) { ev.name = eventName; ev.startDate = startDate.replace(/-/g, '/'); ev.endDate = endDate.replace(/-/g, '/'); ev.status = status; }
+    setText_('dash-ev-name', eventName);
+    fb.className = 'save-fb save-fb-ok'; fb.textContent = '✓ 保存しました';
+    setTimeout(() => { fb.textContent = ''; }, 3000);
+  } else {
+    fb.className = 'save-fb save-fb-err'; fb.textContent = '⚠ 失敗: ' + (res.message || res.error || '');
+  }
 }
 
 // ── Create Event ──────────────────────────────────

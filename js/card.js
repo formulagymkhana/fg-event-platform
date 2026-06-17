@@ -27,9 +27,6 @@ let _d = null;
 // ── イベントリスナー(CSP対応: onclickは使わない) ──
 document.getElementById('email-row')?.addEventListener('click', copyEmail);
 document.getElementById('copy-all-btn')?.addEventListener('click', copyAll);
-document.getElementById('acc-toggle')?.addEventListener('click', toggleAcc);
-document.getElementById('view-email')?.addEventListener('input', e => onViewEmail(e.target.value));
-document.getElementById('view-btn')?.addEventListener('click', saveView);
 document.getElementById('btn-company-scan')?.addEventListener('click', openCompanyScan);
 document.getElementById('btn-scan-cancel')?.addEventListener('click', closeCompanyScan);
 
@@ -190,31 +187,6 @@ function copyAll() {
     btn.textContent = '一覧をコピー（全項目）';
     btn.classList.remove('copied');
   }, 2200);
-}
-
-function toggleAcc() {
-  $('acc-body').classList.toggle('open');
-  $('acc-arrow').classList.toggle('open');
-}
-
-function onViewEmail(v) {
-  const ok  = v.includes('@');
-  const btn = $('view-btn');
-  btn.disabled = !ok;
-  btn.classList.toggle('active', ok);
-}
-
-async function saveView() {
-  const email = $('view-email').value;
-  if (!email.includes('@') || !_d) return;
-  const btn = $('view-btn');
-  btn.disabled    = true;
-  btn.textContent = '登録中...';
-  await FG_API.saveViewLog(FG_API.getParam('token'), 'manual', email);
-  $('view-form').style.display = 'none';
-  const saved = $('view-saved');
-  saved.textContent   = '✓ ' + email + ' で記録しました';
-  saved.style.display = 'block';
 }
 
 // ── 企業QR読み取りオーバーレイ ─────────────────────

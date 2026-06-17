@@ -16,6 +16,16 @@
 
 ---
 
+## 2026-06-17 feat: イベント基本情報編集・card.html旧メール登録欄削除
+- 変更ファイル: `app/admin.html`, `js/admin.js`, `docs/gas-patches/api.gs.final.txt`, `app/card.html`, `js/card.js`
+- 変更内容:
+  - GAS: `adminUpdateEvent` アクション追加（名前・開始日・終了日・状態を EVENT_LIST で更新）
+  - 管理画面 設定セクション上部に「イベント基本情報」フォーム追加（イベント名・開始日・終了日・状態）
+  - ダッシュボード表示時に現在値をフォームへ自動セット
+  - card.html: 旧仕様のメールアドレス登録欄（アコーディオン）を削除
+  - card.js: 対応する `toggleAcc` / `onViewEmail` / `saveView` を削除
+- 申し送り/注意点: **GAS 再デプロイ必須**（adminUpdateEvent 追加）
+
 ## 2026-06-17 fix: QR内のeventをAPIへ渡すよう修正・エラーメッセージ改善
 - 変更ファイル: `js/api.js`, `js/card.js`, `js/start.js`
 - 変更内容:

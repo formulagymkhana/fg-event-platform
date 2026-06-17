@@ -98,6 +98,7 @@ function dispatch_(e) {
       case 'adminGetConfig':    return actionAdminGetConfig_(p);
       case 'adminUpdateConfig': return actionAdminUpdateConfig_(p);
       case 'adminCreateEvent':  return actionAdminCreateEvent_(p);
+      case 'adminUpdateEvent':  return actionAdminUpdateEvent_(p);
       case 'adminDeleteEvent':  return actionAdminDeleteEvent_(p);
       case 'adminGetStats':     return actionAdminGetStats_(p);
       case 'adminGetStampLog':  return actionAdminGetStampLog_(p);
@@ -1236,6 +1237,36 @@ function actionAdminCreateEvent_(p) {
   }
   createEvent_(p.eventId, p.eventName, p.startDate, p.endDate);
   return ok_({ created: true, eventId: p.eventId });
+}
+
+// イベントの基本情報（名前・開始日・終了日・状態）を更新
+function actionAdminUpdateEvent_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.eventId) return err_('missing_params');
+
+  const sheet   = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const idCol   = headers.indexOf('eventId');
+
+  const rowIdx = data.findIndex((r, i) => i > 0 && String(r[idCol]) === String(p.eventId));
+  if (rowIdx < 0) return err_('event_not_found');
+
+  const sheetRow = rowIdx + 1; // 1-indexed
+  const set = (colName, value) => {
+    const col = headers.indexOf(colName);
+    if (col >= 0 && value !== undefined && value !== null) {
+      sheet.getRange(sheetRow, col + 1).setValue(value);
+    }
+  };
+  if (p.eventName) set('イベント名', p.eventName);
+  if (p.startDate) set('開始日', p.startDate);
+  if (p.endDate)   set('終了日', p.endDate);
+  if (p.status)    set('状態', p.status);
+
+  CacheService.getScriptCache().remove('cfg_' + String(p.eventId));
+  return ok_({ updated: true });
 }
 
 // イベントをマスター一覧から削除（スプレッドシート本体は削除しない）

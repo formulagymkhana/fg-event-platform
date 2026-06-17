@@ -386,6 +386,34 @@
         </div>
         <div class="section-body" id="body-settings">
           <div class="cfg-group">
+            <div class="cfg-group-title">イベント基本情報</div>
+            <div class="cfg-row">
+              <label>イベント名</label>
+              <input type="text" class="cfg-input" id="edit-event-name">
+            </div>
+            <div class="cfg-row-half">
+              <div class="cfg-row">
+                <label>開始日</label>
+                <input type="date" class="cfg-input" id="edit-start-date">
+              </div>
+              <div class="cfg-row">
+                <label>終了日</label>
+                <input type="date" class="cfg-input" id="edit-end-date">
+              </div>
+            </div>
+            <div class="cfg-row">
+              <label>状態</label>
+              <select class="cfg-input" id="edit-event-status">
+                <option value="準備中">準備中</option>
+                <option value="開催中">開催中</option>
+                <option value="完了">完了</option>
+              </select>
+            </div>
+            <button class="save-btn" id="btn-save-event-info">保存</button>
+            <span class="save-fb" id="save-event-fb"></span>
+          </div>
+
+          <div class="cfg-group">
             <div class="cfg-group-title">景品・期間設定</div>
             <div class="cfg-hint" style="margin-bottom:8px">例: 5個ごと・最大3個 → 5個で1個、10個で2個、15個で3個</div>
             <div class="cfg-row-half">
