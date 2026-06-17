@@ -89,15 +89,14 @@
       <div class="fg-page-name">スタンプ進捗</div>
     </div>
 
-    <!-- 固定ヘッダー：現在の取得数（X / Y社） -->
-    <div class="pg-top">
-      <span style="font-size:12px;color:var(--fg-muted)">取得ブース</span>
-      <span id="count-num">0</span><span id="bar-label" style="font-size:15px;font-weight:700;color:var(--fg-muted)"></span>
-    </div>
-
-    <!-- スクロール領域：スタンプ帳＋取得履歴 -->
+    <!-- スクロール領域：取得数＋スタンプ帳＋取得履歴 -->
     <div class="pg-scroll app-fixed-scroll">
-      <div style="padding:16px 20px 0">
+      <!-- 取得ブース数（スクロールで流れる） -->
+      <div class="pg-top">
+        <span style="font-size:12px;color:var(--fg-muted)">取得ブース</span>
+        <span id="count-num">0</span><span id="bar-label" style="font-size:15px;font-weight:700;color:var(--fg-muted)"></span>
+      </div>
+      <div style="padding:0 20px 0">
         <div class="section-label">
           <div class="section-en">STAMP BOOK</div>
           <div class="section-ja">スタンプ帳</div>

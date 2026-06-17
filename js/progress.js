@@ -103,7 +103,7 @@ function renderProgress(d) {
 
   // スタンプ帳グリッド・マイルストーンバー・取得履歴リスト
   renderStampGrid(stamps, companies);
-  renderMilestoneBar(count, buildMilestones_(prizeUnitSize, maxPrizes));
+  renderMilestoneBar(count, buildMilestones_(prizeUnitSize, maxPrizes), total);
   renderStampList(stamps);
 }
 
@@ -126,11 +126,6 @@ function renderStampGrid(stamps, companies) {
     circle.className = 'stamp-circle ' + (isGot ? 'got' : 'empty');
 
     if (isGot) {
-      const badge = document.createElement('div');
-      badge.className = 'stamp-check-badge';
-      badge.textContent = '✓';
-      circle.appendChild(badge);
-
       if (co.logoUrl) {
         const img = document.createElement('img');
         img.src = co.logoUrl;
@@ -167,14 +162,14 @@ function renderStampGrid(stamps, companies) {
   });
 }
 
-// ── マイルストーンバー（MAX交換量=100%のゲージ） ──
-function renderMilestoneBar(count, milestones) {
+// ── マイルストーンバー ──
+function renderMilestoneBar(count, milestones, totalCompanies) {
   const section = document.getElementById('milestone-bar-section');
   if (!section || !milestones || milestones.length === 0) return;
 
-  // MAX交換量（最終マイルストーン＝maxPrizes×unitSize）を 100% とみなす
-  const maxThreshold = milestones[milestones.length - 1].threshold;
-  const pct = Math.min(100, Math.round((count / maxThreshold) * 100));
+  // バーの100% = 総ブース数。景品閾値はその中の通過点として配置
+  const maxVal = totalCompanies || milestones[milestones.length - 1].threshold;
+  const pct = Math.min(100, Math.round((count / maxVal) * 100));
 
   section.innerHTML = `
     <div class="milestone-title">マイルストーン</div>
@@ -182,7 +177,7 @@ function renderMilestoneBar(count, milestones) {
       <div class="milestone-track">
         <div class="milestone-fill" style="width:${pct}%"></div>
         ${milestones.map((m, i) => {
-          const pos     = Math.round((m.threshold / maxThreshold) * 100);
+          const pos     = Math.round((m.threshold / maxVal) * 100);
           const reached = count >= m.threshold;
           const remain  = Math.max(0, m.threshold - count);
           const labelMod = i === milestones.length - 1 ? ' last' : (i === 0 ? ' first' : '');
