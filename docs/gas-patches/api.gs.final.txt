@@ -854,20 +854,11 @@ function actionGetCurrentEvent_(p) {
 // アクション: registerWalkIn (T6)
 // 当日飛び込み参加者を登録してstampTokenを発行する。
 // 同日・同一学生(氏名+大学名)の重複登録は既存stampTokenを返す。
-//
-// GASスクリプトプロパティ WALK_IN_CODE を設定すると
-// code パラメータで照合する(未設定の場合は認証スキップ)。
 // ============================================================
 
 function actionRegisterWalkIn_(p) {
   if (!p.event) return err_('missing_event');
   if (!p.name || !p.school) return err_('missing_params');
-
-  // 会場コード検証(スクリプトプロパティが設定されている場合のみ)
-  const validCode = PropertiesService.getScriptProperties().getProperty('WALK_IN_CODE');
-  if (validCode && String(p.code || '') !== String(validCode)) {
-    return err_('invalid_code');
-  }
 
   const studentSheet = eventSs_(p.event).getSheetByName(SHEET.STUDENTS);
   const sData        = studentSheet.getDataRange().getValues();

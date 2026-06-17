@@ -15,9 +15,6 @@ document.getElementById('btn-retry')?.addEventListener('click', () => {
 
 // ── 起動 ──────────────────────────────────────────
 (async function init() {
-  const code = FG_API.getParam('code');
-  if (!code) { showState('no-code'); return; }
-
   showState('loading');
 
   // 今日のイベント情報を取得して来場日バッジに表示
@@ -39,11 +36,9 @@ async function handleSubmit() {
   clearErrors_();
   if (!validateForm_()) return;
 
-  const code = FG_API.getParam('code');
   showState('submitting');
 
   const params = {
-    code,
     name:       val_('f-name').trim(),
     furigana:   val_('f-furigana').trim(),
     school:     val_('f-school').trim(),
