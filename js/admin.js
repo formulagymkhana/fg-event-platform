@@ -423,7 +423,7 @@ function downloadCsv_(body, filename) {
   URL.revokeObjectURL(url);
 }
 
-/** 企業NFC URL を CSV 出力（企業ID/企業名/stampKey/NFC用URL） */
+/** 企業NFC URL を CSV 出力（NFC書き込み用途順: ブース名 / NFC用URL / stampKey / 企業ID） */
 async function downloadNfcCsv_() {
   if (!curEvent_) { showToast_('イベントが選択されていません'); return; }
   const res = await adminCall_('adminGetCompanies', { event: curEvent_ });
@@ -431,9 +431,9 @@ async function downloadNfcCsv_() {
   const list = (res.data.companies || []).filter(c => c.stampKey);
   if (!list.length) { showToast_('スタンプキー発行済みの企業がありません'); return; }
   const esc = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-  const head  = ['企業ID', '企業名', 'stampKey', 'NFC用URL'];
+  const head  = ['ブース名（企業名）', 'NFC用URL', 'stampKey', '企業ID'];
   const lines = [head.join(',')].concat(list.map(c =>
-    [c.companyId, c.name, c.stampKey, nfcUrl_(c.stampKey)].map(esc).join(',')));
+    [c.name, nfcUrl_(c.stampKey), c.stampKey, c.companyId].map(esc).join(',')));
   downloadCsv_(lines.join('\r\n'), `企業NFC_URL_${curEvent_}_${new Date().toISOString().slice(0, 10)}.csv`);
   showToast_(`✓ ${list.length}社のNFC URLを出力しました`);
 }
@@ -482,6 +482,12 @@ async function loadCompanies_(gen = null, ev = null) {
         <span class="key-val">${c.viewKey || '未発行'}</span>
         ${c.viewKey ? `<button class="copy-btn" data-copy="${esc_(c.viewKey)}">コピー</button>` : ''}
       </div>
+      ${c.stampKey ? `
+      <div class="url-row">
+        <span class="url-lbl">NFC用URL（スタンプ）</span>
+        <span class="url-val">${esc_(nfcUrl_(c.stampKey))}</span>
+        <button class="copy-btn" data-copy="${esc_(nfcUrl_(c.stampKey))}">コピー</button>
+      </div>` : ''}
       ${c.viewKey ? `
       <div class="url-row">
         <span class="url-lbl">企業QR用URL（再閲覧設定）</span>
