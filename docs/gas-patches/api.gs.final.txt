@@ -42,8 +42,9 @@ const PRE_REG_COLS = [
 // 参加区分(＋ドライバー登録区分) → 属性 / studentId クラスコード
 const PRE_CLASS_CODES = {
   'Aドライバー':'A','Bドライバー':'B','Cドライバー':'C',
-  '女子クラスドライバー':'W','補欠ドライバー':'K',
-  'メカニック':'M','応援学生':'S','一般参加学生':'V',
+  '女子クラスドライバー':'W',
+  '補欠ドライバー':'S','メカニック':'S','応援学生':'S',
+  '一般参加学生':'V',
 };
 
 // ============================================================
@@ -967,8 +968,8 @@ function actionRegisterPreStudent_(p) {
       message: 'すでに事前登録済みです' };
   }
 
-  // 参加区分 → 属性
-  const attr      = preAttr_(p.category, p.driverClass);
+  // 参加区分 → 属性（serviceClass でメカニック/応援学生を区別）
+  const attr      = preAttr_(p.category, p.driverClass, p.serviceClass);
   const classCode = PRE_CLASS_CODES[attr] || 'V';
 
   // studentId 生成
@@ -1030,12 +1031,13 @@ function actionRegisterPreStudent_(p) {
 }
 
 // 参加区分(＋ドライバー登録区分) → 属性
-function preAttr_(category, driverClass) {
+function preAttr_(category, driverClass, serviceClass) {
   switch (String(category || '')) {
-    case '出場選手(FGクラスドライバー)': return String(driverClass || 'Aドライバー'); // Aドライバー等
+    case '出場選手(FGクラスドライバー)': return String(driverClass || 'Aドライバー');
     case '出場選手(女子クラスドライバー)': return '女子クラスドライバー';
     case '補欠ドライバー':                 return '補欠ドライバー';
-    case '見学・応援学生(メカニック登録含む)': return '応援学生';
+    case '見学・応援学生(メカニック登録含む)':
+      return String(serviceClass || '') === 'メカニック' ? 'メカニック' : '応援学生';
     default: return '応援学生';
   }
 }

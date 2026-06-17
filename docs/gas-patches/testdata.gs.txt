@@ -77,8 +77,9 @@ function insertTestStudents(eventId) {
   ];
   const CLASS_CODES = {
     'Aドライバー':'A','Bドライバー':'B','Cドライバー':'C',
-    '女子クラスドライバー':'W','補欠ドライバー':'K',
-    'メカニック':'M','応援学生':'S','一般参加学生':'V',
+    '女子クラスドライバー':'W',
+    '補欠ドライバー':'S','メカニック':'S','応援学生':'S',
+    '一般参加学生':'V',
   };
 
   const studentsSheet = ss.getSheetByName('学生マスター');
