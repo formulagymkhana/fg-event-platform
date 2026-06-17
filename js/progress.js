@@ -34,7 +34,7 @@ async function loadProgress() {
     showState('error');
     if (res.error === 'timeout') {
       setText('error-title', '接続がタイムアウトしました');
-      setText('error-msg', '更新ボタンで再試行してください。');
+      setText('error-msg', 'ページを再読み込みして再試行してください。');
     } else {
       setText('error-title', 'エラーが発生しました');
       setText('error-msg', res.message || 'もう一度お試しください。');
