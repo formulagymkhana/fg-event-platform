@@ -390,7 +390,7 @@ function actionExchangePrize_(p) {
   if (result.claimableNow <= 0) return err_('nothing_to_claim');
   eventSs_(p.event).getSheetByName(SHEET.PRIZE_LOG).appendRow([
     new Date(), p.event, student.studentId, student.name,
-    count, result.claimableNow, '学生確定',
+    count, '学生確定', result.claimableNow,
   ]);
   // appendRow後に countExchanged_ が更新されるので再計算して返す
   return ok_(buildStampResult_(p.event, student.studentId, count, {}));
@@ -459,7 +459,7 @@ function actionMarkPrizeExchanged_(p) {
 
   eventSs_(p.event).getSheetByName(SHEET.PRIZE_LOG).appendRow([
     new Date(), p.event, student.studentId, student.name,
-    count, result.claimableNow, p.staff || '',
+    count, p.staff || '', result.claimableNow,
   ]);
 
   return ok_({
@@ -882,7 +882,11 @@ function actionRegisterWalkIn_(p) {
   if (existing) {
     const existStudentId = String(existing[sidCol]);
     // 既存stampTokenを返す
-    const participantSheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_PARTICIPANTS);
+    let participantSheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_PARTICIPANTS);
+    if (!participantSheet) {
+      participantSheet = eventSs_(p.event).insertSheet(SHEET.STAMP_PARTICIPANTS);
+      participantSheet.appendRow(['時刻', 'eventId', 'studentId', 'stampToken', '開始日時', 'status']);
+    }
     const pData    = participantSheet.getDataRange().getValues();
     const pHeaders = pData[0].map(String);
     const pSidCol  = pHeaders.indexOf('studentId');
@@ -932,9 +936,14 @@ function actionRegisterWalkIn_(p) {
   });
   studentSheet.appendRow(newRow);
 
-  // スタンプ参加者シートに追加
+  // スタンプ参加者シートに追加（シート未存在時は自動作成）
   const stampToken = Utilities.getUuid();
-  eventSs_(p.event).getSheetByName(SHEET.STAMP_PARTICIPANTS).appendRow([
+  let stampParticipantSheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_PARTICIPANTS);
+  if (!stampParticipantSheet) {
+    stampParticipantSheet = eventSs_(p.event).insertSheet(SHEET.STAMP_PARTICIPANTS);
+    stampParticipantSheet.appendRow(['時刻', 'eventId', 'studentId', 'stampToken', '開始日時', 'status']);
+  }
+  stampParticipantSheet.appendRow([
     new Date(), p.event, studentId, stampToken, new Date(), 'active',
   ]);
 
