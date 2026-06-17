@@ -512,13 +512,14 @@ body {
   flex-direction: column;
   width: 100%;
   max-width: 420px;
-  height: 100dvh;
   height: 100vh; /* dvh 非対応フォールバック */
+  height: 100dvh;
   max-height: 820px;
 }
-.app-fixed-header {
-  flex: 0 0 auto;
-  padding-top: env(safe-area-inset-top, 0px);
+.app-fixed-header { flex: 0 0 auto; }
+/* 詳細度を上げてfg-headerのpaddingを保ちつつセーフエリアを加算 */
+.fg-header.app-fixed-header {
+  padding-top: calc(18px + env(safe-area-inset-top, 0px));
 }
 .app-fixed-scroll {
   flex: 1 1 auto;
