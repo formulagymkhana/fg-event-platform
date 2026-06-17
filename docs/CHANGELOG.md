@@ -16,6 +16,14 @@
 
 ---
 
+## 2026-06-17 fix: iOS Safari フェッチハング対策・企業QRエラー表示改善
+- 変更ファイル: `js/api.js`, `js/card.js`
+- 変更内容:
+  - `call_()`: AbortController → Promise.race でタイムアウト実装（iOS Safari でGASクロスオリジンリダイレクト後に abort signal が失われる既知バグ対策）
+  - `onCompanyQR_`: try/catch 追加、timeout/network_error を個別メッセージで表示
+- 理由/背景: iOS Safari では GAS の CORS リダイレクト後に AbortController のシグナルが失われ fetch が永遠にハングする。GAS がコールドスタートで15秒超えると企業QR読み込みが「確認中...」から進まなくなっていた
+- 申し送り/注意点: デプロイ不要（フロントのみ変更）
+
 ## 2026-06-17 feat: イベント基本情報編集・card.html旧メール登録欄削除
 - 変更ファイル: `app/admin.html`, `js/admin.js`, `docs/gas-patches/api.gs.final.txt`, `app/card.html`, `js/card.js`
 - 変更内容:

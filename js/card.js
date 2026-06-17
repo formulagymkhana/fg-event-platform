@@ -263,11 +263,23 @@ async function onCompanyQR_(qrData) {
   _scanPaused = true;
   setOverlayMsg_('確認中...', '');
 
-  // 企業の検証は企業QRのイベントで行う
-  const res = await FG_API.resolveViewKey(vk, qrEvent);
+  let res;
+  try {
+    res = await FG_API.resolveViewKey(vk, qrEvent);
+  } catch (e) {
+    setOverlayMsg_('通信エラーが発生しました。もう一度お試しください。', 'err');
+    _scanPaused = false;
+    return;
+  }
   if (!res.ok) {
-    setOverlayMsg_('無効な企業QRです。もう一度お試しください。', 'err');
-    _scanPaused = false; // スキャン再開
+    if (res.error === 'timeout') {
+      setOverlayMsg_('接続がタイムアウトしました。もう一度お試しください。', 'err');
+    } else if (res.error === 'network_error') {
+      setOverlayMsg_('通信エラーが発生しました。もう一度お試しください。', 'err');
+    } else {
+      setOverlayMsg_('企業QRが無効です。もう一度お試しください。', 'err');
+    }
+    _scanPaused = false;
     return;
   }
 

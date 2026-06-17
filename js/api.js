@@ -50,18 +50,14 @@ const FG_API = (() => {
     });
 
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 15000);
-      const res = await fetch(url.toString(), {
-        redirect: 'follow',
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
-      return await res.json();
+      // AbortController は iOS Safari でGASリダイレクト後に signal が失われる既知バグがあるため
+      // Promise.race でタイムアウトを実装する（fetch 自体はキャンセルできないが await は解決される）
+      const fetchPromise    = fetch(url.toString(), { redirect: 'follow' }).then(r => r.json());
+      const timeoutPromise  = new Promise(resolve =>
+        setTimeout(() => resolve({ ok: false, error: 'timeout', message: 'タイムアウトしました。再度お試しください。' }), 20000)
+      );
+      return await Promise.race([fetchPromise, timeoutPromise]);
     } catch (e) {
-      if (e.name === 'AbortError') {
-        return { ok: false, error: 'timeout', message: 'タイムアウトしました。再度お試しください。' };
-      }
       return { ok: false, error: 'network_error', message: '通信エラーが発生しました' };
     }
   }
