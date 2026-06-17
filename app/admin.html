@@ -497,31 +497,34 @@
         <div class="stat-card"><div class="stat-val" id="student-stamp-step3">—</div><div class="stat-lbl">スタンプ参加</div></div>
       </div>
 
-      <!-- 事前登録CSVダウンロード -->
+      <!-- 事前登録 -->
       <div class="section" style="margin-bottom:12px">
         <div class="section-hd" data-section="prereg">
           <span class="section-title">📝 事前登録 <span class="section-count" id="prereg-count"></span></span>
           <span class="section-toggle" id="toggle-prereg">▼</span>
         </div>
         <div class="section-body" id="body-prereg">
-          <p class="step-note" style="margin-top:0;margin-bottom:8px">QRパス作成用CSV（学生ID／参加区分／氏名／ふりがな／トークン／QR用URL）</p>
+          <p class="step-note" style="margin-top:0;margin-bottom:8px">QRパス作成用CSV（学生ID／参加区分／氏名／ふりがな／QR用URL）</p>
           <div class="action-row">
             <button class="act-btn act-btn-ghost" id="btn-prereg-csv-driver">⬇ ドライバー用</button>
             <button class="act-btn act-btn-ghost" id="btn-prereg-csv-spectator">⬇ 応援・見学用</button>
             <button class="act-btn act-btn-ghost" id="btn-prereg-csv-all">⬇ 全員</button>
           </div>
-          <div class="tbl-wrap">
-            <table class="data-tbl">
-              <thead><tr><th>区分</th><th>氏名</th><th>大学</th><th>メール</th></tr></thead>
-              <tbody id="prereg-tbody"></tbody>
-            </table>
-          </div>
         </div>
       </div>
 
-      <!-- 全員CSV -->
-      <div style="margin:14px 0 4px">
-        <button class="act-btn act-btn-ghost" id="btn-student-qr-csv" style="width:100%">⬇ 全員QR用URL CSV（当日参加含む）</button>
+      <!-- 当日登録 -->
+      <div class="section" style="margin-bottom:12px">
+        <div class="section-hd" data-section="walkin">
+          <span class="section-title">🚶 当日登録 <span class="section-count" id="walkin-count"></span></span>
+          <span class="section-toggle" id="toggle-walkin">▼</span>
+        </div>
+        <div class="section-body" id="body-walkin">
+          <p class="step-note" style="margin-top:0;margin-bottom:8px">全学生（事前・当日含む）のQR用URLを一括出力します</p>
+          <div class="action-row">
+            <button class="act-btn act-btn-ghost" id="btn-student-qr-csv" style="flex:1">⬇ 全員QR用URL CSV</button>
+          </div>
+        </div>
       </div>
 
       <!-- 絞り込み -->

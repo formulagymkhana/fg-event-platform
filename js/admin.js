@@ -213,11 +213,11 @@ async function loadPreRegistrations_(gen, ev) {
   if (gen !== loadGen_) return;
   if (!res.ok) return;
   preRegData_ = { headers: res.data.headers || [], rows: res.data.rows || [] };
-  setText_('prereg-count', `(${res.data.total || 0}名)`);
 
   const H = preRegData_.headers;
   const col = n => H.indexOf(n);
   const tbody = id_('prereg-tbody');
+  if (!tbody) return;
   if (!preRegData_.rows.length) {
     tbody.innerHTML = '<tr><td colspan="4" class="empty-msg">事前登録はまだありません</td></tr>';
     return;
@@ -627,6 +627,9 @@ async function loadStudents_(gen, ev) {
   setText_('student-count-step3',  studentData_.length);
   setText_('student-prereg-step3', pre);
   setText_('student-walkin-step3', walkin);
+  // アコーディオンバッジを更新
+  setText_('prereg-count', pre + '名');
+  setText_('walkin-count', walkin + '名');
 }
 
 function renderStudentList_() {

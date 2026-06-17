@@ -230,8 +230,12 @@ function actionActivateStamp_(p) {
   const student = findStudentByCardToken_(p.token, p.event);
   if (!student) return err_('invalid_token');
 
-  const participantSheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_PARTICIPANTS);
-  if (!participantSheet) return err_('server_error');
+  const ss_ = eventSs_(p.event);
+  let participantSheet = ss_.getSheetByName(SHEET.STAMP_PARTICIPANTS);
+  if (!participantSheet) {
+    participantSheet = ss_.insertSheet(SHEET.STAMP_PARTICIPANTS);
+    participantSheet.appendRow(['時刻', 'eventId', 'studentId', 'stampToken', '開始日時', 'status']);
+  }
 
   let stampToken = null;
   if (participantSheet.getLastRow() > 1) {
