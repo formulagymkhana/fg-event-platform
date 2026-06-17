@@ -16,6 +16,43 @@
 
 ---
 
+## 2026-06-17 T-E: company.html 実装・バグ修正・api.js補完
+- 変更ファイル: `app/company.html`（新規）, `js/company.js`（新規）, `js/admin.js`, `js/api.js`, `docs/gas-patches/api.gs.final.txt`
+- 変更内容:
+  - **T-E: company.html/company.js**: 企業来訪学生一覧ページを新規実装。QRスキャンログ・スタンプ来訪者の2タブ表示。`company.html?key=<viewKey>&event=<eventId>` 形式。admin 企業カードに「来訪学生一覧URL」コピーボタンを追加
+  - **api.js**: `getEventList` を FG_API に公開（register-pre.html のイベント名バッジ表示修正）
+  - **GAS: prizeCount**: 管理画面統計の景品交換数を行数カウントから claimedCount 列の合計集計に修正
+- 申し送り/注意点: **GAS 再デプロイ必須**（prizeCount 修正）。company.html の QRスキャンログは publicDeadline 経過後に expired エラーになる仕様（GAS 側）—専用エラーメッセージで案内
+
+## 2026-06-17 バグ修正: PRIZE_LOG列順・registerWalkIn_防御
+- 変更ファイル: `docs/gas-patches/api.gs.final.txt`
+- 変更内容:
+  - `actionExchangePrize_` / `actionMarkPrizeExchanged_`: appendRow の列順が逆（対応者↔claimedCount）だったため修正。複数景品交換が常に1個扱いになっていた
+  - `registerWalkIn_`: STAMP_PARTICIPANTS シートが存在しない場合に自動作成（既存学生パス・新規パス両方）
+- 申し送り/注意点: **GAS 再デプロイ済み**
+
+## 2026-06-17 activateStamp自動シート作成・管理画面UI整理・バッジ更新
+- 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `app/admin.html`, `js/admin.js`
+- 変更内容:
+  - **GAS**: `activateStamp` でスタンプ参加者シートが存在しない場合に自動作成（server_error → 正常動作）
+  - **GAS**: `adminGetStudents` に `cardToken` を追加返却
+  - **GAS**: `preAttr_` を3引数化してメカニック/補欠ドライバーを正しく判定
+  - **admin**: 事前登録アコーディオンからテーブル削除・CSVボタンのみに整理
+  - **admin**: 当日登録アコーディオン新設・QR用URLCSVボタンを移動
+  - **admin**: prereg-count/walkin-count バッジを loadStudents_ で動的更新
+  - **admin**: prereg-tbody null チェック追加（テーブル削除後のエラー防止）
+- 申し送り/注意点: **GAS 再デプロイ済み**
+
+## 2026-06-17 学生QR URL一覧・企業NFCコピー・イベント終了画面・クラスコード統一
+- 変更ファイル: `js/admin.js`, `app/admin.html`, `app/stamp.html`, `js/stamp.js`, `js/api.js`, `docs/gas-patches/api.gs.final.txt`, `docs/gas-patches/testdata.gs.txt`
+- 変更内容:
+  - 学生管理ページに QR用URL 表示・全員CSVダウンロード追加
+  - 企業カードにNFC用URLコピーボタン追加・CSV列順をNFC書き込み用途向けに変更
+  - no_active_event / stamp_closed 時に「イベントは終了しました」専用画面を stamp.html に追加
+  - 補欠ドライバー・メカニックのIDコードをS（応援系）に統一（PRE_CLASS_CODES）
+  - testdata.gs.txt の学生構成・ID生成・同意フィールドを本番仕様に修正
+- 申し送り/注意点: **GAS 再デプロイ済み**
+
 ## 2026-06-12 事前登録 確認メールを管理画面で編集可能に
 - 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `app/admin.html`, `js/admin.js`
 - 変更内容:

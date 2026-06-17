@@ -1288,6 +1288,18 @@ function actionAdminGetStats_(p) {
     stampParticipants = uniq.size;
   }
 
+  // 景品交換済み個数（行数ではなく claimedCount の合計）
+  let prizeCount = 0;
+  if (prizeSheet && prizeSheet.getLastRow() > 1) {
+    const pData    = prizeSheet.getDataRange().getValues();
+    const pHeaders = pData[0].map(String);
+    const pEvCol   = pHeaders.indexOf('eventId');
+    const pCntCol  = pHeaders.indexOf('claimedCount');
+    prizeCount = pData.slice(1)
+      .filter(r => String(r[pEvCol]) === String(p.event))
+      .reduce((sum, r) => sum + (pCntCol >= 0 ? Number(r[pCntCol]) || 1 : 1), 0);
+  }
+
   return ok_({
     studentCount,
     preRegisteredCount: studentCount - walkInCount,
@@ -1295,7 +1307,7 @@ function actionAdminGetStats_(p) {
     stampParticipants,
     stampCount:       stampSheet       ? Math.max(0, stampSheet.getLastRow()       - 1) : 0,
     participantCount: participantSheet ? Math.max(0, participantSheet.getLastRow() - 1) : 0,
-    prizeCount:       prizeSheet       ? Math.max(0, prizeSheet.getLastRow()       - 1) : 0,
+    prizeCount,
   });
 }
 

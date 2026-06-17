@@ -255,9 +255,14 @@ const FG_API = (() => {
   }
 
   // ── エクスポート ──────────────────────────────
+  function getEventList() {
+    return call_('getEventList', {});
+  }
+
   return {
     // イベント自動判定
     getCurrentEvent,
+    getEventList,
     // 企業向け
     getStudent,
     saveViewLog,

@@ -86,11 +86,14 @@ FG Event Platform（Formula Gymkhana のイベント管理基盤）の改修。
 - 任意: start/stamp/exchange へのセクション見出し追加（現状は黒ヘッダーのみ）。
 - 当日参加者フォーム: 入力規則の整合（見学・応援パス準拠）まで完了 ✅（2026-06-08）。
   - 将来スコープ（郵便番号/住所詳細・来場日・弁当・サービス作業/保険）は未着手。
-- 未着手の管理機能（管理画面で「準備中」タグ）: 学生QR URL一括発行 / 企業NFC URL発行 /
-  ラベル用CSV出力 / importStudents の管理画面化。
-- T-E: company.html 本体（企業別の閲覧学生リスト/スタンプ来訪者の表示）。
-  データ蓄積側（QR閲覧ログの企業ID付き記録）は 2026-06-11 完了。getCompanyView / getCompanyStampVisitors の2系統が利用可能。
-- 既存イベントの QR閲覧ログ シートに `source` 列ヘッダーを手動追記（推奨）。
+- 管理機能: 学生QR URL一括発行 ✅（2026-06-17）/ 企業NFC URL発行 ✅（2026-06-17）/ ラベル用CSV出力・importStudentsの管理画面化は未着手（「準備中」タグのまま）。
+- T-E: company.html 本体（企業別の閲覧学生リスト/スタンプ来訪者の表示）✅（2026-06-17）。
+  QRスキャンログ・スタンプ来訪者の2タブ。admin 企業カードに「来訪学生一覧URL」を追加。
+- getEventList を api.js に公開 ✅（2026-06-17）
+- prizeCount を行数カウント→claimedCount集計に修正 ✅（2026-06-17。GAS再デプロイ必須）
+- PRIZE_LOG 列順バグ修正 ✅（2026-06-17。GAS再デプロイ済み）
+- registerWalkIn_ STAMP_PARTICIPANTS 自動作成 ✅（2026-06-17。GAS再デプロイ済み）
+- 既存イベントの QR閲覧ログ シートに `source` 列ヘッダーを手動追記（推奨・未着手）。
 - 将来構想: 脱Googleフォーム化（NOTES.md 参照。計画段階）。
 - 任意: eventId 比較の String() 統一（下記「任意（おまけ）」参照。NOTES.md にも記録）。
 
