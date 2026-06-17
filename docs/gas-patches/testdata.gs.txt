@@ -14,29 +14,30 @@ function insertTestStudents(eventId) {
 
   // ── テストデータ定義 ─────────────────────────────────────
   // { name, furigana, school, dept, year, category, attr, gender, pref, regType }
-  // 事前登録: Aドライバー・女子クラス・補欠・応援学生のみ（一般参加学生は事前登録不可）
+  // 事前登録: FGドライバー(A/B/C)・女子クラス・補欠(メカニック付随)・メカニック登録・応援学生
   // 当日参加: 一般参加学生のみ
   const STUDENTS_RAW = [
     // ── 事前登録（15名） ───────────────────────────
-    // Aドライバー 5名
-    { name:'田中 大輝', furigana:'たなか だいき',   school:'東京大学',     dept:'工学部機械工学科',         year:3, category:'出場選手(FGクラスドライバー)',       attr:'Aドライバー',        gender:'男', pref:'東京都',   regType:'事前', driverClass:'A', clubYears:3, simDate:'2026-03-15', simTime:'0:54.123', hotel:'なし', dinner:'なし' },
-    { name:'鈴木 翔太', furigana:'すずき しょうた',  school:'早稲田大学',   dept:'理工学部機械工学科',       year:2, category:'出場選手(FGクラスドライバー)',       attr:'Aドライバー',        gender:'男', pref:'神奈川県', regType:'事前', driverClass:'B', clubYears:2, simDate:'2026-03-15', simTime:'0:55.456', hotel:'なし', dinner:'なし' },
-    { name:'佐藤 健',   furigana:'さとう たける',    school:'名古屋大学',   dept:'工学部機械航空工学科',     year:4, category:'出場選手(FGクラスドライバー)',       attr:'Aドライバー',        gender:'男', pref:'愛知県',   regType:'事前', driverClass:'A', clubYears:4, simDate:'2026-03-16', simTime:'0:53.789', hotel:'あり', dinner:'あり' },
-    { name:'高橋 勇気', furigana:'たかはし ゆうき',  school:'大阪大学',     dept:'工学部地球総合工学科',     year:3, category:'出場選手(FGクラスドライバー)',       attr:'Aドライバー',        gender:'男', pref:'大阪府',   regType:'事前', driverClass:'C', clubYears:3, simDate:'2026-03-16', simTime:'0:56.001', hotel:'あり', dinner:'あり' },
-    { name:'渡辺 航',   furigana:'わたなべ わたる',  school:'東北大学',     dept:'工学部機械知能・航空工学科',year:2, category:'出場選手(FGクラスドライバー)',       attr:'Aドライバー',        gender:'男', pref:'宮城県',   regType:'事前', driverClass:'B', clubYears:2, simDate:'2026-03-15', simTime:'0:57.222', hotel:'あり', dinner:'あり' },
+    // FGクラスドライバー 5名（A×2, B×2, C×1）
+    { name:'田中 大輝', furigana:'たなか だいき',   school:'東京大学',     dept:'工学部機械工学科',            year:3, category:'出場選手(FGクラスドライバー)',       attr:'Aドライバー',        gender:'男', pref:'東京都',   regType:'事前', driverClass:'A', clubYears:3, simDate:'2026-03-15', simTime:'0:54.123', hotel:'なし', dinner:'なし' },
+    { name:'佐藤 健',   furigana:'さとう たける',    school:'名古屋大学',   dept:'工学部機械航空工学科',        year:4, category:'出場選手(FGクラスドライバー)',       attr:'Aドライバー',        gender:'男', pref:'愛知県',   regType:'事前', driverClass:'A', clubYears:4, simDate:'2026-03-16', simTime:'0:53.789', hotel:'あり', dinner:'あり' },
+    { name:'鈴木 翔太', furigana:'すずき しょうた',  school:'早稲田大学',   dept:'理工学部機械工学科',          year:2, category:'出場選手(FGクラスドライバー)',       attr:'Bドライバー',        gender:'男', pref:'神奈川県', regType:'事前', driverClass:'B', clubYears:2, simDate:'2026-03-15', simTime:'0:55.456', hotel:'なし', dinner:'なし' },
+    { name:'渡辺 航',   furigana:'わたなべ わたる',  school:'東北大学',     dept:'工学部機械知能・航空工学科',  year:2, category:'出場選手(FGクラスドライバー)',       attr:'Bドライバー',        gender:'男', pref:'宮城県',   regType:'事前', driverClass:'B', clubYears:2, simDate:'2026-03-15', simTime:'0:57.222', hotel:'あり', dinner:'あり' },
+    { name:'高橋 勇気', furigana:'たかはし ゆうき',  school:'大阪大学',     dept:'工学部地球総合工学科',        year:3, category:'出場選手(FGクラスドライバー)',       attr:'Cドライバー',        gender:'男', pref:'大阪府',   regType:'事前', driverClass:'C', clubYears:3, simDate:'2026-03-16', simTime:'0:56.001', hotel:'あり', dinner:'あり' },
     // 女子クラスドライバー 2名
-    { name:'田中 彩花', furigana:'たなか あやか',    school:'慶應義塾大学', dept:'理工学部機械工学科',       year:3, category:'出場選手(女子クラスドライバー)',     attr:'女子クラスドライバー',gender:'女', pref:'東京都',   regType:'事前', driverClass:'W', clubYears:3, simDate:'2026-03-15', simTime:'1:02.345', hotel:'なし', dinner:'なし' },
-    { name:'鈴木 美咲', furigana:'すずき みさき',    school:'東京工業大学', dept:'工学院機械系',             year:2, category:'出場選手(女子クラスドライバー)',     attr:'女子クラスドライバー',gender:'女', pref:'東京都',   regType:'事前', driverClass:'W', clubYears:2, simDate:'2026-03-16', simTime:'1:05.678', hotel:'なし', dinner:'なし' },
-    // 補欠ドライバー 2名
-    { name:'伊藤 誠',   furigana:'いとう まこと',    school:'北海道大学',   dept:'工学部機械知能工学科',     year:4, category:'補欠ドライバー',                     attr:'補欠ドライバー',     gender:'男', pref:'北海道',   regType:'事前', driverClass:'K', clubYears:4, simDate:'2026-03-16', simTime:'0:58.999', hotel:'あり', dinner:'あり' },
-    { name:'加藤 颯',   furigana:'かとう はやて',    school:'横浜国立大学', dept:'理工学部機械工学・材料系学科',year:3, category:'補欠ドライバー',                  attr:'補欠ドライバー',     gender:'男', pref:'神奈川県', regType:'事前', driverClass:'K', clubYears:3, simDate:'2026-03-16', simTime:'1:00.111', hotel:'なし', dinner:'なし' },
-    // 応援学生 6名
-    { name:'中村 拓也', furigana:'なかむら たくや',  school:'九州大学',     dept:'工学部機械航空工学科',     year:3, category:'見学・応援学生(メカニック登録含む)', attr:'応援学生',           gender:'男', pref:'福岡県',   regType:'事前', driverClass:'', clubYears:3 },
-    { name:'小林 和也', furigana:'こばやし かずや',  school:'神戸大学',     dept:'工学部機械工学科',         year:2, category:'見学・応援学生(メカニック登録含む)', attr:'応援学生',           gender:'男', pref:'兵庫県',   regType:'事前', driverClass:'', clubYears:2 },
-    { name:'山本 雄太', furigana:'やまもと ゆうた',  school:'筑波大学',     dept:'理工学群工学システム学類', year:1, category:'見学・応援学生(メカニック登録含む)', attr:'応援学生',           gender:'男', pref:'茨城県',   regType:'事前', driverClass:'', clubYears:1 },
-    { name:'佐藤 桜',   furigana:'さとう さくら',    school:'早稲田大学',   dept:'基幹理工学部機械科学・航空学科',year:2, category:'見学・応援学生(メカニック登録含む)', attr:'応援学生',      gender:'女', pref:'埼玉県',   regType:'事前', driverClass:'', clubYears:2 },
-    { name:'吉田 一郎', furigana:'よしだ いちろう',  school:'名古屋大学',   dept:'工学部機械航空工学科',     year:2, category:'見学・応援学生(メカニック登録含む)', attr:'応援学生',           gender:'男', pref:'愛知県',   regType:'事前', driverClass:'', clubYears:2 },
-    { name:'高橋 純奈', furigana:'たかはし すみな',  school:'東京大学',     dept:'工学部精密工学科',         year:1, category:'見学・応援学生(メカニック登録含む)', attr:'応援学生',           gender:'女', pref:'東京都',   regType:'事前', driverClass:'', clubYears:1 },
+    { name:'田中 彩花', furigana:'たなか あやか',    school:'慶應義塾大学', dept:'理工学部機械工学科',          year:3, category:'出場選手(女子クラスドライバー)',     attr:'女子クラスドライバー',gender:'女', pref:'東京都',   regType:'事前', driverClass:'W', clubYears:3, simDate:'2026-03-15', simTime:'1:02.345', hotel:'なし', dinner:'なし' },
+    { name:'鈴木 美咲', furigana:'すずき みさき',    school:'東京工業大学', dept:'工学院機械系',                year:2, category:'出場選手(女子クラスドライバー)',     attr:'女子クラスドライバー',gender:'女', pref:'東京都',   regType:'事前', driverClass:'W', clubYears:2, simDate:'2026-03-16', simTime:'1:05.678', hotel:'なし', dinner:'なし' },
+    // 補欠ドライバー 2名（メカニック登録が付随）
+    { name:'伊藤 誠',   furigana:'いとう まこと',    school:'北海道大学',   dept:'工学部機械知能工学科',        year:4, category:'補欠ドライバー',                     attr:'補欠ドライバー',     gender:'男', pref:'北海道',   regType:'事前', driverClass:'K', clubYears:4, serviceClass:'メカニック', simDate:'2026-03-16', simTime:'0:58.999', hotel:'あり', dinner:'あり' },
+    { name:'加藤 颯',   furigana:'かとう はやて',    school:'横浜国立大学', dept:'理工学部機械工学・材料系学科', year:3, category:'補欠ドライバー',                    attr:'補欠ドライバー',     gender:'男', pref:'神奈川県', regType:'事前', driverClass:'K', clubYears:3, serviceClass:'メカニック', simDate:'2026-03-16', simTime:'1:00.111', hotel:'なし', dinner:'なし' },
+    // メカニック登録 2名
+    { name:'中村 拓也', furigana:'なかむら たくや',  school:'九州大学',     dept:'工学部機械航空工学科',        year:3, category:'見学・応援学生(メカニック登録含む)', attr:'メカニック',         gender:'男', pref:'福岡県',   regType:'事前', driverClass:'', clubYears:3, serviceClass:'メカニック' },
+    { name:'小林 和也', furigana:'こばやし かずや',  school:'神戸大学',     dept:'工学部機械工学科',            year:2, category:'見学・応援学生(メカニック登録含む)', attr:'メカニック',         gender:'男', pref:'兵庫県',   regType:'事前', driverClass:'', clubYears:2, serviceClass:'メカニック' },
+    // 応援学生のみ 4名
+    { name:'山本 雄太', furigana:'やまもと ゆうた',  school:'筑波大学',     dept:'理工学群工学システム学類',    year:1, category:'見学・応援学生(メカニック登録含む)', attr:'応援学生',           gender:'男', pref:'茨城県',   regType:'事前', driverClass:'', clubYears:1, serviceClass:'応援学生' },
+    { name:'佐藤 桜',   furigana:'さとう さくら',    school:'早稲田大学',   dept:'基幹理工学部機械科学・航空学科',year:2, category:'見学・応援学生(メカニック登録含む)', attr:'応援学生',          gender:'女', pref:'埼玉県',   regType:'事前', driverClass:'', clubYears:2, serviceClass:'応援学生' },
+    { name:'吉田 一郎', furigana:'よしだ いちろう',  school:'名古屋大学',   dept:'工学部機械航空工学科',        year:2, category:'見学・応援学生(メカニック登録含む)', attr:'応援学生',           gender:'男', pref:'愛知県',   regType:'事前', driverClass:'', clubYears:2, serviceClass:'応援学生' },
+    { name:'高橋 純奈', furigana:'たかはし すみな',  school:'東京大学',     dept:'工学部精密工学科',            year:1, category:'見学・応援学生(メカニック登録含む)', attr:'応援学生',           gender:'女', pref:'東京都',   regType:'事前', driverClass:'', clubYears:1, serviceClass:'応援学生' },
 
     // ── 当日参加（15名・全員「一般参加学生」） ────────
     { name:'山田 浩二', furigana:'やまだ こうじ',    school:'大阪大学',     dept:'工学部機械工学科',         year:3, category:'一般参加学生', attr:'一般参加学生', gender:'男', pref:'大阪府',   regType:'当日' },
@@ -92,17 +93,32 @@ function insertTestStudents(eventId) {
     preRegSheet.getRange(1, 1, 1, PRE_REG_COLS.length).setValues([PRE_REG_COLS]);
   }
 
-  const classCounters = {};
+  // studentId 生成用パラメータ（本番と同じ方式）
+  const yearMatch  = String(eventId).match(/(\d{4})/);
+  const yearSuffix = yearMatch ? yearMatch[1].slice(-1) : String(new Date().getFullYear()).slice(-1);
+  const { uniMap } = loadUniversityMaster_();
+
+  // 既存学生の属性別カウント（重複防止）
+  const existingData    = studentsSheet.getLastRow() > 1 ? studentsSheet.getDataRange().getValues() : [STUDENT_COLS];
+  const existingHeaders = existingData[0].map(String);
+  const attrColIdx      = existingHeaders.indexOf('属性');
+  const attrCounters    = {};
+  existingData.slice(1).forEach(r => {
+    const a = String(r[attrColIdx] || '');
+    if (a) attrCounters[a] = (attrCounters[a] || 0) + 1;
+  });
 
   const studentRows = [];
   const preRegRows  = [];
 
   STUDENTS_RAW.forEach(d => {
-    const code = CLASS_CODES[d.attr] || 'V';
-    classCounters[code] = (classCounters[code] || 0) + 1;
-    const studentId = eventId + '_' + code + String(classCounters[code]).padStart(3, '0');
+    const uniCode   = uniMap.get(String(d.school).trim()) || '0000';
+    const classCode = CLASS_CODES[d.attr] || 'V';
+    attrCounters[d.attr] = (attrCounters[d.attr] || 0) + 1;
+    const seq       = attrCounters[d.attr];
+    const studentId = yearSuffix + uniCode + classCode + String(seq).padStart(2, '0');
     const cardToken = Utilities.getUuid();
-    const email     = studentId.replace(/_/g, '.') + '@test.example.com';
+    const email     = d.name.replace(/\s/g, '').toLowerCase() + seq + '@test.example.com';
     const phone     = '090-' + (1000 + Math.floor(Math.random() * 9000)) + '-' + (1000 + Math.floor(Math.random() * 9000));
     const bday      = `${1999 + (4 - d.year)}-${String(Math.ceil(Math.random()*12)).padStart(2,'0')}-${String(1+Math.floor(Math.random()*28)).padStart(2,'0')}`;
 
@@ -123,10 +139,10 @@ function insertTestStudents(eventId) {
     sRow[sc('性別')]              = d.gender;
     sRow[sc('メールアドレス')]    = email;
     sRow[sc('電話番号')]          = phone;
-    sRow[sc('所属校出場')]        = d.regType === '事前' && d.driverClass ? 'TRUE' : '';
-    sRow[sc('規則誓約同意')]      = 'TRUE';
-    sRow[sc('SNS同意')]           = d.gender === '女' ? '' : 'TRUE';
-    sRow[sc('個人情報同意')]      = 'TRUE';
+    sRow[sc('所属校出場')]        = d.regType === '事前' && d.driverClass ? 'true' : '';
+    sRow[sc('規則誓約同意')]      = 'true';
+    sRow[sc('SNS同意')]           = 'true';
+    sRow[sc('個人情報同意')]      = 'true';
     sRow[sc('登録種別')]          = d.regType;
     studentRows.push(sRow);
 
@@ -161,9 +177,10 @@ function insertTestStudents(eventId) {
       pRow[pc('来場予定日')]        = '土日両日';
       pRow[pc('弁当_土')]           = d.hotel === 'あり' ? 'あり' : 'なし';
       pRow[pc('弁当_日')]           = d.hotel === 'あり' ? 'あり' : 'なし';
-      pRow[pc('規則誓約同意')]      = 'TRUE';
-      pRow[pc('個人情報同意')]      = 'TRUE';
-      pRow[pc('メディア同意')]      = d.gender !== '女' ? 'TRUE' : '';
+      pRow[pc('サービス作業クラス')]= d.serviceClass || '';
+      pRow[pc('規則誓約同意')]      = 'true';
+      pRow[pc('個人情報同意')]      = 'true';
+      pRow[pc('メディア同意')]      = 'true';
       preRegRows.push(pRow);
     }
   });

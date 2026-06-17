@@ -71,18 +71,40 @@ body {
 }
 
 .fg-logo {
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: #111827;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
 }
 
-.fg-logo span {
+.fg-logo-mark {
+  font-family: Impact, 'Arial Narrow Bold', sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  color: #111827;
+  line-height: 1;
+  display: flex;
+  align-items: stretch;
+}
+
+.fg-logo-mark span {
   background: var(--fg-blue);
   color: #fff;
-  padding: 3px 8px;
-  border-radius: 2px;
+  padding: 0 7px;
   margin-left: 4px;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+}
+
+.fg-logo-sub {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 10px;
+  font-weight: 400;
+  color: #111827;
+  letter-spacing: 0.06em;
+  line-height: 1;
 }
 
 .fg-page-name {
