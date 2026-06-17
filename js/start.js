@@ -115,6 +115,14 @@ async function onQRFound(qrData) {
       // 復帰(Cookie消失後の再スキャン) → 継続 or 交換済み画面
       renderContinuing(res.data);
     }
+  } else if (res.error === 'no_active_event') {
+    showState('error');
+    setText('error-title', '現在開催中のイベントがありません');
+    setText('error-msg', '開催日時をご確認ください。');
+  } else if (res.error === 'missing_event') {
+    showState('error');
+    setText('error-title', 'イベントを特定できませんでした');
+    setText('error-msg', 'スタッフにお問い合わせください。');
   } else {
     showState('error');
     setText('error-title', 'QRコードが無効です');

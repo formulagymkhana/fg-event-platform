@@ -74,6 +74,10 @@ document.getElementById('btn-scan-cancel')?.addEventListener('click', closeCompa
       showError('公開期限が終了しました。', '期限内に登録された企業はメールからアクセスできます。');
     } else if (res.error === 'timeout') {
       showError('接続がタイムアウトしました。', 'もう一度お試しください。');
+    } else if (res.error === 'no_active_event') {
+      showError('現在開催中のイベントがありません。', '開催日時をご確認ください。');
+    } else if (res.error === 'missing_event') {
+      showError('イベントを特定できませんでした。', 'スタッフにお問い合わせください。');
     } else {
       showError('QRコードが無効です。', 'もう一度スキャンしてください。');
     }
