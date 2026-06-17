@@ -68,7 +68,7 @@ document.getElementById('btn-scan-cancel')?.addEventListener('click', closeCompa
 
   // ⚠ cardTokenのcookie保存は行わない(企業の端末で開くため)
 
-  const res = await FG_API.getStudent(token);
+  const res = await FG_API.getStudent(token, pageEvent);
   if (!res.ok) {
     if (res.error === 'expired') {
       showError('公開期限が終了しました。', '期限内に登録された企業はメールからアクセスできます。');

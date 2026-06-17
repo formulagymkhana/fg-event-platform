@@ -16,6 +16,16 @@
 
 ---
 
+## 2026-06-17 fix: QR内のeventをAPIへ渡すよう修正・エラーメッセージ改善
+- 変更ファイル: `js/api.js`, `js/card.js`, `js/start.js`
+- 変更内容:
+  - `getStudent(cardToken, event)` / `activateStamp(cardToken, event)` に event 引数を追加
+  - `card.js`: URLの `event` パラメータを `getStudent` へ渡すよう修正
+  - `start.js`: スキャンしたQR URLから `event` を取得し `activateStamp` へ渡すよう修正
+  - `no_active_event` / `missing_event` を汎用「QRコードが無効です」と区別して表示
+- 理由/背景: 学生QRは `card.html?token=...&event=...` 形式だが、card.js・start.js が event を捨てて API コールしていた。API は `getCurrentEvent`（今日が開催期間内かチェック）にフォールバックするため、会期外・別イベント選択時に invalid_token / no_active_event エラーになっていた
+- 申し送り/注意点: デプロイ不要（フロントのみ変更）。GAS側は元々 event 必須で対応済み
+
 ## 2026-06-17 admin.gs クリーンアップ: 危険な関数の削除・initializeMaster ガード追加
 - 変更ファイル: `docs/gas-patches/admin.gs.final.txt`
 - 変更内容:

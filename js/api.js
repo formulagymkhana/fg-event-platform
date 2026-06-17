@@ -99,8 +99,10 @@ const FG_API = (() => {
   // ── 企業向けAPI ───────────────────────────────
 
   /** cardTokenで学生情報を取得(企業がQR名刺を見るとき) */
-  function getStudent(cardToken) {
-    return call_('getStudent', { token: cardToken });
+  function getStudent(cardToken, event) {
+    const p = { token: cardToken };
+    if (event) p.event = event;
+    return call_('getStudent', p);
   }
 
   /** 企業が学生QRを閲覧したログを記録(メール手動登録用) */
@@ -131,8 +133,10 @@ const FG_API = (() => {
    * 学生が自分のQRをスキャンして呼ぶ。
    * 返り値: { stampToken, stampCount, prizeCriteria, cleared }
    */
-  function activateStamp(cardToken) {
-    return call_('activateStamp', { token: cardToken });
+  function activateStamp(cardToken, event) {
+    const p = { token: cardToken };
+    if (event) p.event = event;
+    return call_('activateStamp', p);
   }
 
   /** stampTokenでNFCスタンプを記録 */

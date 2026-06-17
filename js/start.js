@@ -91,7 +91,12 @@ async function onQRFound(qrData) {
   stopCamera();
 
   let cardToken = null;
-  try { cardToken = new URL(qrData).searchParams.get('token'); } catch (e) {}
+  let qrEvent   = null;
+  try {
+    const u  = new URL(qrData);
+    cardToken = u.searchParams.get('token');
+    qrEvent   = u.searchParams.get('event');
+  } catch (e) {}
 
   if (!cardToken) {
     showState('error');
@@ -101,7 +106,7 @@ async function onQRFound(qrData) {
   }
 
   showState('loading');
-  const res = await FG_API.activateStamp(cardToken);
+  const res = await FG_API.activateStamp(cardToken, qrEvent);
 
   if (res.ok) {
     FG_API.saveStampToken(res.data.stampToken);
