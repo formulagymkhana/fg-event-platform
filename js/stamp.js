@@ -35,6 +35,10 @@
     case 'already_stamped':
       showState('already');
       break;
+    case 'no_active_event':
+    case 'stamp_closed':
+      showState('ended');
+      break;
     case 'timeout':
       showState('error');
       setText('error-title', '接続がタイムアウトしました');
@@ -74,7 +78,7 @@ function renderSuccess(d) {
 }
 
 function showState(state) {
-  ['loading', 'no-token', 'success', 'already', 'error'].forEach(s => {
+  ['loading', 'no-token', 'success', 'already', 'ended', 'error'].forEach(s => {
     const el = document.getElementById('state-' + s);
     if (el) el.style.display = s === state ? 'block' : 'none';
   });

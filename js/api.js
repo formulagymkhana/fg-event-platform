@@ -31,6 +31,7 @@ const FG_API = (() => {
         localStorage.setItem('fg_event_date',  today);
         return res.data.eventId;
       }
+      if (res.error === 'no_active_event') return null;
     } catch (e) {}
     return FG_CONFIG.EVENT_ID;
   }
@@ -40,7 +41,9 @@ const FG_API = (() => {
     url.searchParams.set('action', action);
     // getCurrentEvent 自身はイベントID不要。それ以外は自動解決。
     if (action !== 'getCurrentEvent' && !params.event) {
-      params = { event: await getOrFetchEventId_(), ...params };
+      const eventId = await getOrFetchEventId_();
+      if (eventId === null) return { ok: false, error: 'no_active_event', message: '現在開催中のイベントはありません' };
+      params = { event: eventId, ...params };
     }
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null) url.searchParams.set(k, v);
