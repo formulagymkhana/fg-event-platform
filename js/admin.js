@@ -365,10 +365,7 @@ async function loadConfig_(gen, ev) {
   const cfg = res.data.config || {};
   setVal_('cfg-prizeUnitSize', cfg.prizeUnitSize || cfg.prizeThreshold || 5);
   setVal_('cfg-maxPrizes',    cfg.maxPrizes     || cfg.prizeCount    || 3);
-  setVal_('cfg-stampStartAt',     toDtLocal_(cfg.stampStartAt));
-  setVal_('cfg-stampEndAt',       toDtLocal_(cfg.stampEndAt));
-  setVal_('cfg-exchangeDeadline', toDtLocal_(cfg.exchangeDeadline));
-  setVal_('cfg-publicDeadline',   toDtLocal_(cfg.publicDeadline));
+  setVal_('cfg-publicDeadline', toDtLocal_(cfg.publicDeadline));
   setVal_('cfg-preRegMailSubject', cfg.preRegMailSubject || PREREG_MAIL_SUBJECT_DEFAULT);
   setVal_('cfg-preRegMailBody',    cfg.preRegMailBody    || PREREG_MAIL_BODY_DEFAULT);
 }
@@ -391,9 +388,6 @@ async function handleSaveConfig_() {
   const map = {
     prizeUnitSize:    getVal_('cfg-prizeUnitSize'),
     maxPrizes:        getVal_('cfg-maxPrizes'),
-    stampStartAt:     fromDtLocal_(getVal_('cfg-stampStartAt')),
-    stampEndAt:       fromDtLocal_(getVal_('cfg-stampEndAt')),
-    exchangeDeadline: fromDtLocal_(getVal_('cfg-exchangeDeadline')),
     publicDeadline:   fromDtLocal_(getVal_('cfg-publicDeadline')),
     preRegMailSubject: getVal_('cfg-preRegMailSubject'),
     preRegMailBody:    getVal_('cfg-preRegMailBody'),
@@ -844,42 +838,58 @@ async function handleClearCache_() {
 
 // ── Edit Event Info ───────────────────────────────
 
-function loadEventInfo_() {
+async function loadEventInfo_() {
   const ev = allEvents_.find(e => e.eventId === curEvent_);
   if (!ev) return;
   setVal_('edit-event-name', ev.name || '');
-  // yyyy/MM/dd → yyyy-MM-dd (date input形式)
-  const toInputDate = s => s ? String(s).replace(/\//g, '-') : '';
-  setVal_('edit-start-date', toInputDate(ev.startDate));
-  setVal_('edit-end-date',   toInputDate(ev.endDate));
   const sel = id_('edit-event-status');
   if (sel) sel.value = ev.status || '準備中';
+
+  // CONFIGからstampStartAt/stampEndAt/exchangeDeadlineを取得して datetime 入力を埋める
+  const cfgRes = await adminCall_('adminGetConfig', { event: curEvent_ });
+  const cfg = cfgRes.ok ? (cfgRes.data.config || {}) : {};
+  setVal_('edit-start-datetime',    toDtLocal_(cfg.stampStartAt)    || dateToDtLocal_(ev.startDate));
+  setVal_('edit-end-datetime',      toDtLocal_(cfg.stampEndAt)      || dateToDtLocal_(ev.endDate));
+  setVal_('edit-exchange-deadline', toDtLocal_(cfg.exchangeDeadline));
+}
+
+// "yyyy/MM/dd" → datetime-local の日付部分のみ (時刻は 00:00)
+function dateToDtLocal_(val) {
+  if (!val) return '';
+  const d = String(val).replace(/\//g, '-').slice(0, 10);
+  return d.length === 10 ? d + 'T00:00' : '';
 }
 
 async function handleSaveEventInfo_() {
   if (!curEvent_) return;
-  const eventName = getVal_('edit-event-name').trim();
-  const startDate = getVal_('edit-start-date');
-  const endDate   = getVal_('edit-end-date');
-  const status    = getVal_('edit-event-status');
+  const eventName        = getVal_('edit-event-name').trim();
+  const startDatetime    = getVal_('edit-start-datetime');
+  const endDatetime      = getVal_('edit-end-datetime');
+  const exchangeDeadline = getVal_('edit-exchange-deadline');
+  const status           = getVal_('edit-event-status');
   const btn = id_('btn-save-event-info');
   const fb  = id_('save-event-fb');
-  if (!eventName || !startDate || !endDate) {
-    fb.className = 'save-fb save-fb-err'; fb.textContent = '全項目を入力してください'; return;
+  if (!eventName || !startDatetime || !endDatetime) {
+    fb.className = 'save-fb save-fb-err'; fb.textContent = '名前・開始日時・終了日時は必須です'; return;
   }
   btn.disabled = true; fb.className = 'save-fb'; fb.textContent = '';
+  // EVENT_LIST には日付のみ渡す（getCurrentEvent の日付比較用）
+  const startDate = startDatetime.slice(0, 10).replace(/-/g, '/');
+  const endDate   = endDatetime.slice(0, 10).replace(/-/g, '/');
   const res = await adminCall_('adminUpdateEvent', {
     eventId: curEvent_,
     eventName,
-    startDate: startDate.replace(/-/g, '/'),
-    endDate:   endDate.replace(/-/g, '/'),
+    startDate,
+    endDate,
     status,
+    stampStartAt:     fromDtLocal_(startDatetime),
+    stampEndAt:       fromDtLocal_(endDatetime),
+    exchangeDeadline: exchangeDeadline ? fromDtLocal_(exchangeDeadline) : fromDtLocal_(endDatetime),
   });
   btn.disabled = false;
   if (res.ok) {
-    // ローカルのイベント情報を更新
     const ev = allEvents_.find(e => e.eventId === curEvent_);
-    if (ev) { ev.name = eventName; ev.startDate = startDate.replace(/-/g, '/'); ev.endDate = endDate.replace(/-/g, '/'); ev.status = status; }
+    if (ev) { ev.name = eventName; ev.startDate = startDate; ev.endDate = endDate; ev.status = status; }
     setText_('dash-ev-name', eventName);
     fb.className = 'save-fb save-fb-ok'; fb.textContent = '✓ 保存しました';
     setTimeout(() => { fb.textContent = ''; }, 3000);

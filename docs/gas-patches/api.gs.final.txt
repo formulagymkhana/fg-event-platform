@@ -1239,12 +1239,13 @@ function actionAdminCreateEvent_(p) {
   return ok_({ created: true, eventId: p.eventId });
 }
 
-// イベントの基本情報（名前・開始日・終了日・状態）を更新
+// イベントの基本情報（名前・開始日・終了日・状態）とCONFIG期間設定を更新
 function actionAdminUpdateEvent_(p) {
   const e = validateAdmin_(p);
   if (e) return e;
   if (!p.eventId) return err_('missing_params');
 
+  // EVENT_LIST を更新（getCurrentEvent の日付比較用）
   const sheet   = masterSs_().getSheetByName(SHEET.EVENT_LIST);
   const data    = sheet.getDataRange().getValues();
   const headers = data[0].map(String);
@@ -1253,17 +1254,30 @@ function actionAdminUpdateEvent_(p) {
   const rowIdx = data.findIndex((r, i) => i > 0 && String(r[idCol]) === String(p.eventId));
   if (rowIdx < 0) return err_('event_not_found');
 
-  const sheetRow = rowIdx + 1; // 1-indexed
-  const set = (colName, value) => {
+  const sheetRow = rowIdx + 1;
+  const setList = (colName, value) => {
     const col = headers.indexOf(colName);
-    if (col >= 0 && value !== undefined && value !== null) {
-      sheet.getRange(sheetRow, col + 1).setValue(value);
-    }
+    if (col >= 0 && value) sheet.getRange(sheetRow, col + 1).setValue(value);
   };
-  if (p.eventName) set('イベント名', p.eventName);
-  if (p.startDate) set('開始日', p.startDate);
-  if (p.endDate)   set('終了日', p.endDate);
-  if (p.status)    set('状態', p.status);
+  if (p.eventName) setList('イベント名', p.eventName);
+  if (p.startDate) setList('開始日', p.startDate);
+  if (p.endDate)   setList('終了日', p.endDate);
+  if (p.status)    setList('状態', p.status);
+
+  // CONFIG シートも更新（スタンプ・交換期間）
+  if (p.stampStartAt || p.stampEndAt || p.exchangeDeadline) {
+    const cfg = eventSs_(p.eventId).getSheetByName(SHEET.CONFIG);
+    const cfgData = cfg.getDataRange().getValues();
+    const setConfig = (key, value) => {
+      if (!value) return;
+      const idx = cfgData.findIndex(r => String(r[0]) === key);
+      if (idx >= 0) cfg.getRange(idx + 1, 2).setValue(value);
+      else cfg.appendRow([key, value]);
+    };
+    if (p.stampStartAt)     setConfig('stampStartAt',     p.stampStartAt);
+    if (p.stampEndAt)       setConfig('stampEndAt',       p.stampEndAt);
+    if (p.exchangeDeadline) setConfig('exchangeDeadline', p.exchangeDeadline);
+  }
 
   CacheService.getScriptCache().remove('cfg_' + String(p.eventId));
   return ok_({ updated: true });

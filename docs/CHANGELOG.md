@@ -24,6 +24,16 @@
 - 理由/背景: iOS Safari では GAS の CORS リダイレクト後に AbortController のシグナルが失われ fetch が永遠にハングする。GAS がコールドスタートで15秒超えると企業QR読み込みが「確認中...」から進まなくなっていた
 - 申し送り/注意点: デプロイ不要（フロントのみ変更）
 
+## 2026-06-17 refactor: 日時設定を「イベント基本情報」に統合
+- 変更ファイル: `app/admin.html`, `js/admin.js`, `docs/gas-patches/api.gs.final.txt`
+- 変更内容:
+  - 「イベント基本情報」を開始日時・終了日時（datetime-local）＋景品交換受付期限に変更
+  - 保存時に EVENT_LIST（日付のみ）と CONFIG（stampStartAt/stampEndAt/exchangeDeadline）を同時更新
+  - 「景品・期間設定」から stampStartAt/stampEndAt/exchangeDeadline を削除（QR閲覧公開期限のみ残す）
+  - `adminUpdateEvent` GAS アクション: CONFIG シートへの書き込みを追加
+  - `js/card.js`: view-deadline 参照を削除（要素削除済み）
+- 申し送り/注意点: **GAS 再デプロイ必須**（adminUpdateEvent に CONFIG 書き込み追加）
+
 ## 2026-06-17 feat: イベント基本情報編集・card.html旧メール登録欄削除
 - 変更ファイル: `app/admin.html`, `js/admin.js`, `docs/gas-patches/api.gs.final.txt`, `app/card.html`, `js/card.js`
 - 変更内容:

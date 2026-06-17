@@ -391,15 +391,18 @@
               <label>イベント名</label>
               <input type="text" class="cfg-input" id="edit-event-name">
             </div>
-            <div class="cfg-row-half">
-              <div class="cfg-row">
-                <label>開始日</label>
-                <input type="date" class="cfg-input" id="edit-start-date">
-              </div>
-              <div class="cfg-row">
-                <label>終了日</label>
-                <input type="date" class="cfg-input" id="edit-end-date">
-              </div>
+            <div class="cfg-row">
+              <label>開始日時</label>
+              <input type="datetime-local" class="cfg-input" id="edit-start-datetime">
+            </div>
+            <div class="cfg-row">
+              <label>終了日時</label>
+              <input type="datetime-local" class="cfg-input" id="edit-end-datetime">
+            </div>
+            <div class="cfg-row">
+              <label>景品交換受付期限</label>
+              <div class="cfg-hint">空欄=終了日時と同じ</div>
+              <input type="datetime-local" class="cfg-input" id="edit-exchange-deadline">
             </div>
             <div class="cfg-row">
               <label>状態</label>
@@ -414,7 +417,7 @@
           </div>
 
           <div class="cfg-group">
-            <div class="cfg-group-title">景品・期間設定</div>
+            <div class="cfg-group-title">景品設定</div>
             <div class="cfg-hint" style="margin-bottom:8px">例: 5個ごと・最大3個 → 5個で1個、10個で2個、15個で3個</div>
             <div class="cfg-row-half">
               <div class="cfg-row">
@@ -427,20 +430,8 @@
               </div>
             </div>
             <div class="cfg-row">
-              <label>スタンプ開始日時</label>
-              <div class="cfg-hint">未設定=制限なし</div>
-              <input type="datetime-local" class="cfg-input" id="cfg-stampStartAt">
-            </div>
-            <div class="cfg-row">
-              <label>スタンプ終了日時</label>
-              <input type="datetime-local" class="cfg-input" id="cfg-stampEndAt">
-            </div>
-            <div class="cfg-row">
-              <label>景品交換期限</label>
-              <input type="datetime-local" class="cfg-input" id="cfg-exchangeDeadline">
-            </div>
-            <div class="cfg-row">
               <label>QR閲覧公開期限</label>
+              <div class="cfg-hint">企業が学生QRを閲覧できる期限</div>
               <input type="datetime-local" class="cfg-input" id="cfg-publicDeadline">
             </div>
           </div>
