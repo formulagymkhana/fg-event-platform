@@ -1323,14 +1323,15 @@ function actionAdminGetStudents_(p) {
   const students = data.slice(1)
     .filter(r => String(g(r, 'studentId')) !== '')
     .map(r => ({
-      studentId: String(g(r, 'studentId')),
-      name:      g(r, '氏名'),
-      furigana:  g(r, 'ふりがな'),
-      school:    g(r, '大学名'),
-      year:      g(r, '学年'),
-      category:  g(r, '属性'),
-      regType:   String(g(r, '登録種別') || '当日'),
-      email:     g(r, 'メールアドレス'),
+      studentId:  String(g(r, 'studentId')),
+      cardToken:  String(g(r, 'cardToken') || ''),
+      name:       g(r, '氏名'),
+      furigana:   g(r, 'ふりがな'),
+      school:     g(r, '大学名'),
+      year:       g(r, '学年'),
+      category:   g(r, '属性'),
+      regType:    String(g(r, '登録種別') || '当日'),
+      email:      g(r, 'メールアドレス'),
     }));
   return ok_({ students });
 }

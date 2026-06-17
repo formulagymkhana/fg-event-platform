@@ -55,6 +55,7 @@ window.addEventListener('DOMContentLoaded', () => {
   id_('btn-prereg-csv-driver')?.addEventListener('click', () => downloadPreRegCsv_('driver'));
   id_('btn-prereg-csv-spectator')?.addEventListener('click', () => downloadPreRegCsv_('spectator'));
   id_('btn-prereg-csv-all')?.addEventListener('click', () => downloadPreRegCsv_('all'));
+  id_('btn-student-qr-csv')?.addEventListener('click', downloadStudentQrCsv_);
 
   // 準備中ボタン: トースト案内
   document.addEventListener('click', e => {
@@ -423,6 +424,20 @@ function downloadCsv_(body, filename) {
   URL.revokeObjectURL(url);
 }
 
+/** 学生全員のQR用URL CSV（当日参加含む） */
+async function downloadStudentQrCsv_() {
+  if (!curEvent_) { showToast_('イベントが選択されていません'); return; }
+  if (!studentData_.length) { showToast_('学生データがありません（先に学生管理ページを開いてください）'); return; }
+  const esc = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const head  = ['氏名', 'ふりがな', '大学名', '属性', '登録種別', 'QR用URL'];
+  const lines = [head.join(',')].concat(studentData_.map(s => [
+    s.name, s.furigana, s.school, s.category || '', s.regType,
+    s.cardToken ? cardPassUrl_(s.cardToken) : '',
+  ].map(esc).join(',')));
+  downloadCsv_('﻿' + lines.join('\r\n'), `学生QR_URL_${curEvent_}_${new Date().toISOString().slice(0,10)}.csv`);
+  showToast_(`✓ ${studentData_.length}名のQR用URLを出力しました`);
+}
+
 /** 企業NFC URL を CSV 出力（NFC書き込み用途順: ブース名 / NFC用URL / stampKey / 企業ID） */
 async function downloadNfcCsv_() {
   if (!curEvent_) { showToast_('イベントが選択されていません'); return; }
@@ -631,22 +646,30 @@ function renderStudentList_() {
     <div style="font-size:10px;color:var(--gray);margin-bottom:6px">${rows.length}名 表示</div>
     <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
       ${rows.map((s, i) => `
-        <div style="display:grid;grid-template-columns:1fr auto;align-items:center;
-          padding:9px 12px;${i ? 'border-top:1px solid var(--border)' : ''};
+        <div style="padding:9px 12px;${i ? 'border-top:1px solid var(--border)' : ''};
           background:${s.regType === '事前' ? '#fff' : '#EFF6FF'}">
-          <div>
-            <div style="font-size:13px;font-weight:600;color:var(--navy)">${esc_(s.name)}
-              <span style="font-size:10px;font-weight:400;color:var(--gray);margin-left:4px">${esc_(s.furigana)}</span>
+          <div style="display:grid;grid-template-columns:1fr auto;align-items:center;margin-bottom:4px">
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--navy)">${esc_(s.name)}
+                <span style="font-size:10px;font-weight:400;color:var(--gray);margin-left:4px">${esc_(s.furigana)}</span>
+              </div>
+              <div style="font-size:10px;color:var(--gray);margin-top:2px">${esc_(s.school)} · ${esc_(s.category || '—')} · ${esc_(s.year ? s.year + '年' : '—')}</div>
             </div>
-            <div style="font-size:10px;color:var(--gray);margin-top:2px">${esc_(s.school)} · ${esc_(s.category || '—')} · ${esc_(s.year ? s.year + '年' : '—')}</div>
+            <span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;
+              background:${s.regType === '事前' ? '#F3F4F6' : '#DBEAFE'};
+              color:${s.regType === '事前' ? '#6B7280' : '#1E40AF'}">
+              ${s.regType === '事前' ? '事前登録' : '当日'}
+            </span>
           </div>
-          <span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;
-            background:${s.regType === '事前' ? '#F3F4F6' : '#DBEAFE'};
-            color:${s.regType === '事前' ? '#6B7280' : '#1E40AF'}">
-            ${s.regType === '事前' ? '事前登録' : '当日'}
-          </span>
+          ${s.cardToken ? `
+          <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+            <span style="font-size:9px;color:var(--gray);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc_(cardPassUrl_(s.cardToken))}</span>
+            <button class="copy-btn" data-copy="${esc_(cardPassUrl_(s.cardToken))}" style="flex-shrink:0;font-size:10px;padding:2px 8px">URLコピー</button>
+          </div>` : ''}
         </div>`).join('')}
     </div>`;
+  wrap.querySelectorAll('.copy-btn[data-copy]').forEach(b =>
+    b.addEventListener('click', () => copyText_(b.dataset.copy)));
 }
 
 async function handleToggleStampRally_(cb) {
