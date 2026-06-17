@@ -462,6 +462,17 @@
         <div id="co-summary-grid" style="display:flex;flex-direction:column;gap:10px"></div>
       </div>
 
+      <div class="add-co-form" id="import-co-form">
+        <div class="add-co-form-title">↩ 前回イベントから読み込み</div>
+        <div class="add-co-row">
+          <select id="import-source-event" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:#fff;color:var(--navy)">
+            <option value="">イベントを選択...</option>
+          </select>
+        </div>
+        <button class="save-btn" id="btn-import-companies" style="background:var(--navy-mid)">読み込む</button>
+        <p id="import-co-msg" style="font-size:12px;margin-top:8px;color:var(--gray)"></p>
+      </div>
+
       <div class="add-co-form">
         <div class="add-co-form-title">＋ 企業を追加</div>
         <div class="add-co-row">

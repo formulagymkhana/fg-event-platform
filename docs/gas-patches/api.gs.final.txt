@@ -110,7 +110,8 @@ function dispatch_(e) {
       case 'adminAddCompany':   return actionAdminAddCompany_(p);
       case 'adminUpdateCompany':return actionAdminUpdateCompany_(p);
       case 'adminDeleteCompany':return actionAdminDeleteCompany_(p);
-      case 'adminGenerateKeys': return actionAdminGenerateKeys_(p);
+      case 'adminGenerateKeys':    return actionAdminGenerateKeys_(p);
+      case 'adminImportCompanies': return actionAdminImportCompanies_(p);
       case 'adminUpdateKey':    return actionAdminUpdateKey_(p);
       default:                        return err_('unknown_action');
     }
@@ -1550,6 +1551,52 @@ function actionAdminUpdateKey_(p) {
   if (!p.newKey) return err_('missing_params');
   PropertiesService.getScriptProperties().setProperty('ADMIN_KEY', String(p.newKey));
   return ok_({ updated: true });
+}
+
+// 前回イベントから企業を引き継ぎ（stampKey/viewKey/logoUrl を保持）
+function actionAdminImportCompanies_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.event || !p.sourceEvent) return err_('missing_params');
+  if (String(p.event) === String(p.sourceEvent)) return err_('same_event');
+
+  const sourceSheet = eventSs_(p.sourceEvent).getSheetByName(SHEET.COMPANIES);
+  if (!sourceSheet || sourceSheet.getLastRow() < 2) return err_('no_source_companies');
+
+  const targetSheet  = eventSs_(p.event).getSheetByName(SHEET.COMPANIES);
+  const sourceData   = sourceSheet.getDataRange().getValues();
+  const sourceHdrs   = sourceData[0].map(String);
+  const targetData   = targetSheet.getDataRange().getValues();
+  const targetHdrs   = targetData[0].map(String);
+  const targetIdCol  = targetHdrs.indexOf('companyId');
+  const existingIds  = new Set(targetData.slice(1).map(r => String(r[targetIdCol])));
+
+  const sg = (row, name) => { const i = sourceHdrs.indexOf(name); return i >= 0 ? row[i] : ''; };
+
+  let imported = 0;
+  const baseOrder = targetData.length; // ヘッダー込み行数 = 既存企業数+1
+  sourceData.slice(1).forEach(row => {
+    const companyId = String(sg(row, 'companyId'));
+    if (!companyId || existingIds.has(companyId)) return;
+    const newRow = targetHdrs.map(h => {
+      switch (h) {
+        case 'companyId':  return companyId;
+        case '企業名':     return String(sg(row, '企業名'));
+        case 'stampKey':   return String(sg(row, 'stampKey')  || '');
+        case 'viewKey':    return String(sg(row, 'viewKey')   || '');
+        case '表示順':     return baseOrder + imported;
+        case 'hasNfc':     return String(sg(row, 'hasNfc')    || 'false');
+        case 'logoUrl':    return String(sg(row, 'logoUrl')   || '');
+        case 'stampRally': return String(sg(row, 'stampRally')|| 'true');
+        default:           return '';
+      }
+    });
+    targetSheet.appendRow(newRow);
+    existingIds.add(companyId);
+    imported++;
+  });
+
+  return ok_({ imported });
 }
 
 // 未発行キーを一括発行

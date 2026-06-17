@@ -39,6 +39,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // 企業管理ページ
   id_('btn-add-company')?.addEventListener('click', handleAddCompany_);
   id_('btn-gen-keys')?.addEventListener('click', handleGenerateKeys_);
+  id_('btn-import-companies')?.addEventListener('click', handleImportCompanies_);
 
   // Section toggles
   document.querySelectorAll('.section-hd').forEach(hd => {
@@ -135,6 +136,7 @@ function route_() {
 
   if (section === 'companies') {
     showPage_('companies');
+    populateImportSelect_();
     loadCompanies_();
   } else if (section === 'students') {
     showPage_('students');
@@ -713,6 +715,41 @@ async function handleDeleteCompany_(companyId) {
     loadCompanies_();
   } else {
     showToast_('⚠ 削除失敗: ' + (res.message || ''));
+  }
+}
+
+function populateImportSelect_() {
+  const sel = id_('import-source-event');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">イベントを選択...</option>' +
+    allEvents_
+      .filter(ev => ev.eventId !== curEvent_)
+      .map(ev => `<option value="${esc_(ev.eventId)}">${esc_(ev.name || ev.eventId)}</option>`)
+      .join('');
+  id_('import-co-msg').textContent = '';
+}
+
+async function handleImportCompanies_() {
+  if (!curEvent_) return;
+  const sel = id_('import-source-event');
+  const sourceEvent = sel?.value;
+  if (!sourceEvent) { id_('import-co-msg').textContent = 'イベントを選択してください'; return; }
+  const btn = id_('btn-import-companies');
+  btn.disabled = true;
+  btn.textContent = '読み込み中...';
+  const res = await adminCall_('adminImportCompanies', { event: curEvent_, sourceEvent });
+  btn.disabled = false;
+  btn.textContent = '読み込む';
+  const msg = id_('import-co-msg');
+  if (res.ok) {
+    msg.style.color = 'var(--green, #1a6640)';
+    msg.textContent = `✓ ${res.data.imported}社を引き継ぎました`;
+    loadCompanies_();
+  } else {
+    msg.style.color = 'var(--red, #9a2a2a)';
+    msg.textContent = res.error === 'no_source_companies' ? 'コピー元に企業が登録されていません'
+      : res.error === 'same_event' ? '同じイベントは選択できません'
+      : (res.message || '読み込みに失敗しました');
   }
 }
 
