@@ -135,12 +135,6 @@ function render(d) {
   $('birthday').textContent   = d.birthday;
   $('email').textContent      = d.email;
 
-  if (d.deadline) {
-    const dl  = new Date(d.deadline);
-    const fmt = `${dl.getFullYear()}/${dl.getMonth()+1}/${dl.getDate()} `
-              + `${pad(dl.getHours())}:${pad(dl.getMinutes())}`;
-    $('view-deadline').textContent = '公開期限: ' + fmt;
-  }
 
   $('state-loading').style.display = 'none';
   $('state-card').style.display    = 'block';
