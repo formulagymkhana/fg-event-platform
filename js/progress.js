@@ -181,13 +181,14 @@ function renderMilestoneBar(count, milestones) {
     <div style="position:relative">
       <div class="milestone-track">
         <div class="milestone-fill" style="width:${pct}%"></div>
-        ${milestones.map(m => {
+        ${milestones.map((m, i) => {
           const pos     = Math.round((m.threshold / maxThreshold) * 100);
           const reached = count >= m.threshold;
           const remain  = Math.max(0, m.threshold - count);
+          const labelMod = i === milestones.length - 1 ? ' last' : (i === 0 ? ' first' : '');
           return `
             <div class="milestone-marker ${reached ? 'reached' : 'unreached'}" style="left:${pos}%"></div>
-            <div class="milestone-label" style="left:${pos}%">
+            <div class="milestone-label${labelMod}" style="left:${pos}%">
               <span class="m-count">${m.threshold}個達成</span>
               <span class="m-remain">${reached ? '達成！' : 'あと' + remain + '個'}</span>
             </div>`;
