@@ -16,6 +16,16 @@
 
 ---
 
+## 2026-06-17 admin.gs クリーンアップ: 危険な関数の削除・initializeMaster ガード追加
+- 変更ファイル: `docs/gas-patches/admin.gs.final.txt`
+- 変更内容:
+  - `initializeMaster()` に確認引数ガードを追加（`'INIT_MASTER'` なしでは実行不可）
+  - `registerExistingEvent()`, `createNewEvent()` を削除（admin UI で管理済み・古い hardcoded ID）
+  - `runGenerateCompanyKeys()`, `runAddStampParticipantsSheet()`, `runSetupPrizeConfig()` を削除（hardcoded '2026_rd2' で時代遅れ）
+  - 未使用定数 `POKEBELL` を削除
+- 理由/背景: `initializeMaster()` を誤実行すると MASTER_SPREADSHEET_ID が上書きされ「イベントがありません」状態になる事故が発生したため防衛的ガードを追加。古い関数群は admin UI に機能移転済みで不要
+- 申し送り/注意点: **GAS 再デプロイ必須**。各 one-off セットアップが必要な場合は eventId を明示してコンソール実行すること
+
 ## 2026-06-17 T-E: company.html 実装・バグ修正・api.js補完
 - 変更ファイル: `app/company.html`（新規）, `js/company.js`（新規）, `js/admin.js`, `js/api.js`, `docs/gas-patches/api.gs.final.txt`
 - 変更内容:

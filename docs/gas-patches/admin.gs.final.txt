@@ -2,11 +2,14 @@
  * FG Event Platform — 管理用スクリプト(スタンドアローン版)
  *
  * 初回セットアップ手順:
- *   1. initializeMaster()           → マスタースプレッドシートを作成
- *   2. initializeUniversityMaster() → 大学コードを投入
- *   3. registerExistingEvent()      → 既存イベントを登録
- *   4. addStampParticipantsSheet()  → スタンプ参加者シートを追加(既存SSのみ)
- *   5. importStudents()             → 学生マスターを生成
+ *   1. initializeMaster("INIT_MASTER") → マスタースプレッドシートを作成
+ *   2. initializeUniversityMaster()    → 大学コードを投入
+ *   3. 管理画面からイベントを作成
+ *   4. importStudents(eventId)         → 学生マスターを生成（Googleフォームから）
+ *
+ * ⚠ 注意: initializeMaster は MASTER_SPREADSHEET_ID を上書きするため
+ *          既存運用中に誤実行すると管理画面からイベントが消える。
+ *          必ず確認引数 "INIT_MASTER" を渡すこと。
  */
 
 const STUDENT_COLS = [
@@ -22,29 +25,17 @@ const CLASS_CODES = {
   'メカニック':'M','応援学生':'S','一般参加学生':'V',
 };
 
-const POKEBELL = {
-  'ア':'11','イ':'12','ウ':'13','エ':'14','オ':'15',
-  'カ':'21','キ':'22','ク':'23','ケ':'24','コ':'25',
-  'ガ':'21','ギ':'22','グ':'23','ゲ':'24','ゴ':'25',
-  'サ':'31','シ':'32','ス':'33','セ':'34','ソ':'35',
-  'ザ':'31','ジ':'32','ズ':'33','ゼ':'34','ゾ':'35',
-  'タ':'41','チ':'42','ツ':'43','テ':'44','ト':'45',
-  'ダ':'41','ヂ':'42','ヅ':'43','デ':'44','ド':'45',
-  'ナ':'51','ニ':'52','ヌ':'53','ネ':'54','ノ':'55',
-  'ハ':'61','ヒ':'62','フ':'63','ヘ':'64','ホ':'65',
-  'バ':'61','ビ':'62','ブ':'63','ベ':'64','ボ':'65',
-  'パ':'61','ピ':'62','プ':'63','ペ':'64','ポ':'65',
-  'マ':'71','ミ':'72','ム':'73','メ':'74','モ':'75',
-  'ヤ':'81','ユ':'83','ヨ':'85',
-  'ラ':'91','リ':'92','ル':'93','レ':'94','ロ':'95',
-  'ワ':'01','ヲ':'02','ン':'03',
-};
-
 // ============================================================
 // initializeMaster
+// ⚠ MASTER_SPREADSHEET_ID を上書きするため既存運用中は絶対に実行しない
+// 実行するには引数 "INIT_MASTER" が必要
 // ============================================================
 
-function initializeMaster() {
+function initializeMaster(confirm) {
+  if (confirm !== 'INIT_MASTER') {
+    notifyUser_('⚠ 危険な操作です。\nこの関数は MASTER_SPREADSHEET_ID を上書きします。\n\n実行するには引数を付けて呼び出してください:\n  initializeMaster("INIT_MASTER")');
+    return;
+  }
   const ss = SpreadsheetApp.create('FG Event Platform - マスター');
   PropertiesService.getScriptProperties()
     .setProperty('MASTER_SPREADSHEET_ID', ss.getId());
@@ -61,35 +52,6 @@ function initializeMaster() {
   const url = ss.getUrl();
   console.log('✅ マスタースプレッドシートを作成しました\nURL: ' + url);
   notifyUser_('マスタースプレッドシートを作成しました。\nURL: ' + url);
-}
-
-// ============================================================
-// registerExistingEvent
-// ============================================================
-
-function registerExistingEvent() {
-  const EVENT_ID       = '2026_rd2';
-  const EVENT_NAME     = 'FORMULA GYMKHANA 2026 予選会 Rd.2';
-  const SPREADSHEET_ID = '← スプレッドシートIDをここに貼り付け';
-  const START_DATE     = '2026/08/22';
-  const END_DATE       = '2026/08/23';
-  const STATUS         = '準備中'; // 本番前は準備中。終了後に手動で完了へ変更する
-
-  const sheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
-  sheet.appendRow([EVENT_ID, EVENT_NAME, SPREADSHEET_ID, START_DATE, END_DATE, STATUS]);
-  notifyUser_('イベントを登録しました: ' + EVENT_NAME);
-}
-
-// ============================================================
-// createNewEvent
-// ============================================================
-
-function createNewEvent() {
-  const EVENT_ID   = '2026_rd3';
-  const EVENT_NAME = 'FORMULA GYMKHANA 2026 予選会 Rd.3';
-  const START_DATE = '2026/08/XX';
-  const END_DATE   = '2026/08/XX';
-  createEvent_(EVENT_ID, EVENT_NAME, START_DATE, END_DATE);
 }
 
 function createEvent_(eventId, eventName, startDate, endDate) {
@@ -443,7 +405,3 @@ function clearCache(eventId) {
   }
 }
 
-// ラッパー関数（スクリプトエディタから直接実行用）
-function runGenerateCompanyKeys()       { generateCompanyKeys('2026_rd2'); }
-function runAddStampParticipantsSheet() { addStampParticipantsSheet('2026_rd2'); }  // T7: 末尾に1つだけ残す
-function runSetupPrizeConfig()          { setupPrizeConfig('2026_rd2', 15, 3); }
