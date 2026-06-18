@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self';
+             script-src 'self';
+             connect-src https://script.google.com
+                         https://script.googleusercontent.com;
+             img-src 'self' data:;
+             style-src 'self' 'unsafe-inline';">
+  <title>FORMULA GYMKHANA — マイページ</title>
+  <link rel="preconnect" href="https://script.google.com">
+  <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+  <link rel="stylesheet" href="../js/style.css">
+  <style>
+    body { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 24px 16px 40px; }
+    .card { width: 100%; max-width: 360px; }
+
+    /* 氏名ブロック */
+    .pass-name-block { text-align: center; padding: 20px 20px 4px; }
+    .pass-furigana   { font-size: 12px; color: var(--fg-muted); margin-bottom: 4px; }
+    .pass-name       { font-size: 26px; font-weight: 700; color: var(--fg-navy); letter-spacing: 0.04em; }
+    .pass-school     { font-size: 13px; color: #2D4A6A; margin-top: 8px; }
+
+    /* QRブロック */
+    .qr-wrap   { display: flex; justify-content: center; padding: 8px 20px 4px; }
+    .qr-box    { background: #fff; padding: 14px; border-radius: 14px; border: 1px solid var(--fg-line); }
+    .qr-box canvas, .qr-box img { display: block; }
+    .qr-caption { font-size: 12px; color: var(--fg-muted); text-align: center; padding: 10px 24px 0; line-height: 1.7; }
+
+    /* 保存のすすめ */
+    .keep-note { margin: 16px 20px 0; padding: 12px 14px; border-radius: 10px; background: var(--fg-blue-soft); color: var(--fg-muted); font-size: 11px; line-height: 1.7; }
+    .keep-note b { color: var(--fg-navy); }
+
+    .pass-actions { padding: 16px 20px 4px; }
+  </style>
+</head>
+<body>
+
+  <!-- ローディング -->
+  <div class="card" id="state-loading">
+    <div class="fg-header">
+      <div class="fg-logo"><div class="fg-logo-mark">FORMULA <span>GYMKHANA</span></div><div class="fg-logo-sub">College Students RD</div></div>
+      <div class="fg-page-name">マイページ</div>
+    </div>
+    <div class="card-body">
+      <div class="spinner"></div>
+      <p style="font-size:13px;color:var(--fg-muted);text-align:center;">読み込み中...</p>
+    </div>
+  </div>
+
+  <!-- 本体 -->
+  <div class="card" id="state-ready" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo"><div class="fg-logo-mark">FORMULA <span>GYMKHANA</span></div><div class="fg-logo-sub">College Students RD</div></div>
+      <div class="fg-page-name" id="event-name">マイページ</div>
+    </div>
+
+    <div class="pass-name-block">
+      <div class="pass-furigana" id="furigana"></div>
+      <div class="pass-name"     id="name"></div>
+      <div class="pass-school"   id="school"></div>
+    </div>
+
+    <div class="qr-wrap">
+      <div class="qr-box" id="qr-box"></div>
+    </div>
+    <p class="qr-caption">企業ブースの方には<br>このQRコードを見せてください。</p>
+
+    <div class="pass-actions">
+      <a href="progress.html" class="action-link primary" id="btn-progress">スタンプ進捗を確認する →</a>
+    </div>
+
+    <div class="keep-note">
+      <b>このページを保存しておきましょう。</b><br>
+      ブラウザのブックマーク、または「ホーム画面に追加」をしておくと、いつでもこのページに戻れます。スタンプの進捗が消えてしまった場合も、ここから元に戻せます。
+    </div>
+  </div>
+
+  <!-- エラー -->
+  <div class="card" id="state-error" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo"><div class="fg-logo-mark">FORMULA <span>GYMKHANA</span></div><div class="fg-logo-sub">College Students RD</div></div>
+      <div class="fg-page-name">マイページ</div>
+    </div>
+    <div class="card-body">
+      <div class="state-icon">⚠</div>
+      <p class="state-title" id="error-title">エラー</p>
+      <p class="state-msg"   id="error-msg"></p>
+    </div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/vendor/qrcode.min.js"></script>
+  <script src="../js/mypass.js"></script>
+</body>
+</html>

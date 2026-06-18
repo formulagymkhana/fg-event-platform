@@ -13,6 +13,7 @@ let _canvas    = null;
 let _ctx       = null;
 let _staffKey  = null;   // URLのkeyパラメータ
 let _curToken  = null;   // 現在表示中の学生cardToken
+let _event     = null;   // URLのevent（省略時のみ当日の自動判定）
 
 // ── イベントリスナー ──────────────────────────────
 
@@ -27,6 +28,7 @@ document.getElementById('btn-retry')?.addEventListener('click', () => showState(
 
 (function init() {
   _staffKey = FG_API.getParam('key');
+  _event    = FG_API.getParam('event') || null;
   if (!_staffKey) {
     showState('no-key');
     return;
@@ -88,7 +90,7 @@ async function onQRFound(qrData) {
   _curToken = cardToken;
   showState('loading');
 
-  const res = await FG_API.getExchangeStatus(cardToken, _staffKey);
+  const res = await FG_API.getExchangeStatus(cardToken, _staffKey, _event);
 
   if (!res.ok) {
     showState('error');
@@ -153,7 +155,7 @@ async function doExchange() {
   btn.disabled = true;
   btn.textContent = '記録中...';
 
-  const res = await FG_API.markPrizeExchanged(_curToken, _staffKey, '');
+  const res = await FG_API.markPrizeExchanged(_curToken, _staffKey, '', _event);
 
   btn.disabled = false;
   btn.textContent = '景品を渡した（引換完了）';

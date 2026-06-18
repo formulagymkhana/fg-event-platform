@@ -7,7 +7,6 @@
  */
 
 // ── イベントリスナー(CSP対応: onclickは使わない) ──
-document.getElementById('btn-reload')?.addEventListener('click', loadProgress);
 document.getElementById('btn-exchange-start')?.addEventListener('click', () => {
   hide('exchange-start'); show('exchange-confirm');
 });
@@ -177,7 +176,8 @@ function renderMilestoneBar(count, milestones, totalCompanies) {
       <div class="milestone-track">
         <div class="milestone-fill" style="width:${pct}%"></div>
         ${milestones.map((m, i) => {
-          const pos     = Math.round((m.threshold / maxVal) * 100);
+          // 出展社数が景品閾値より少ない場合でも目盛りがバー外へ出ないようclamp
+          const pos     = Math.min(100, Math.round((m.threshold / maxVal) * 100));
           const reached = count >= m.threshold;
           const remain  = Math.max(0, m.threshold - count);
           const labelMod = i === milestones.length - 1 ? ' last' : (i === 0 ? ' first' : '');

@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'self';
              script-src 'self';
@@ -11,6 +11,8 @@
              style-src 'self' 'unsafe-inline';
              media-src blob:;">
   <title>FORMULA GYMKHANA — 当日参加登録</title>
+  <link rel="preconnect" href="https://script.google.com">
+  <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
   <link rel="stylesheet" href="../js/style.css">
   <style>
     body { display: flex; flex-direction: column; align-items: center; padding: 24px 16px 48px; }
@@ -26,7 +28,7 @@
     .form-row label .req { color: #C0392B; margin-left: 3px; }
     .form-row input, .form-row select {
       width: 100%; padding: 11px 13px; border: 1.5px solid var(--fg-line); border-radius: 8px;
-      font-size: 15px; color: var(--fg-text); background: #fff; appearance: none; -webkit-appearance: none;
+      font-size: 16px; color: var(--fg-text); background: #fff; appearance: none; -webkit-appearance: none;
       transition: border-color 0.15s;
     }
     .form-row input:focus, .form-row select:focus { outline: none; border-color: var(--fg-blue); }
@@ -333,7 +335,16 @@
       </div>
       <div class="bar-track"><div class="bar-fill" id="result-bar"></div></div>
       <p class="result-count" id="result-count">0 / 15 個</p>
-      <a href="progress.html" class="action-link secondary">スタンプ進捗を確認する →</a>
+
+      <div style="margin-top:20px;padding-top:18px;border-top:1px solid var(--fg-line)">
+        <a href="#" class="action-link primary" id="link-mypage">📲 マイページを開く（保存してね）</a>
+        <p style="font-size:11px;color:var(--fg-muted);line-height:1.7;margin-top:10px">
+          氏名とQRコードを表示するあなた専用ページです。<br>
+          <b style="color:var(--fg-navy)">同じリンクをメールでも送信しました。</b>ブックマークやホーム画面に追加しておくと、進捗が消えてもここから戻れます。
+        </p>
+      </div>
+
+      <a href="progress.html" class="action-link secondary" style="margin-top:12px">スタンプ進捗を確認する →</a>
     </div>
   </div>
 

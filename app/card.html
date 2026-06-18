@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'self';
              script-src 'self';
@@ -11,6 +11,8 @@
              style-src 'self' 'unsafe-inline';
              media-src blob:;">
   <title>FORMULA GYMKHANA — 学生情報</title>
+  <link rel="preconnect" href="https://script.google.com">
+  <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
   <link rel="stylesheet" href="../js/style.css">
   <style>
     body { display: flex; flex-direction: column; align-items: center; padding: 24px 16px 48px; }
@@ -34,16 +36,16 @@
       padding: 16px 20px 12px;
       display: flex;
       align-items: center;
-      border-bottom: 1px solid var(--fg-line);
+      border-bottom: 3px solid var(--fg-blue);
     }
-    .fg-logo { font-size: 13px; font-weight: 800; letter-spacing: 0.04em; color: #111827; }
-    .fg-logo span { background: var(--fg-blue); color: #fff; padding: 2px 7px; border-radius: 3px; margin-left: 4px; }
+    .fg-logo span { border-radius: 0; }
     .fg-event-name { margin-left: auto; font-size: 11px; color: var(--fg-muted); }
 
     /* カテゴリバナー */
     .category-banner { padding: 20px 20px 18px; display: flex; align-items: flex-end; justify-content: space-between; }
     .sid-label { font-size: 10px; opacity: 0.55; letter-spacing: 0.1em; margin-bottom: 4px; }
     .sid-value { font-size: 20px; font-weight: 700; letter-spacing: 0.1em; }
+    .category-banner { color: #fff; }
     .cat-badge { background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.35); border-radius: 5px; padding: 6px 14px; font-size: 13px; font-weight: 500; letter-spacing: 0.04em; }
 
     /* 氏名ブロック */
@@ -235,7 +237,7 @@
     </div>
   </div>
 
-  <script src="../js/vendor/jsQR.js"></script>
+  <!-- jsQR(256KB)は card.js が企業QR読取り時にのみ遅延読込 -->
   <script src="../js/config.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/card.js"></script>

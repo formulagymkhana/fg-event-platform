@@ -85,10 +85,11 @@ function renderStampList(visitors) {
 
 // ── データ取得 ────────────────────────────────────
 let _key = '';
+let _event = null;   // URLの event。省略時のみ当日の自動判定にフォールバック
 
 async function loadQr() {
   $('qr-list-wrap').innerHTML = '<p class="empty-note" style="color:var(--fg-muted)">読み込み中...</p>';
-  const res = await FG_API.getCompanyView(_key);
+  const res = await FG_API.getCompanyView(_key, _event);
   if (!res.ok) {
     const msg = res.error === 'expired'
       ? 'イベント終了後はQR閲覧ログの表示期間が終了しています。'
@@ -102,7 +103,7 @@ async function loadQr() {
 
 async function loadStamp() {
   $('stamp-list-wrap').innerHTML = '<p class="empty-note" style="color:var(--fg-muted)">読み込み中...</p>';
-  const res = await FG_API.getCompanyStampVisitors(_key);
+  const res = await FG_API.getCompanyStampVisitors(_key, _event);
   if (!res.ok) {
     $('stamp-list-wrap').innerHTML = `<div class="err-note">${esc(res.message || '取得に失敗しました')}</div>`;
     return;
@@ -113,14 +114,15 @@ async function loadStamp() {
 
 // ── 初期化 ────────────────────────────────────────
 (async () => {
-  _key = FG_API.getParam('key') || FG_API.getCompanyViewKey() || '';
+  _key   = FG_API.getParam('key') || FG_API.getCompanyViewKey() || '';
+  _event = FG_API.getParam('event') || null;   // URLにeventがあれば優先（会期外・複数イベントの取り違え防止）
   if (!_key) {
     showErr('閲覧キーがありません', '企業担当者用のURLからアクセスしてください。');
     return;
   }
 
   // 企業名取得（スタンプ来訪者は期限なしで使える）
-  const stampRes = await FG_API.getCompanyStampVisitors(_key);
+  const stampRes = await FG_API.getCompanyStampVisitors(_key, _event);
   if (!stampRes.ok && stampRes.error === 'invalid_key') {
     showErr('閲覧キーが無効です', '配布されたURLを再度ご確認ください。');
     return;
@@ -144,7 +146,7 @@ async function loadStamp() {
   $('btn-reload-qr')?.addEventListener('click', loadQr);
   $('btn-reload-stamp')?.addEventListener('click', async () => {
     $('stamp-list-wrap').innerHTML = '<p class="empty-note" style="color:var(--fg-muted)">読み込み中...</p>';
-    const r = await FG_API.getCompanyStampVisitors(_key);
+    const r = await FG_API.getCompanyStampVisitors(_key, _event);
     if (r.ok) {
       $('stamp-count').textContent = ' ' + r.data.total + '名';
       renderStampList(r.data.visitors || []);

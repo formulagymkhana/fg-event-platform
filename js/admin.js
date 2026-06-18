@@ -173,7 +173,9 @@ function renderEventList_() {
     return;
   }
   list.innerHTML = allEvents_.map(ev => {
-    const statusClass = ev.status === '完了' ? 'done' : ev.status === '準備中' ? 'wip' : 'active';
+    // 公開停止(旧: 完了)は done、それ以外(公開中/旧 準備中・開催中)は active
+    const stopped = ev.status === '公開停止' || ev.status === '完了';
+    const statusClass = stopped ? 'done' : 'active';
     return `
       <a class="event-card" href="#${esc_(ev.eventId)}">
         <div class="ev-card-name">${esc_(ev.name || ev.eventId)}</div>
@@ -365,7 +367,6 @@ async function loadConfig_(gen, ev) {
   const cfg = res.data.config || {};
   setVal_('cfg-prizeUnitSize', cfg.prizeUnitSize || cfg.prizeThreshold || 5);
   setVal_('cfg-maxPrizes',    cfg.maxPrizes     || cfg.prizeCount    || 3);
-  setVal_('cfg-publicDeadline', toDtLocal_(cfg.publicDeadline));
   setVal_('cfg-preRegMailSubject', cfg.preRegMailSubject || PREREG_MAIL_SUBJECT_DEFAULT);
   setVal_('cfg-preRegMailBody',    cfg.preRegMailBody    || PREREG_MAIL_BODY_DEFAULT);
 }
@@ -388,7 +389,6 @@ async function handleSaveConfig_() {
   const map = {
     prizeUnitSize:    getVal_('cfg-prizeUnitSize'),
     maxPrizes:        getVal_('cfg-maxPrizes'),
-    publicDeadline:   fromDtLocal_(getVal_('cfg-publicDeadline')),
     preRegMailSubject: getVal_('cfg-preRegMailSubject'),
     preRegMailBody:    getVal_('cfg-preRegMailBody'),
   };
@@ -432,7 +432,7 @@ async function downloadStudentQrCsv_() {
     s.name, s.furigana, s.school, s.category || '', s.regType,
     s.cardToken ? cardPassUrl_(s.cardToken) : '',
   ].map(esc).join(',')));
-  downloadCsv_('﻿' + lines.join('\r\n'), `学生QR_URL_${curEvent_}_${new Date().toISOString().slice(0,10)}.csv`);
+  downloadCsv_(lines.join('\r\n'), `学生QR_URL_${curEvent_}_${new Date().toISOString().slice(0,10)}.csv`);
   showToast_(`✓ ${studentData_.length}名のQR用URLを出力しました`);
 }
 
@@ -522,7 +522,7 @@ async function loadCompanies_(gen = null, ev = null) {
         <span class="logo-lbl">ロゴURL</span>
         <input class="logo-url-input" type="url" placeholder="https://… または logos/xxx.png"
           data-logo-id="${esc_(c.companyId)}" value="${esc_(c.logoUrl || '')}">
-        <div class="logo-preview">${c.logoUrl ? `<img src="${esc_(c.logoUrl)}" alt="" onerror="this.parentNode.textContent='?'">` : '?'}</div>
+        <div class="logo-preview">${c.logoUrl ? `<img src="${esc_(c.logoUrl)}" alt="">` : '?'}</div>
         <button class="copy-btn logo-save-btn" data-logo-save="${esc_(c.companyId)}">保存</button>
       </div>
     </div>`;
@@ -535,15 +535,27 @@ async function loadCompanies_(gen = null, ev = null) {
     inp.addEventListener('input', () => {
       const pv = inp.closest('.logo-row').querySelector('.logo-preview');
       const url = inp.value.trim();
-      pv.innerHTML = url
-        ? `<img src="${esc_(url)}" alt="" onerror="this.parentNode.textContent='?'">`
-        : '?';
+      if (url) { pv.textContent = ''; pv.appendChild(makeLogoImg_(url)); }
+      else     { pv.textContent = '?'; }
     }));
+  // 初期表示のロゴ画像にも error フォールバックを付与（CSPでinline onerrorは不可）
+  container.querySelectorAll('.logo-preview img').forEach(attachLogoFallback_);
   container.querySelectorAll('.logo-save-btn[data-logo-save]').forEach(b =>
     b.addEventListener('click', () => handleSaveLogo_(b)));
   container.querySelectorAll('input[data-rally]').forEach(cb =>
     cb.addEventListener('change', () => handleToggleStampRally_(cb)));
   updateStepBadges_();
+}
+
+// ロゴ画像のエラー時フォールバック（読み込み失敗で「?」表示）。CSP対策でJS付与。
+function attachLogoFallback_(img) {
+  img.addEventListener('error', () => { img.parentNode.textContent = '?'; });
+}
+function makeLogoImg_(url) {
+  const img = document.createElement('img');
+  img.src = url; img.alt = '';
+  attachLogoFallback_(img);
+  return img;
 }
 
 async function handleAddCompany_() {
@@ -677,11 +689,35 @@ function renderStudentList_() {
           <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
             <span style="font-size:9px;color:var(--gray);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc_(cardPassUrl_(s.cardToken))}</span>
             <button class="copy-btn" data-copy="${esc_(cardPassUrl_(s.cardToken))}" style="flex-shrink:0;font-size:10px;padding:2px 8px">URLコピー</button>
+            ${s.regType !== '事前' ? `
+            <button class="copy-btn" data-resend="${esc_(s.cardToken)}" style="flex-shrink:0;font-size:10px;padding:2px 8px">メール再送信</button>` : ''}
           </div>` : ''}
         </div>`).join('')}
     </div>`;
   wrap.querySelectorAll('.copy-btn[data-copy]').forEach(b =>
     b.addEventListener('click', () => copyText_(b.dataset.copy)));
+  wrap.querySelectorAll('.copy-btn[data-resend]').forEach(b =>
+    b.addEventListener('click', () => handleResendWalkInMail_(b)));
+}
+
+// 当日参加者へ個人ページ(氏名+QR)のリンクをメール再送信する
+async function handleResendWalkInMail_(btn) {
+  if (!curEvent_) return;
+  const token = btn.dataset.resend;
+  if (!token) return;
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '送信中…';
+  const res = await adminCall_('adminResendWalkInMail', {
+    event: curEvent_,
+    token,
+    appBase: new URL('.', location.href).href,
+  });
+  btn.disabled = false; btn.textContent = orig;
+  if (res.ok) {
+    showToast_(`✓ メールを再送信しました（${res.data && res.data.email ? res.data.email : ''}）`);
+  } else {
+    showToast_('⚠ 再送信に失敗: ' + (res.message || res.error || ''));
+  }
 }
 
 async function handleToggleStampRally_(cb) {
@@ -762,12 +798,8 @@ async function handleGenerateKeys_() {
 function updateWalkInUrl_() {
   const el = id_('walkin-url');
   if (!el) return;
-  if (walkInCode_) {
-    const base = location.origin + location.pathname.replace(/[^/]+$/, 'register.html');
-    el.textContent = `${base}?code=${walkInCode_}`;
-  } else {
-    el.textContent = '（WALK_IN_CODEがGASに未設定）';
-  }
+  // 当日受付コードは撤廃済み（開放）。素の register.html を当日の受付URLとして表示する。
+  el.textContent = location.origin + location.pathname.replace(/[^/]+$/, 'register.html');
 }
 
 function handleCopyUrl_() {
@@ -843,7 +875,7 @@ async function loadEventInfo_() {
   if (!ev) return;
   setVal_('edit-event-name', ev.name || '');
   const sel = id_('edit-event-status');
-  if (sel) sel.value = ev.status || '準備中';
+  if (sel) sel.value = (ev.status === '公開停止' || ev.status === '完了') ? '公開停止' : '公開中';
 
   // CONFIGからstampStartAt/stampEndAt/exchangeDeadlineを取得して datetime 入力を埋める
   const cfgRes = await adminCall_('adminGetConfig', { event: curEvent_ });
@@ -851,6 +883,7 @@ async function loadEventInfo_() {
   setVal_('edit-start-datetime',    toDtLocal_(cfg.stampStartAt)    || dateToDtLocal_(ev.startDate));
   setVal_('edit-end-datetime',      toDtLocal_(cfg.stampEndAt)      || dateToDtLocal_(ev.endDate));
   setVal_('edit-exchange-deadline', toDtLocal_(cfg.exchangeDeadline));
+  setVal_('cfg-publicDeadline',     toDtLocal_(cfg.publicDeadline));
 }
 
 // "yyyy/MM/dd" → datetime-local の日付部分のみ (時刻は 00:00)
@@ -866,6 +899,7 @@ async function handleSaveEventInfo_() {
   const startDatetime    = getVal_('edit-start-datetime');
   const endDatetime      = getVal_('edit-end-datetime');
   const exchangeDeadline = getVal_('edit-exchange-deadline');
+  const publicDeadline   = getVal_('cfg-publicDeadline');
   const status           = getVal_('edit-event-status');
   const btn = id_('btn-save-event-info');
   const fb  = id_('save-event-fb');
@@ -888,6 +922,8 @@ async function handleSaveEventInfo_() {
   });
   btn.disabled = false;
   if (res.ok) {
+    const pdValue = publicDeadline ? fromDtLocal_(publicDeadline) : fromDtLocal_(endDatetime);
+    await adminCall_('adminUpdateConfig', { event: curEvent_, key: 'publicDeadline', value: pdValue });
     const ev = allEvents_.find(e => e.eventId === curEvent_);
     if (ev) { ev.name = eventName; ev.startDate = startDate; ev.endDate = endDate; ev.status = status; }
     setText_('dash-ev-name', eventName);

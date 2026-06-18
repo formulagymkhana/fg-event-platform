@@ -405,12 +405,17 @@
               <input type="datetime-local" class="cfg-input" id="edit-exchange-deadline">
             </div>
             <div class="cfg-row">
+              <label>QR閲覧公開期限</label>
+              <div class="cfg-hint">企業が学生QRを閲覧できる期限（空欄=終了日時と同じ）</div>
+              <input type="datetime-local" class="cfg-input" id="cfg-publicDeadline">
+            </div>
+            <div class="cfg-row">
               <label>状態</label>
               <select class="cfg-input" id="edit-event-status">
-                <option value="準備中">準備中</option>
-                <option value="開催中">開催中</option>
-                <option value="完了">完了</option>
+                <option value="公開中">公開中</option>
+                <option value="公開停止">公開停止</option>
               </select>
+              <div class="cfg-hint">公開停止にすると開催日内でも参加・閲覧導線を止められます（緊急/早期停止）</div>
             </div>
             <button class="save-btn" id="btn-save-event-info">保存</button>
             <span class="save-fb" id="save-event-fb"></span>
@@ -428,11 +433,6 @@
                 <label>最大景品数</label>
                 <input type="number" class="cfg-input" id="cfg-maxPrizes" min="1" max="20">
               </div>
-            </div>
-            <div class="cfg-row">
-              <label>QR閲覧公開期限</label>
-              <div class="cfg-hint">企業が学生QRを閲覧できる期限</div>
-              <input type="datetime-local" class="cfg-input" id="cfg-publicDeadline">
             </div>
           </div>
 

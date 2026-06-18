@@ -68,7 +68,7 @@ document.getElementById('btn-scan-cancel')?.addEventListener('click', closeCompa
   const res = await FG_API.getStudent(token, pageEvent);
   if (!res.ok) {
     if (res.error === 'expired') {
-      showError('公開期限が終了しました。', '期限内に登録された企業はメールからアクセスできます。');
+      showError('公開期限が終了しました。', 'QRカードの公開期間が終了しています。');
     } else if (res.error === 'timeout') {
       showError('接続がタイムアウトしました。', 'もう一度お試しください。');
     } else if (res.error === 'no_active_event') {
@@ -128,7 +128,7 @@ function render(d) {
   $('furigana').textContent   = d.furigana;
   $('name').textContent       = d.name;
   $('school').textContent     = d.school;
-  $('school-sub').textContent = d.department + '　' + d.year;
+  $('school-sub').textContent = d.department + '　' + (d.year ? d.year + '年' : '');
 
   $('club-years').textContent = d.clubYears;
   $('prefecture').textContent = d.prefecture;
@@ -192,6 +192,21 @@ let _scanRafId  = null;
 let _scanCanvas = null;
 let _scanCtx    = null;
 let _scanPaused = false;
+let _jsqrPromise = null;   // jsQR(256KB)は企業QR読取り時にのみ遅延読込
+
+// jsQR を必要になった時だけ読み込む（card.html初期表示から256KBを除外）
+function ensureJsQR_() {
+  if (window.jsQR) return Promise.resolve();
+  if (_jsqrPromise) return _jsqrPromise;
+  _jsqrPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = '../js/vendor/jsQR.js';
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('jsQR load failed'));
+    document.head.appendChild(s);
+  });
+  return _jsqrPromise;
+}
 
 async function openCompanyScan() {
   const overlay = $('scan-overlay');
@@ -202,6 +217,7 @@ async function openCompanyScan() {
   _scanCtx    = _scanCanvas.getContext('2d');
 
   try {
+    const jsqrReady = ensureJsQR_();
     _scanStream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
     });
@@ -210,6 +226,7 @@ async function openCompanyScan() {
     await video.play();
     _scanCanvas.width  = video.videoWidth  || 640;
     _scanCanvas.height = video.videoHeight || 480;
+    await jsqrReady;   // デコーダ読込完了を待ってからループ開始
     scanLoop_(video);
   } catch (err) {
     setOverlayMsg_('カメラを起動できませんでした。カメラのアクセスを許可してください。', 'err');

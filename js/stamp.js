@@ -77,6 +77,12 @@ function renderSuccess(d) {
   }
 }
 
+// ブラウザの「戻る」でbfcache復元された時は再実行する。
+// （スタンプラリー開始後にこのNFCページへ戻ると、付与済みトークンで自動スタンプされる）
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted) location.reload();
+});
+
 function showState(state) {
   ['loading', 'no-token', 'success', 'already', 'ended', 'error'].forEach(s => {
     const el = document.getElementById('state-' + s);

@@ -13,6 +13,7 @@ let _stream = null;
 let _rafId  = null;
 let _canvas = null;
 let _ctx    = null;
+let _jsqrPromise = null;   // jsQR(256KB)は初回スキャン時にのみ遅延読込
 
 // ── イベントリスナー ──────────────────────────────
 
@@ -22,7 +23,7 @@ document.getElementById('btn-retry')?.addEventListener('click', () => showState(
 
 // ── 起動 ──────────────────────────────────────────
 
-(function init() {
+function init() {
   // Cookie にstampTokenがある → 既存進捗を表示
   const existingStamp = FG_API.getStampToken();
   if (existingStamp) {
@@ -31,7 +32,14 @@ document.getElementById('btn-retry')?.addEventListener('click', () => showState(
   }
   // なければ QRスキャン待機
   showState('ready');
-})();
+}
+init();
+
+// ブラウザの「戻る」でbfcache復元された場合、init を再実行する。
+// （スキャンで付与済みのstampTokenを再評価し、QRボタンの再表示を防ぐ）
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted) { stopCamera(); init(); }
+});
 
 // ── Cookie有効: 既存進捗を読み込む ─────────────────
 
@@ -53,12 +61,28 @@ async function loadExistingProgress(token) {
 
 // ── QRスキャン ────────────────────────────────────
 
+// jsQR を必要になった時だけ読み込む（初期ロードから256KBを除外）
+function ensureJsQR() {
+  if (window.jsQR) return Promise.resolve();
+  if (_jsqrPromise) return _jsqrPromise;
+  _jsqrPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = '../js/vendor/jsQR.js';
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('jsQR load failed'));
+    document.head.appendChild(s);
+  });
+  return _jsqrPromise;
+}
+
 async function startScan() {
   showState('scanning');
   _canvas = document.createElement('canvas');
   _ctx    = _canvas.getContext('2d');
 
   try {
+    // QRデコーダとカメラ権限を並行で準備
+    const jsqrReady = ensureJsQR();
     _stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
     });
@@ -67,6 +91,7 @@ async function startScan() {
     await video.play();
     _canvas.width  = video.videoWidth  || 640;
     _canvas.height = video.videoHeight || 480;
+    await jsqrReady;   // デコーダ読込完了を待ってからループ開始
     scanLoop(video);
   } catch (err) {
     stopCamera();
@@ -113,8 +138,10 @@ async function onQRFound(qrData) {
     if (res.data.isNew) {
       // 初回登録 → 遊び方ガイドを表示
       renderBar('result-bar', 'result-count', res.data);
-      setText('guide-goal',  String(res.data.prizeThreshold || 15));
-      setText('guide-count', String(res.data.prizeCount     || 3));
+      const us = res.data.prizeUnitSize || res.data.prizeThreshold || 5;
+      const mp = res.data.maxPrizes     || res.data.prizeCount     || 3;
+      setText('guide-goal',  String(us * mp));   // 全景品獲得に必要なスタンプ数
+      setText('guide-count', String(mp));        // 獲得できる景品数
       showState('success');
     } else {
       // 復帰(Cookie消失後の再スキャン) → 継続 or 交換済み画面
@@ -161,8 +188,11 @@ function renderContinuing(d) {
 }
 
 function renderBar(barId, countId, d) {
-  const count     = d.stampCount     || 0;
-  const threshold = d.prizeThreshold || 5;
+  const count     = d.stampCount    || 0;
+  const unitSize  = d.prizeUnitSize || d.prizeThreshold || 5;
+  const maxPrizes = d.maxPrizes     || d.prizeCount     || 3;
+  // 次の交換閾値があればそこまで、無ければ全景品ぶんを満タンとする
+  const threshold = d.nextThreshold || (maxPrizes * unitSize);
   const bar = document.getElementById(barId);
   if (bar) bar.style.width = Math.min(100, Math.round((count / threshold) * 100)) + '%';
   const el = document.getElementById(countId);

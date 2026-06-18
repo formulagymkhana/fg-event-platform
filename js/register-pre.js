@@ -69,7 +69,16 @@ document.querySelectorAll('input[name="sService"]').forEach(r =>
   }));
 
 // ── ファイル（区分別） ──────────────────────────
-const MAX_FILE = 8 * 1024 * 1024; // 8MB
+const MAX_FILE  = 8 * 1024 * 1024;   // 1ファイル上限 8MB
+const MAX_TOTAL = 20 * 1024 * 1024;  // 合計上限 20MB（GAS POSTの実用上限・base64膨張を考慮）
+
+// 選択中ファイルの合計バイト数
+function totalFileBytes_(cat) {
+  return fileSpec(cat).reduce((sum, s) => {
+    const f = ($(s.id).files || [])[0];
+    return sum + (f ? f.size : 0);
+  }, 0);
+}
 
 function fileSpec(cat) {
   if (cat === '出場選手(FGクラスドライバー)')
@@ -284,6 +293,14 @@ async function submitForm() {
   }
   if (!validate(d)) {
     banner.textContent = '未入力・不正な項目があります。赤色の箇所をご確認ください。';
+    banner.classList.add('show');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  // 合計サイズ上限チェック（超過時は原因を明示。送信前に止める）
+  if (d.category && totalFileBytes_(d.category) > MAX_TOTAL) {
+    banner.textContent = `添付ファイルの合計が大きすぎます（上限 ${Math.round(MAX_TOTAL / 1024 / 1024)}MB）。ファイルを小さくして再度お試しください。`;
     banner.classList.add('show');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     return;

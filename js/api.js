@@ -157,14 +157,19 @@ const FG_API = (() => {
 
   // ── 企業閲覧API ───────────────────────────────
 
-  /** 企業がQR閲覧学生一覧を取得(viewKeyで認証) */
-  function getCompanyView(viewKey) {
-    return call_('getCompanyView', { key: viewKey });
+  /** 企業がQR閲覧学生一覧を取得(viewKeyで認証)
+   *  event 省略時のみ当日の自動判定にフォールバック。 */
+  function getCompanyView(viewKey, event) {
+    const p = { key: viewKey };
+    if (event) p.event = event;
+    return call_('getCompanyView', p);
   }
 
   /** 企業ブースでスタンプを取得した学生一覧を取得 */
-  function getCompanyStampVisitors(viewKey) {
-    return call_('getCompanyStampVisitors', { key: viewKey });
+  function getCompanyStampVisitors(viewKey, event) {
+    const p = { key: viewKey };
+    if (event) p.event = event;
+    return call_('getCompanyStampVisitors', p);
   }
 
   // ── 当日飛び込み登録API ──────────────────────
@@ -174,8 +179,17 @@ const FG_API = (() => {
    * params: { code, name, furigana, school, department, year,
    *           clubYears, birthday, email, phone, prefecture }
    */
-  function registerWalkIn(params) {
-    return call_('registerWalkIn', params);
+  async function registerWalkIn(params) {
+    // 個人情報（氏名/メール/電話/生年月日等）をURLに載せないためPOST送信。
+    // postCall_ は event を自動補完しないので、ここで当日イベントを解決して付与する。
+    if (!params.event) {
+      const eventId = await getOrFetchEventId_();
+      if (eventId === null) {
+        return { ok: false, error: 'no_active_event', message: '現在開催中のイベントはありません' };
+      }
+      params = { event: eventId, ...params };
+    }
+    return postCall_('registerWalkIn', params);
   }
 
   /**
@@ -189,13 +203,17 @@ const FG_API = (() => {
   // ── 景品交換API(スタッフ用) ──────────────────
 
   /** 学生cardTokenとスタッフキーで景品交換状況を取得 */
-  function getExchangeStatus(cardToken, staffKey) {
-    return call_('getExchangeStatus', { token: cardToken, key: staffKey });
+  function getExchangeStatus(cardToken, staffKey, event) {
+    const p = { token: cardToken, key: staffKey };
+    if (event) p.event = event;
+    return call_('getExchangeStatus', p);
   }
 
   /** 学生を景品交換済みとして記録 */
-  function markPrizeExchanged(cardToken, staffKey, staff) {
-    return call_('markPrizeExchanged', { token: cardToken, key: staffKey, staff });
+  function markPrizeExchanged(cardToken, staffKey, staff, event) {
+    const p = { token: cardToken, key: staffKey, staff };
+    if (event) p.event = event;
+    return call_('markPrizeExchanged', p);
   }
 
   // ── stampToken Cookie操作 ─────────────────────

@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'self';
              script-src 'self';
@@ -11,6 +11,8 @@
              img-src 'self' https: data:;
              style-src 'self' 'unsafe-inline';">
   <title>FORMULA GYMKHANA — スタンプ進捗</title>
+  <link rel="preconnect" href="https://script.google.com">
+  <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
   <link rel="stylesheet" href="../js/style.css?v=20260616a">
   <style>
     html, body { height: 100%; overflow: hidden; }
@@ -21,8 +23,12 @@
     .spinner { margin: 32px auto 16px; }
 
     /* progress画面は .app-fixed（style.css）でアプリ型レイアウト */
-    .pg-top { flex-shrink: 0; padding: 12px 20px; display: flex; align-items: baseline;
+    .pg-top { flex-shrink: 0; padding: 16px 20px 18px; display: flex; align-items: baseline;
       justify-content: center; gap: 8px; border-bottom: 1px solid var(--fg-line); }
+    /* STAMP BOOK 見出し：取得ブース数との間に余白を確保し詰まりを解消 */
+    .pg-scroll .section-label { margin-bottom: 16px; }
+    .pg-scroll .section-en { font-size: 22px; letter-spacing: 0.1em; }
+    .stampbook-head { padding: 20px 20px 0; }
     .pg-bottom { flex-shrink: 0; padding: 14px 0 12px; border-top: 1px solid var(--fg-line); background: #fff; }
     .pg-bottom .reload-btn { width: auto; margin: 4px 20px 0; padding: 8px 16px; }
     .pg-note { margin: 8px 20px 0; padding: 10px 12px; border-radius: 10px; background: var(--fg-blue-soft); color: var(--fg-muted); font-size: 11px; line-height: 1.6; }
@@ -96,7 +102,7 @@
         <span style="font-size:12px;color:var(--fg-muted)">取得ブース</span>
         <span id="count-num">0</span><span id="bar-label" style="font-size:15px;font-weight:700;color:var(--fg-muted)"></span>
       </div>
-      <div style="padding:0 20px 0">
+      <div class="stampbook-head">
         <div class="section-label">
           <div class="section-en">STAMP BOOK</div>
           <div class="section-ja">スタンプ帳</div>

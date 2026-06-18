@@ -13,6 +13,9 @@ document.getElementById('btn-retry')?.addEventListener('click', () => {
   showState('form');
 });
 
+// 成功画面のマイページリンク組み立て用に、解決済みイベントIDを保持
+let pageEvent_ = null;
+
 // ── 起動 ──────────────────────────────────────────
 (async function init() {
   showState('loading');
@@ -21,6 +24,7 @@ document.getElementById('btn-retry')?.addEventListener('click', () => {
   const res = await FG_API.getCurrentEvent();
   if (res.ok && res.data) {
     const d = res.data;
+    pageEvent_ = d.eventId || null;
     const label = formatEventDate_(d.startDate, d.eventName);
     setText('event-date-label', label);
   } else {
@@ -55,6 +59,8 @@ async function handleSubmit() {
     rulesConsent:   document.getElementById('cb-rules').checked   ? 'true' : 'false',
     snsConsent:     document.getElementById('cb-media').checked   ? 'true' : 'false',
     privacyConsent: document.getElementById('cb-privacy').checked ? 'true' : 'false',
+    // 個人ページ(氏名+QR)リンクをメールに載せるための app/ ディレクトリ絶対URL
+    appBase:    new URL('.', location.href).href,
   };
 
   const res = await FG_API.registerWalkIn(params);
@@ -207,14 +213,24 @@ function clearErrors_() {
 
 // ── 成功画面描画 ──────────────────────────────────
 function renderSuccess_(d) {
-  const count     = d.stampCount     || 0;
-  const threshold = d.prizeThreshold || 15;
-  const prizeNum  = d.prizeCount     || 1;
+  const count     = d.stampCount    || 0;
+  const unitSize  = d.prizeUnitSize || d.prizeThreshold || 5;
+  const maxPrizes = d.maxPrizes     || d.prizeCount     || 3;
+  const threshold = d.nextThreshold || (maxPrizes * unitSize);
   const pct = Math.min(100, Math.round((count / threshold) * 100));
   document.getElementById('result-bar').style.width = pct + '%';
   setText('result-count', `${count} / ${threshold} 個`);
-  setText('guide-goal',  String(threshold));
-  setText('guide-count', String(prizeNum));
+  setText('guide-goal',  String(unitSize * maxPrizes));  // 全景品獲得に必要なスタンプ数
+  setText('guide-count', String(maxPrizes));             // 獲得できる景品数
+
+  // マイページ(氏名+QR)へのリンク。cardToken はサーバが返す。
+  const link = document.getElementById('link-mypage');
+  if (link && d.cardToken) {
+    const ev = pageEvent_ ? `&event=${encodeURIComponent(pageEvent_)}` : '';
+    link.href = `mypass.html?token=${encodeURIComponent(d.cardToken)}${ev}`;
+  } else if (link) {
+    link.style.display = 'none';
+  }
 }
 
 // ── 日付フォーマット ──────────────────────────────

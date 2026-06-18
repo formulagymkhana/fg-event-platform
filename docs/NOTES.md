@@ -123,3 +123,19 @@
 - 状況: `api.gs` / `admin.gs` はリポジトリに含まれず、`docs/gas-patches/*.final.txt` を GAS エディタへ手動コピペして反映する運用。
 - 懸念/論点: 反映漏れ・反映ズレが検知できない。`*.final.txt` と実 GAS が乖離しても気づけない。
 - 案: 反映時に CHANGELOG へ「GAS反映済み」を1行残す、もしくは clasp 等で GAS をリポジトリ管理下に置くことを将来検討。
+
+## [解消] 横断レビュー一括対応（2026-06-18）
+- **eventId 比較の String() 統一**: `actionSaveStamp_`（dup/prevCount）・`actionGetStampProgress_`・`actionGetCompanyStampVisitors_` の `r[1] === p.event` を `String()` 比較に統一済み（上記「未解決」eventId項を解消）。**GAS再デプロイ必須**。
+- **既存学生の再受付トークン**: `actionRegisterWalkIn_` の `already_registered` で参加者行が無い場合に発行トークンをシートへ追記するよう修正（未保存トークン→スタンプ不能を解消）。**GAS再デプロイ必須**。
+- **当日重複照合の空白正規化**: 氏名+大学名の照合を空白除去して比較（復帰の取りこぼし防止）。**GAS再デプロイ必須**。
+- フロント: 当日登録のPOST化（PII非URL化）、company/exchange への event 貫通、card/start の jsQR 遅延読込、登録フォーム input 16px化＋全ページ maximum-scale 撤去、preconnect 追加、start.js 景品表示の現行フィールド化、admin ロゴ onerror の JS化、CSV二重BOM解消、admin 受付URL `?code=` 掃除（デプロイ不要）。
+
+## [注意] importStudents は token を「氏名＋大学名」で引き継ぐ（2026-06-18 記録）
+- 状況: `importStudents`（[admin.gs.final.txt](gas-patches/admin.gs.final.txt) 付近）は学生マスターをクリア再作成し、cardToken を氏名＋大学名で同定して引き継ぐ。
+- 懸念: 同姓同名・大学名の表記揺れ・改名/入力修正があると、トークンの消失や誤引継ぎ（別人へ）が起きうる。
+- 案: 取り込み前にバックアップ。氏名＋大学名の正規化（空白除去）を再取込側にも適用するか、studentId キーでの引継ぎを検討。
+
+## [見送り・受容] 横断レビューで対応しない判断（2026-06-18）
+- **Cookie がイベント別でない**: 旧 `fg_stamp_token`/`fg_company_view` が残っても、トークンは event 一致でしか解決せず「invalid（安全失敗）」になるため、別イベント参加者として扱われる事故は起きない。イベント重複予定も無いため対応見送り。
+- **準備中でも公開導線が開く**: 日付駆動のみとする確定方針により受容（`完了` のみ除外）。「開催中必須」は当日切替忘れ→全停止の単一障害点になるため採用しない。
+- **CI / GAS差分可視化**: 別タスク（インフラ）。本リポジトリ単独では自動化判断が必要なため保留。
