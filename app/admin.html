@@ -332,8 +332,7 @@
           <span class="section-toggle" id="toggle-step4">▼</span>
         </div>
         <div class="section-body" id="body-step4">
-          <button class="save-btn" id="btn-nfc-csv" style="width:100%;background:var(--navy-mid);margin-bottom:8px">📡 企業NFC URL を発行（CSV）</button>
-          <div class="cfg-group" style="margin-top:16px">
+          <div class="cfg-group" style="margin-top:0">
             <div class="cfg-group-title">当日参加登録URL</div>
             <div class="url-box">
               <div style="font-size:11px;color:var(--gray);margin-bottom:4px">会場掲示用QRコードのリンク先</div>
@@ -504,7 +503,11 @@
         <button class="save-btn" id="btn-add-company">追加</button>
       </div>
 
-      <button class="save-btn" id="btn-gen-keys" style="margin-bottom:14px;width:100%;background:var(--navy-mid)">🔑 未発行キーを一括発行</button>
+      <button class="save-btn" id="btn-gen-keys" style="margin-bottom:8px;width:100%;background:var(--navy-mid)">🔑 未発行キーを一括発行</button>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="save-btn" id="btn-nfc-csv" style="flex:1;background:var(--navy-mid)">📡 NFC URL 一括発行（CSV）</button>
+        <button class="save-btn" id="btn-company-qr-csv" style="flex:1;background:var(--navy-mid)">📷 再閲覧QR URL 一括発行（CSV）</button>
+      </div>
       <div id="company-list"></div>
     </div>
   </div><!-- /page-companies -->

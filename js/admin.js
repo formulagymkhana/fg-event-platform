@@ -50,8 +50,9 @@ window.addEventListener('DOMContentLoaded', () => {
   // イベント削除（ダッシュボード設定内）
   id_('btn-delete-event')?.addEventListener('click', () => handleDeleteEvent_(curEvent_));
 
-  // 企業NFC URL発行
+  // 企業URL一括発行
   id_('btn-nfc-csv')?.addEventListener('click', downloadNfcCsv_);
+  id_('btn-company-qr-csv')?.addEventListener('click', downloadCompanyQrCsv_);
 
   // 事前登録CSVダウンロード（QRパス用・区分別）
   id_('btn-prereg-csv-driver')?.addEventListener('click', () => downloadPreRegCsv_('driver'));
@@ -455,6 +456,21 @@ async function downloadNfcCsv_() {
 function companyPageUrl_(viewKey) {
   const ev = curEvent_ ? `&event=${encodeURIComponent(curEvent_)}` : '';
   return new URL(`company.html?key=${encodeURIComponent(viewKey)}${ev}`, location.href).toString();
+}
+
+/** 企業QR URL（再閲覧用）を CSV 出力 */
+async function downloadCompanyQrCsv_() {
+  if (!curEvent_) { showToast_('イベントが選択されていません'); return; }
+  const res = await adminCall_('adminGetCompanies', { event: curEvent_ });
+  if (!res.ok) { showToast_('企業の取得に失敗しました'); return; }
+  const list = (res.data.companies || []).filter(c => c.viewKey);
+  if (!list.length) { showToast_('閲覧キー発行済みの企業がありません'); return; }
+  const esc = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const head  = ['ブース名（企業名）', '再閲覧QR用URL', 'viewKey', '企業ID'];
+  const lines = [head.join(',')].concat(list.map(c =>
+    [c.name, companyQrUrl_(c.viewKey), c.viewKey, c.companyId].map(esc).join(',')));
+  downloadCsv_(lines.join('\r\n'), `企業再閲覧QR_URL_${curEvent_}_${new Date().toISOString().slice(0, 10)}.csv`);
+  showToast_(`✓ ${list.length}社の再閲覧QR URLを出力しました`);
 }
 
 /** 企業QR(cookie登録用)のURL: card.html?viewkey=<viewKey>&event=<eventId>
