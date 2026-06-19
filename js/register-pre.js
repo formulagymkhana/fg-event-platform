@@ -32,21 +32,34 @@ let _formConfig = {};
     FG_API.getFormConfig(_event),
   ]);
 
+  let _eventName = _event;
+  let _day1 = '土曜日';
+  let _day2 = '日曜日';
+
   if (evRes.ok) {
     const ev = (evRes.data.events || []).find(e => String(e.eventId) === String(_event));
-    $('event-name-label').textContent = ev ? (ev.name || ev.eventId) : _event;
+    if (ev) {
+      _eventName = ev.name || ev.eventId;
+      if (ev.startDate) { const d = new Date(ev.startDate); if (!isNaN(d)) _day1 = fmtDay_(d); }
+      if (ev.endDate)   { const d = new Date(ev.endDate);   if (!isNaN(d)) _day2 = fmtDay_(d); }
+    }
+    $('event-name-label').textContent = _eventName;
   } else {
     $('event-name-label').textContent = _event;
   }
+
+  // フォーム内の「土曜日」「日曜日」を実際の日付に置換
+  replaceDays_(_day1, _day2);
 
   if (cfgRes.ok) {
     _formConfig = cfgRes.data || {};
     const now = new Date();
 
-    // 「所属校は出場しますか？」ラベルをイベントごとに差し替え
-    if (_formConfig.competingLabel) {
-      const el = $('label-competing');
-      if (el) el.textContent = _formConfig.competingLabel;
+    // 「所属校は出場しますか？」ラベルをイベント名から自動生成（管理画面設定が優先）
+    const compEl = $('label-competing');
+    if (compEl) {
+      compEl.textContent = _formConfig.competingLabel ||
+        `所属する学校は、${_eventName}に出場しますか？`;
     }
 
     // フォーム公開開始前
@@ -418,6 +431,34 @@ async function submitForm() {
   banner.textContent = res.message || '送信に失敗しました。時間をおいて再度お試しください。';
   banner.classList.add('show');
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── 日付ユーティリティ ────────────────────────────
+function fmtDay_(date) {
+  const days = ['日', '月', '火', '水', '木', '金', '土'];
+  return `${date.getMonth() + 1}月${date.getDate()}日（${days[date.getDay()]}）`;
+}
+
+function replaceDays_(d1, d2) {
+  // テキストノードを走査して「土曜日」「日曜日」を置換
+  function walk(node) {
+    if (node.nodeType === 3) {
+      const t = node.textContent;
+      const r = t.replace(/土曜日/g, d1).replace(/日曜日/g, d2);
+      if (r !== t) node.textContent = r;
+    } else if (node.nodeType === 1 && node.tagName !== 'SCRIPT' && node.tagName !== 'STYLE') {
+      node.childNodes.forEach(walk);
+    }
+  }
+  const form = $('state-form');
+  if (form) walk(form);
+
+  // radio/checkbox の value も置換（GASへの送信値に反映）
+  document.querySelectorAll('#state-form input[type="radio"], #state-form input[type="checkbox"]').forEach(inp => {
+    if (inp.value.includes('土曜日') || inp.value.includes('日曜日')) {
+      inp.value = inp.value.replace(/土曜日/g, d1).replace(/日曜日/g, d2);
+    }
+  });
 }
 
 // ── 状態切替 ────────────────────────────────────
