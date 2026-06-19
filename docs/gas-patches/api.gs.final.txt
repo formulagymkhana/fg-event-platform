@@ -94,6 +94,7 @@ function dispatch_(e) {
       case 'registerWalkIn':          return actionRegisterWalkIn_(p);    // T6 追加
       case 'registerPreStudent':      return actionRegisterPreStudent_(p); // 事前登録(脱Googleフォーム)
       case 'getFormConfig':           return actionGetFormConfig_(p);      // 事前登録フォーム設定(公開)
+      case 'getSchoolList':           return actionGetSchoolList_(p);      // 大学候補リスト(公開)
       // ── admin (T12) ───────────────────────────────────────────────────
       case 'adminGetEvents':    return actionAdminGetEvents_(p);
       case 'adminGetConfig':    return actionAdminGetConfig_(p);
@@ -542,6 +543,15 @@ function actionGetCompanyStampVisitors_(p) {
 }
 
 // ============================================================
+// アクション: getSchoolList（大学マスターの名前一覧を返す）
+// ============================================================
+
+function actionGetSchoolList_(p) {
+  const { uniMap } = loadUniversityMaster_();
+  const schools = Array.from(uniMap.keys()).sort();
+  return ok_({ schools });
+}
+
 // アクション: getFormConfig（事前登録フォーム設定を公開APIとして返す）
 // ============================================================
 
@@ -947,8 +957,13 @@ function actionRegisterWalkIn_(p) {
   // studentId 生成(Vクラス)
   const yearMatch  = String(p.event).match(/(\d{4})/);
   const yearSuffix = yearMatch ? yearMatch[1].slice(-1) : String(new Date().getFullYear()).slice(-1);
-  const { uniMap } = loadUniversityMaster_();
-  const uniCode = uniMap.get(String(p.school).trim()) || '0000';
+  const { uniMap, maxAutoCode } = loadUniversityMaster_();
+  const schoolName = String(p.school).trim();
+  let uniCode = uniMap.get(schoolName);
+  if (!uniCode) {
+    uniCode = String(maxAutoCode + 1).padStart(4, '0');
+    saveNewUniversities_([[schoolName, uniCode, '自動割当(要確認)']]);
+  }
   const vCount  = sData.slice(1).filter(r =>
     String(r[sHeaders.indexOf('属性')]) === '一般参加学生' &&
     String(r[sHeaders.indexOf('登録種別')]) === '当日'
@@ -1037,8 +1052,13 @@ function actionRegisterPreStudent_(p) {
   // studentId 生成
   const yearMatch  = String(p.event).match(/(\d{4})/);
   const yearSuffix = yearMatch ? yearMatch[1].slice(-1) : String(new Date().getFullYear()).slice(-1);
-  const { uniMap }  = loadUniversityMaster_();
-  const uniCode     = uniMap.get(String(p.school).trim()) || '0000';
+  const { uniMap, maxAutoCode } = loadUniversityMaster_();
+  const schoolName = String(p.school).trim();
+  let uniCode = uniMap.get(schoolName);
+  if (!uniCode) {
+    uniCode = String(maxAutoCode + 1).padStart(4, '0');
+    saveNewUniversities_([[schoolName, uniCode, '自動割当(要確認)']]);
+  }
   const seq         = sData.slice(1).filter(r => String(r[idx('属性')]) === attr).length + 1;
   const studentId   = yearSuffix + uniCode + classCode + String(seq).padStart(2, '0');
   const cardToken   = Utilities.getUuid();

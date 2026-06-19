@@ -20,10 +20,14 @@ let pageEvent_ = null;
 (async function init() {
   showState('loading');
 
+  const [eventRes, schoolRes] = await Promise.all([
+    FG_API.getCurrentEvent(),
+    FG_API.getSchoolList(),
+  ]);
+
   // 今日のイベント情報を取得して来場日バッジに表示
-  const res = await FG_API.getCurrentEvent();
-  if (res.ok && res.data) {
-    const d = res.data;
+  if (eventRes.ok && eventRes.data) {
+    const d = eventRes.data;
     pageEvent_ = d.eventId || null;
     const label = formatEventDate_(d.startDate, d.eventName);
     setText('event-date-label', label);
@@ -31,6 +35,8 @@ let pageEvent_ = null;
     // イベントが見つからない場合もフォームは表示する(GAS側でも再チェック)
     setText('event-date-label', formatToday_());
   }
+
+  if (schoolRes.ok) fillSchoolList_(schoolRes.data.schools || []);
 
   showState('form');
 })();
@@ -248,6 +254,15 @@ function formatToday_() {
   const d = new Date();
   const days = ['日', '月', '火', '水', '木', '金', '土'];
   return `${d.getMonth() + 1}月${d.getDate()}日（${days[d.getDay()]}）`;
+}
+
+// ── 大学候補リスト（五十音順）─────────────────────
+function fillSchoolList_(schools) {
+  const dl = document.getElementById('dl-universities');
+  if (!dl) return;
+  const sorted = [...schools].sort((a, b) =>
+    a.localeCompare(b, 'ja-JP', { sensitivity: 'base' }));
+  dl.innerHTML = sorted.map(s => `<option value="${s.replace(/"/g, '&quot;')}"></option>`).join('');
 }
 
 // ── ユーティリティ ────────────────────────────────

@@ -26,11 +26,13 @@ let _formConfig = {};
   _event = FG_API.getParam('event');
   if (!_event) { showState('no-event'); return; }
 
-  // イベント名＋フォーム設定を並行取得
-  const [evRes, cfgRes] = await Promise.all([
+  // イベント名・フォーム設定・大学リストを並行取得
+  const [evRes, cfgRes, schoolRes] = await Promise.all([
     FG_API.getEventList(),
     FG_API.getFormConfig(_event),
+    FG_API.getSchoolList(),
   ]);
+  if (schoolRes.ok) fillSchoolList_(schoolRes.data.schools || []);
 
   let _eventName = _event;
   let _day1 = '土曜日';
@@ -461,15 +463,14 @@ function replaceDays_(d1, d2) {
   });
 }
 
-// ── 大学候補リストを五十音順にソート ────────────
-(function sortUniversities_() {
+// ── 大学候補リストを動的に構築（五十音順）────────
+function fillSchoolList_(schools) {
   const dl = document.getElementById('dl-universities');
   if (!dl) return;
-  const opts = Array.from(dl.options).sort((a, b) =>
-    a.value.localeCompare(b.value, 'ja-JP', { sensitivity: 'base' }));
-  dl.innerHTML = '';
-  opts.forEach(o => dl.appendChild(o));
-})();
+  const sorted = [...schools].sort((a, b) =>
+    a.localeCompare(b, 'ja-JP', { sensitivity: 'base' }));
+  dl.innerHTML = sorted.map(s => `<option value="${s.replace(/"/g, '&quot;')}"></option>`).join('');
+}
 
 // ── 状態切替 ────────────────────────────────────
 function showState(state) {

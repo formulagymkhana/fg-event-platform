@@ -281,6 +281,10 @@ const FG_API = (() => {
     return call_('getFormConfig', { event });
   }
 
+  function getSchoolList() {
+    return call_('getSchoolList', {});
+  }
+
   return {
     // イベント自動判定
     getCurrentEvent,
@@ -300,6 +304,7 @@ const FG_API = (() => {
     // 事前登録
     registerPreStudent,
     getFormConfig,
+    getSchoolList,
     // 企業閲覧
     getCompanyView,
     getCompanyStampVisitors,
