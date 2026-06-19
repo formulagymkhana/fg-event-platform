@@ -342,7 +342,7 @@
         </a>
         <a class="nav-card" id="nav-uni-card" href="#">
           <span class="nav-card-icon">🎓</span>
-          <span class="nav-card-label">大学マスター</span>
+          <span class="nav-card-label">大学管理</span>
           <span class="nav-card-count init" id="badge-uni">確認中</span>
         </a>
       </div>
@@ -672,19 +672,42 @@
   </div><!-- /page-forms -->
 
   <!-- ─────────────────────────────────────
-       PAGE: 大学マスター
+       PAGE: 大学管理
   ───────────────────────────────────── -->
   <div id="page-universities" style="display:none">
     <header class="page-hd">
       <a class="page-back" id="back-dash-uni" href="#">← ダッシュボード</a>
-      <span class="page-title">大学マスター</span>
+      <span class="page-title">大学管理</span>
     </header>
     <div class="app-body">
-      <p class="step-desc" style="margin-top:4px">新規登録された大学にコードを割り当てて確定します。読みの頭1文字を入力するとコードが自動生成されます。</p>
 
-      <div id="uni-pending-wrap">
-        <p style="font-size:12px;color:var(--gray);text-align:center;padding:20px 0">読み込み中...</p>
+      <!-- 参加大学一覧 -->
+      <div class="section">
+        <div class="section-hd" data-section="u-list">
+          <span class="section-title">🏫 参加大学一覧 <span class="section-count" id="uni-list-count"></span></span>
+          <span class="section-toggle open" id="toggle-u-list">▼</span>
+        </div>
+        <div class="section-body open" id="body-u-list">
+          <div id="uni-list-wrap">
+            <p style="font-size:12px;color:var(--gray);text-align:center;padding:20px 0">読み込み中...</p>
+          </div>
+        </div>
       </div>
+
+      <!-- 承認待ち -->
+      <div class="section">
+        <div class="section-hd" data-section="u-pending">
+          <span class="section-title">⏳ 承認待ち <span class="section-count" id="uni-pending-count"></span></span>
+          <span class="section-toggle" id="toggle-u-pending">▼</span>
+        </div>
+        <div class="section-body" id="body-u-pending">
+          <p class="step-note" style="margin-top:0;margin-bottom:12px">読みの頭1文字を入力するとポケベルコードが自動計算されます。確定するとコードが大学マスターに登録されます。</p>
+          <div id="uni-pending-wrap">
+            <p style="font-size:12px;color:var(--gray);text-align:center;padding:20px 0">読み込み中...</p>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div><!-- /page-universities -->
 

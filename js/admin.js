@@ -160,7 +160,7 @@ function route_() {
     loadConfig_(++loadGen_, curEvent_);
   } else if (section === 'universities') {
     showPage_('universities');
-    loadPendingUniversities_();
+    loadUniversities_();
   } else {
     showPage_('dashboard');
     const ev = allEvents_.find(e => e.eventId === curEvent_);
@@ -1235,32 +1235,94 @@ async function updateUniBadge_(gen) {
   setBadge_('badge-uni', n > 0 ? 'todo' : 'done', n > 0 ? `要確認 ${n}` : '✓ 完了');
 }
 
-/** 大学マスターページ: 要確認の大学一覧を表示 */
-async function loadPendingUniversities_() {
-  const wrap = id_('uni-pending-wrap');
+/** 大学管理ページ: 参加大学一覧＋承認待ちを並行ロード */
+async function loadUniversities_() {
+  const gen = ++loadGen_;
+  // 学生データとpending一覧を並行取得
+  const [stuRes, pendRes] = await Promise.all([
+    studentData_.length
+      ? Promise.resolve({ ok: true, data: { students: studentData_ } })
+      : adminCall_('adminGetStudents', { event: curEvent_ }),
+    adminCall_('adminGetPendingUniversities', { event: curEvent_ }),
+  ]);
+  if (gen !== loadGen_) return;
+  renderUniList_(stuRes);
+  renderUniPending_(pendRes);
+}
+
+/** 参加大学一覧をレンダリング */
+function renderUniList_(res) {
+  const wrap = id_('uni-list-wrap');
   if (!wrap) return;
-  wrap.innerHTML = '<p style="font-size:12px;color:var(--gray);text-align:center;padding:20px 0">読み込み中...</p>';
-  const res = await adminCall_('adminGetPendingUniversities', { event: curEvent_ });
   if (!res.ok) {
-    wrap.innerHTML = '<p style="font-size:12px;color:var(--fg-warning);text-align:center;padding:20px 0">読み込みに失敗しました</p>';
+    wrap.innerHTML = '<p style="font-size:12px;color:var(--fg-warning);text-align:center;padding:16px 0">読み込みに失敗しました</p>';
     return;
   }
-  const list = res.data.universities || [];
-  if (!list.length) {
-    wrap.innerHTML = '<p style="font-size:12px;color:var(--gray);text-align:center;padding:20px 0">確認が必要な大学はありません。</p>';
+  const students = res.data.students || [];
+  // 大学ごとに集計
+  const uniMap = new Map(); // name → { driver, spectator, walkin, total }
+  students.forEach(s => {
+    const name = s.school || '不明';
+    if (!uniMap.has(name)) uniMap.set(name, { driver: 0, spectator: 0, walkin: 0, total: 0 });
+    const r = uniMap.get(name);
+    r.total++;
+    if (String(s.category || '').includes('ドライバー')) r.driver++;
+    else if (s.category === '見学・応援学生') r.spectator++;
+    else if (s.regType === '当日') r.walkin++;
+    else r.spectator++; // その他事前 → 見学枠でまとめる
+  });
+  const sorted = [...uniMap.entries()].sort((a, b) =>
+    a[0].localeCompare(b[0], 'ja-JP', { sensitivity: 'base' }));
+  setText_('uni-list-count', `${sorted.length}校`);
+  if (!sorted.length) {
+    wrap.innerHTML = '<p style="font-size:12px;color:var(--gray);text-align:center;padding:16px 0">登録学生がいません</p>';
     return;
   }
   wrap.innerHTML =
-    `<p class="uni-alert">⚠ 確認が必要な大学が ${list.length}校 あります</p>` +
-    list.map(u => `
-      <div class="uni-row" data-name="${esc_(u.name)}">
-        <div class="uni-name">${esc_(u.name)}<span class="uni-tmp">仮 ${esc_(u.code)}</span></div>
-        <div class="uni-ctrl">
-          <input class="uni-reading" maxlength="2" placeholder="読み" autocomplete="off">
-          <span class="uni-prev">—</span>
-          <button class="sm-btn uni-confirm">確定</button>
-        </div>
-      </div>`).join('');
+    `<table class="data-tbl" style="width:100%">
+      <thead><tr>
+        <th>大学名</th>
+        <th style="text-align:right">ドライバー</th>
+        <th style="text-align:right">見学/応援</th>
+        <th style="text-align:right">当日一般</th>
+        <th style="text-align:right">合計</th>
+      </tr></thead>
+      <tbody>` +
+    sorted.map(([name, r]) =>
+      `<tr>
+        <td>${esc_(name)}</td>
+        <td style="text-align:right">${r.driver || '—'}</td>
+        <td style="text-align:right">${r.spectator || '—'}</td>
+        <td style="text-align:right">${r.walkin || '—'}</td>
+        <td style="text-align:right;font-weight:700">${r.total}</td>
+      </tr>`).join('') +
+    `</tbody></table>`;
+}
+
+/** 承認待ち一覧をレンダリング */
+function renderUniPending_(res) {
+  const wrap = id_('uni-pending-wrap');
+  if (!wrap) return;
+  if (!res.ok) {
+    wrap.innerHTML = '<p style="font-size:12px;color:var(--gray);text-align:center;padding:16px 0">（GAS未デプロイ時は利用不可）</p>';
+    setText_('uni-pending-count', '');
+    return;
+  }
+  const list = res.data.universities || [];
+  setText_('uni-pending-count', list.length ? `${list.length}件` : '');
+  if (!list.length) {
+    wrap.innerHTML = '<p style="font-size:12px;color:var(--gray);text-align:center;padding:16px 0">承認待ちの大学はありません</p>';
+    return;
+  }
+  wrap.innerHTML = list.map(u => `
+    <div class="uni-row" data-name="${esc_(u.name)}">
+      <div class="uni-name">${esc_(u.name)}<span class="uni-tmp">仮 ${esc_(u.code)}</span></div>
+      <div class="uni-ctrl">
+        <input class="uni-reading" maxlength="2" placeholder="読み" autocomplete="off">
+        <span class="uni-prev">—</span>
+        <button class="sm-btn uni-confirm">確定</button>
+      </div>
+    </div>`).join('');
   wrap.querySelectorAll('.uni-row').forEach(row => {
     const inp  = row.querySelector('.uni-reading');
     const prev = row.querySelector('.uni-prev');
