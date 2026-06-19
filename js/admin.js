@@ -54,6 +54,12 @@ window.addEventListener('DOMContentLoaded', () => {
   id_('btn-nfc-csv')?.addEventListener('click', downloadNfcCsv_);
   id_('btn-company-qr-csv')?.addEventListener('click', downloadCompanyQrCsv_);
 
+  // 事前登録フォームURLコピー
+  id_('btn-copy-prereg-url')?.addEventListener('click', () => {
+    const txt = id_('prereg-form-url')?.textContent;
+    if (txt && !txt.startsWith('（')) copyText_(txt);
+  });
+
   // 事前登録CSVダウンロード（QRパス用・区分別）
   id_('btn-prereg-csv-driver')?.addEventListener('click', () => downloadPreRegCsv_('driver'));
   id_('btn-prereg-csv-spectator')?.addEventListener('click', () => downloadPreRegCsv_('spectator'));
@@ -370,6 +376,12 @@ async function loadConfig_(gen, ev) {
   setVal_('cfg-maxPrizes',    cfg.maxPrizes     || cfg.prizeCount    || 3);
   setVal_('cfg-preRegMailSubject', cfg.preRegMailSubject || PREREG_MAIL_SUBJECT_DEFAULT);
   setVal_('cfg-preRegMailBody',    cfg.preRegMailBody    || PREREG_MAIL_BODY_DEFAULT);
+  setVal_('cfg-formOpenAt',         toDtLocal_(cfg.formOpenAt));
+  setVal_('cfg-deadlineDriver',     toDtLocal_(cfg.deadlineDriver));
+  setVal_('cfg-deadlineWomenDriver',toDtLocal_(cfg.deadlineWomenDriver));
+  setVal_('cfg-deadlineReserve',    toDtLocal_(cfg.deadlineReserve));
+  setVal_('cfg-deadlineMechanic',   toDtLocal_(cfg.deadlineMechanic));
+  updatePreRegFormUrl_();
 }
 
 // 確認メールの既定文面（CONFIG未設定時に表示・保存されるテンプレ）
@@ -387,11 +399,17 @@ async function handleSaveConfig_() {
   const fb  = id_('save-feedback');
   btn.disabled = true; fb.className = 'save-fb'; fb.textContent = '';
 
+  const toIso_ = v => v ? fromDtLocal_(v) : '';
   const map = {
-    prizeUnitSize:    getVal_('cfg-prizeUnitSize'),
-    maxPrizes:        getVal_('cfg-maxPrizes'),
-    preRegMailSubject: getVal_('cfg-preRegMailSubject'),
-    preRegMailBody:    getVal_('cfg-preRegMailBody'),
+    prizeUnitSize:        getVal_('cfg-prizeUnitSize'),
+    maxPrizes:            getVal_('cfg-maxPrizes'),
+    preRegMailSubject:    getVal_('cfg-preRegMailSubject'),
+    preRegMailBody:       getVal_('cfg-preRegMailBody'),
+    formOpenAt:           toIso_(getVal_('cfg-formOpenAt')),
+    deadlineDriver:       toIso_(getVal_('cfg-deadlineDriver')),
+    deadlineWomenDriver:  toIso_(getVal_('cfg-deadlineWomenDriver')),
+    deadlineReserve:      toIso_(getVal_('cfg-deadlineReserve')),
+    deadlineMechanic:     toIso_(getVal_('cfg-deadlineMechanic')),
   };
 
   let failed = false;
@@ -809,6 +827,14 @@ async function handleGenerateKeys_() {
   btn.disabled = false; btn.textContent = '🔑 未発行キーを一括発行';
   if (res.ok) { showToast_('✓ キーを発行しました'); loadCompanies_(); }
   else showToast_('⚠ 失敗: ' + (res.message || ''));
+}
+
+function updatePreRegFormUrl_() {
+  const el = id_('prereg-form-url');
+  if (!el) return;
+  if (!curEvent_) { el.textContent = '（イベント未選択）'; return; }
+  const base = location.origin + location.pathname.replace(/[^/]+$/, 'register-pre.html');
+  el.textContent = `${base}?event=${encodeURIComponent(curEvent_)}`;
 }
 
 function updateWalkInUrl_() {

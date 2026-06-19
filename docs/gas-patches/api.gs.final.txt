@@ -93,6 +93,7 @@ function dispatch_(e) {
       case 'getCurrentEvent':         return actionGetCurrentEvent_(p);   // T6 追加
       case 'registerWalkIn':          return actionRegisterWalkIn_(p);    // T6 追加
       case 'registerPreStudent':      return actionRegisterPreStudent_(p); // 事前登録(脱Googleフォーム)
+      case 'getFormConfig':           return actionGetFormConfig_(p);      // 事前登録フォーム設定(公開)
       // ── admin (T12) ───────────────────────────────────────────────────
       case 'adminGetEvents':    return actionAdminGetEvents_(p);
       case 'adminGetConfig':    return actionAdminGetConfig_(p);
@@ -114,6 +115,7 @@ function dispatch_(e) {
       case 'adminGenerateKeys':    return actionAdminGenerateKeys_(p);
       case 'adminImportCompanies': return actionAdminImportCompanies_(p);
       case 'adminUpdateKey':    return actionAdminUpdateKey_(p);
+      case 'adminResendWalkInMail': return actionAdminResendWalkInMail_(p);
       default:                        return err_('unknown_action');
     }
   } catch (e) {
@@ -253,8 +255,11 @@ function actionActivateStamp_(p) {
     if (existing) stampToken = String(existing[stCol]);
   }
 
+  // 参加者行が無ければ新規発行（＝今回が初回起動）。isNew で初回/復帰を区別する。
+  let isNew = false;
   if (!stampToken) {
     stampToken = Utilities.getUuid();
+    isNew = true;
     participantSheet.appendRow([
       new Date(), p.event, student.studentId,
       stampToken, new Date(), 'active',
@@ -262,7 +267,7 @@ function actionActivateStamp_(p) {
   }
 
   const count = countStamps_(p.event, student.studentId);
-  return ok_(buildStampResult_(p.event, student.studentId, count, { stampToken }));
+  return ok_(buildStampResult_(p.event, student.studentId, count, { stampToken, isNew }));
 }
 
 // ============================================================
@@ -287,8 +292,8 @@ function actionSaveStamp_(p) {
     : [];
 
   const dup = rows.some(r =>
-    r[1] === p.event &&
-    r[2] === student.studentId &&
+    String(r[1]) === String(p.event) &&
+    String(r[2]) === String(student.studentId) &&
     String(r[7]) === String(company.companyId)
   );
   if (dup) return err_('already_stamped');
@@ -308,7 +313,7 @@ function actionSaveStamp_(p) {
   ]);
 
   const prevCount = rows.filter(r =>
-    r[1] === p.event && r[2] === student.studentId
+    String(r[1]) === String(p.event) && String(r[2]) === String(student.studentId)
   ).length;
   const count = prevCount + 1;
 
@@ -339,7 +344,7 @@ function actionGetStampProgress_(p) {
     : [];
 
   const myStamps = rows
-    .filter(r => r[1] === p.event && r[2] === student.studentId)
+    .filter(r => String(r[1]) === String(p.event) && String(r[2]) === String(student.studentId))
     .map(r => ({
       company:   r[6],
       companyId: String(r[7] || ''),   // スタンプ帳グリッドのID突合用
@@ -525,7 +530,7 @@ function actionGetCompanyStampVisitors_(p) {
     : [];
 
   const visitors = rows
-    .filter(r => r[1] === p.event && String(r[7]) === String(company.companyId))
+    .filter(r => String(r[1]) === String(p.event) && String(r[7]) === String(company.companyId))
     .map(r => ({
       studentId: r[2], name: r[3], school: r[4], category: r[5],
       time: r[0] instanceof Date
@@ -537,6 +542,23 @@ function actionGetCompanyStampVisitors_(p) {
 }
 
 // ============================================================
+// アクション: getFormConfig（事前登録フォーム設定を公開APIとして返す）
+// ============================================================
+
+function actionGetFormConfig_(p) {
+  if (!p.event) return err_('missing_event');
+  const cfg = getConfig_(p.event);
+  const tz  = Session.getScriptTimeZone();
+  const fmt = v => v ? Utilities.formatDate(new Date(v), tz, "yyyy/MM/dd HH:mm") : '';
+  return ok_({
+    formOpenAt:          fmt(cfg.formOpenAt),
+    deadlineDriver:      fmt(cfg.deadlineDriver),
+    deadlineWomenDriver: fmt(cfg.deadlineWomenDriver),
+    deadlineReserve:     fmt(cfg.deadlineReserve),
+    deadlineMechanic:    fmt(cfg.deadlineMechanic),
+  });
+}
+
 // アクション: getEventList
 // ============================================================
 
@@ -800,6 +822,7 @@ function err_(code) {
     no_active_event:       '本日開催のイベントが見つかりません', // T6 追加
     invalid_code:          '登録コードが無効です',               // T6 追加
     already_registered:    'すでに本日のイベントに登録済みです', // T6 追加
+    no_email:              'この参加者にはメールアドレスが登録されていません',
     // T12 admin
     admin_key_not_configured: 'ADMIN_KEYがGASスクリプトプロパティに未設定です',
     invalid_admin_key:        '管理者キーが正しくありません',
@@ -830,7 +853,11 @@ function actionGetCurrentEvent_(p) {
   today.setHours(0, 0, 0, 0);
 
   const row = data.slice(1).find(r => {
-    if (statusCol >= 0 && String(r[statusCol]) === '完了') return false;
+    // 「公開停止」(旧データ互換で「完了」も)は開催日内でも公開対象から除外する
+    if (statusCol >= 0) {
+      const st = String(r[statusCol]);
+      if (st === '公開停止' || st === '完了') return false;
+    }
     const start = new Date(r[startCol]); start.setHours(0, 0, 0, 0);
     const end   = new Date(r[endCol]);   end.setHours(23, 59, 59, 999);
     return today >= start && today <= end;
@@ -868,9 +895,12 @@ function actionRegisterWalkIn_(p) {
   const sidCol       = sHeaders.indexOf('studentId');
 
   // 同日・同一学生の重複チェック(氏名+大学名)
+  // 空白の表記揺れ（半角/全角/前後）で別人扱いにならないよう正規化して照合する。
+  // （クッキー喪失→再登録での復帰の取りこぼしを防ぐ）
+  const norm_ = s => String(s == null ? '' : s).replace(/[\s　]/g, '');
   const existing = sData.slice(1).find(r =>
-    String(r[nameCol])   === String(p.name).trim() &&
-    String(r[schoolCol]) === String(p.school).trim()
+    norm_(r[nameCol])   === norm_(p.name) &&
+    norm_(r[schoolCol]) === norm_(p.school)
   );
   if (existing) {
     const existStudentId = String(existing[sidCol]);
@@ -888,9 +918,27 @@ function actionRegisterWalkIn_(p) {
       String(r[pSidCol]) === existStudentId &&
       String(r[pHeaders.indexOf('eventId')]) === String(p.event)
     );
-    const stampToken = pRow ? String(pRow[pStCol]) : Utilities.getUuid();
+    // 既存学生だが参加者行が無い場合（例: 事前登録済みで未開始）は
+    // 新規トークンを発行し、必ずシートへ追記する。
+    // （追記しないと未保存トークンを返し、以後スタンプ不能になるため）
+    let stampToken;
+    if (pRow) {
+      stampToken = String(pRow[pStCol]);
+    } else {
+      stampToken = Utilities.getUuid();
+      participantSheet.appendRow([
+        new Date(), p.event, existStudentId, stampToken, new Date(), 'active',
+      ]);
+    }
+    const existCardToken = String(existing[sHeaders.indexOf('cardToken')] || '');
     const count = countStamps_(p.event, existStudentId);
-    const result = buildStampResult_(p.event, existStudentId, count, { stampToken });
+    const result = buildStampResult_(p.event, existStudentId, count, { stampToken, cardToken: existCardToken });
+    // 再登録は実質「復帰」操作。個人ページ(氏名+QR)のリンクを再送（失敗しても登録判定は維持）
+    try {
+      sendWalkInPassMail_(p.email, p.name, p.event, buildPassUrl_(p.appBase, existCardToken, p.event));
+    } catch (err) {
+      console.error('sendWalkInPassMail_ (already_registered) failed:', err);
+    }
     return { ok: false, error: 'already_registered', data: result,
              message: 'すでに本日のイベントに登録済みです' };
   }
@@ -940,7 +988,14 @@ function actionRegisterWalkIn_(p) {
     new Date(), p.event, studentId, stampToken, new Date(), 'active',
   ]);
 
-  return ok_(buildStampResult_(p.event, studentId, 0, { stampToken, isNew: true }));
+  // 個人ページ(氏名+QR)のリンクをメール送信（失敗しても登録は成立させる）
+  try {
+    sendWalkInPassMail_(p.email, p.name, p.event, buildPassUrl_(p.appBase, token, p.event));
+  } catch (err) {
+    console.error('sendWalkInPassMail_ failed:', err);
+  }
+
+  return ok_(buildStampResult_(p.event, studentId, 0, { stampToken, isNew: true, cardToken: token }));
 }
 
 // ============================================================
@@ -1099,6 +1154,61 @@ function sendPreRegMail_(to, name, eventId) {
   } catch (err) {
     console.error('sendPreRegMail_ error:', err);
   }
+}
+
+// 当日参加者の個人ページ(氏名+QR)URLを組み立てる。
+// appBase は静的サイトの app/ ディレクトリの絶対URL（フロントが location から渡す）。
+// 取得できない場合は空文字（メール側でリンク無し扱い）。
+function buildPassUrl_(appBase, token, eventId) {
+  let base = String(appBase || '').trim();
+  if (!base || !token) return '';
+  if (base.charAt(base.length - 1) !== '/') base += '/';
+  return base + 'mypass.html?token=' + encodeURIComponent(token) +
+         '&event=' + encodeURIComponent(eventId);
+}
+
+// 当日参加者へ個人ページ(氏名+QR)のリンクをメール送信。
+// QR画像は埋め込まず、リンクのみ（cardTokenを外部サービスに送らない方針）。
+function sendWalkInPassMail_(to, name, eventId, passUrl) {
+  if (!to) return;
+  try {
+    const cfg    = getConfig_(eventId);
+    const evName = cfg.eventName || eventId;
+    const subject = '【' + evName + '】当日参加 受付完了（あなたのマイページ）';
+    const body = [
+      (name || '') + ' 様',
+      '',
+      evName + ' の当日参加登録を受け付けました。スタンプラリーにご参加いただけます。',
+      '',
+      '▼あなたのマイページ（氏名・QRコード）',
+      passUrl || '（リンクの発行に失敗しました。会場スタッフにお問い合わせください）',
+      '',
+      '・このページをブックマーク／ホーム画面に追加しておくと、いつでも開けます。',
+      '・企業ブースの方には、このページのQRコードを見せてください。',
+      '・スタンプの進捗が消えてしまった場合も、このページから元に戻せます。',
+      '',
+      '── FORMULA GYMKHANA 事務局',
+    ].join('\n');
+    MailApp.sendEmail({ to: String(to), subject: subject, body: body });
+  } catch (err) {
+    console.error('sendWalkInPassMail_ error:', err);
+  }
+}
+
+// 管理画面: 当日参加者へ個人ページのリンクを再送信する。
+function actionAdminResendWalkInMail_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.event) return err_('missing_event');
+  if (!p.token) return err_('missing_token');
+
+  const student = findStudentByCardToken_(p.token, p.event);
+  if (!student)        return err_('invalid_token');
+  if (!student.email)  return err_('no_email');
+
+  sendWalkInPassMail_(student.email, student.name, p.event,
+                      buildPassUrl_(p.appBase, p.token, p.event));
+  return ok_({ sent: true, email: student.email });
 }
 
 // 事前登録の提出ファイルをDriveに保存（非公開＝オーナー/組織のみ閲覧）。URLを返す。

@@ -449,6 +449,38 @@
           </div>
 
           <div class="cfg-group">
+            <div class="cfg-group-title">事前登録フォーム設定</div>
+            <div class="cfg-hint" style="margin-bottom:8px">締切を過ぎた区分はフォーム上で選択不可になります。空欄＝制限なし。</div>
+            <div class="cfg-row">
+              <label>フォーム公開開始日時</label>
+              <input type="datetime-local" class="cfg-input" id="cfg-formOpenAt">
+            </div>
+            <div class="cfg-row">
+              <label>FGクラスドライバー 締切</label>
+              <input type="datetime-local" class="cfg-input" id="cfg-deadlineDriver">
+            </div>
+            <div class="cfg-row">
+              <label>女子クラスドライバー 締切</label>
+              <input type="datetime-local" class="cfg-input" id="cfg-deadlineWomenDriver">
+            </div>
+            <div class="cfg-row">
+              <label>補欠ドライバー 締切</label>
+              <input type="datetime-local" class="cfg-input" id="cfg-deadlineReserve">
+            </div>
+            <div class="cfg-row">
+              <label>見学・応援学生 締切</label>
+              <input type="datetime-local" class="cfg-input" id="cfg-deadlineMechanic">
+            </div>
+            <div class="cfg-row" style="margin-top:8px">
+              <label>事前登録フォームURL</label>
+              <div class="url-box">
+                <div class="url-val" id="prereg-form-url">—</div>
+                <button class="sm-btn" id="btn-copy-prereg-url">URLをコピー</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="cfg-group">
             <button class="save-btn" id="btn-save-config">保存</button>
             <span class="save-fb" id="save-feedback"></span>
           </div>

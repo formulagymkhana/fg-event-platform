@@ -277,6 +277,10 @@ const FG_API = (() => {
     return call_('getEventList', {});
   }
 
+  function getFormConfig(event) {
+    return call_('getFormConfig', { event });
+  }
+
   return {
     // イベント自動判定
     getCurrentEvent,
@@ -295,6 +299,7 @@ const FG_API = (() => {
     registerWalkIn,
     // 事前登録
     registerPreStudent,
+    getFormConfig,
     // 企業閲覧
     getCompanyView,
     getCompanyStampVisitors,

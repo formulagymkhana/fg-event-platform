@@ -12,21 +12,59 @@ const $ = id => document.getElementById(id);
 
 let _event = null;
 
+// カテゴリ → formConfig のキー対応
+const CAT_DEADLINE_KEY = {
+  '出場選手(FGクラスドライバー)':       'deadlineDriver',
+  '出場選手(女子クラスドライバー)':     'deadlineWomenDriver',
+  '補欠ドライバー':                     'deadlineReserve',
+  '見学・応援学生(メカニック登録含む)': 'deadlineMechanic',
+};
+
+let _formConfig = {};
+
 (async () => {
   _event = FG_API.getParam('event');
   if (!_event) { showState('no-event'); return; }
 
-  // イベント名をバッジ表示（取得失敗しても続行）
-  try {
-    const res = await FG_API.getEventList();
-    if (res.ok) {
-      const ev = (res.data.events || []).find(e => String(e.eventId) === String(_event));
-      $('event-name-label').textContent = ev ? (ev.name || ev.eventId) : _event;
-    } else {
-      $('event-name-label').textContent = _event;
-    }
-  } catch (e) {
+  // イベント名＋フォーム設定を並行取得
+  const [evRes, cfgRes] = await Promise.all([
+    FG_API.getEventList(),
+    FG_API.getFormConfig(_event),
+  ]);
+
+  if (evRes.ok) {
+    const ev = (evRes.data.events || []).find(e => String(e.eventId) === String(_event));
+    $('event-name-label').textContent = ev ? (ev.name || ev.eventId) : _event;
+  } else {
     $('event-name-label').textContent = _event;
+  }
+
+  if (cfgRes.ok) {
+    _formConfig = cfgRes.data || {};
+    const now = new Date();
+
+    // フォーム公開開始前
+    if (_formConfig.formOpenAt && now < new Date(_formConfig.formOpenAt)) {
+      showState('not-open');
+      return;
+    }
+
+    // カテゴリ別締切チェック（期限切れはラジオを無効化・ラベルに注記）
+    document.querySelectorAll('input[name="category"]').forEach(radio => {
+      const key = CAT_DEADLINE_KEY[radio.value];
+      const dl  = key && _formConfig[key];
+      if (dl && now > new Date(dl)) {
+        radio.disabled = true;
+        const label = radio.closest('label') || radio.parentElement;
+        if (label && !label.querySelector('.deadline-note')) {
+          const note = document.createElement('span');
+          note.className = 'deadline-note';
+          note.textContent = '（受付終了）';
+          note.style.cssText = 'color:#e53935;font-size:12px;margin-left:4px';
+          label.appendChild(note);
+        }
+      }
+    });
   }
 
   showState('form');
@@ -378,7 +416,7 @@ async function submitForm() {
 
 // ── 状態切替 ────────────────────────────────────
 function showState(state) {
-  ['no-event', 'loading', 'form', 'success', 'error'].forEach(s => {
+  ['no-event', 'loading', 'not-open', 'form', 'success', 'error'].forEach(s => {
     const el = $('state-' + s);
     if (el) el.style.display = s === state ? 'block' : 'none';
   });
