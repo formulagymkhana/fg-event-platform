@@ -32,7 +32,8 @@ window.addEventListener('DOMContentLoaded', () => {
   // ダッシュボード操作
   id_('btn-reload')?.addEventListener('click', () => loadAll_());
   id_('btn-save-event-info')?.addEventListener('click', handleSaveEventInfo_);
-  id_('btn-save-config')?.addEventListener('click', handleSaveConfig_);
+  id_('btn-save-config')?.addEventListener('click', () => saveConfig_('btn-save-config', 'save-feedback'));
+  id_('btn-save-form-config')?.addEventListener('click', () => saveConfig_('btn-save-form-config', 'form-save-feedback'));
   id_('btn-clear-cache')?.addEventListener('click', handleClearCache_);
   id_('btn-change-key')?.addEventListener('click', handleChangeKey_);
   id_('btn-copy-url')?.addEventListener('click', handleCopyUrl_);
@@ -154,6 +155,12 @@ function route_() {
     const gen = ++loadGen_;
     loadStudents_(gen, curEvent_);
     loadPreRegistrations_(gen, curEvent_);
+  } else if (section === 'forms') {
+    showPage_('forms');
+    loadConfig_(++loadGen_, curEvent_);
+  } else if (section === 'universities') {
+    showPage_('universities');
+    loadPendingUniversities_();
   } else {
     showPage_('dashboard');
     const ev = allEvents_.find(e => e.eventId === curEvent_);
@@ -165,7 +172,7 @@ function route_() {
 }
 
 function showPage_(name) {
-  ['events', 'dashboard', 'companies', 'students', 'settings'].forEach(p => {
+  ['events', 'dashboard', 'companies', 'students', 'forms', 'universities', 'settings'].forEach(p => {
     const el = id_('page-' + p);
     if (el) el.style.display = p === name ? '' : 'none';
   });
@@ -199,12 +206,20 @@ function renderEventList_() {
 function updateNavLinks_() {
   const co = id_('nav-co-card');
   const st = id_('nav-st-card');
+  const fm = id_('nav-form-card');
+  const un = id_('nav-uni-card');
   const backCo = id_('back-dash-co');
   const backSt = id_('back-dash-st');
+  const backFm = id_('back-dash-form');
+  const backUn = id_('back-dash-uni');
   if (co) co.href = '#' + curEvent_ + '/companies';
   if (st) st.href = '#' + curEvent_ + '/students';
+  if (fm) fm.href = '#' + curEvent_ + '/forms';
+  if (un) un.href = '#' + curEvent_ + '/universities';
   if (backCo) backCo.href = '#' + curEvent_;
   if (backSt) backSt.href = '#' + curEvent_;
+  if (backFm) backFm.href = '#' + curEvent_;
+  if (backUn) backUn.href = '#' + curEvent_;
 }
 
 // ── Load all data ─────────────────────────────────
@@ -217,6 +232,7 @@ async function loadAll_() {
   loadPrizeLog_(gen, ev);
   loadConfig_(gen, ev);
   loadCompanies_(gen, ev);
+  updateUniBadge_(gen);
 }
 
 // ── 事前登録一覧 ──────────────────────────────────
@@ -383,6 +399,20 @@ async function loadConfig_(gen, ev) {
   setVal_('cfg-deadlineMechanic',   toDtLocal_(cfg.deadlineMechanic));
   setVal_('cfg-competingLabel',     cfg.competingLabel || '');
   updatePreRegFormUrl_();
+  updateFormBadge_(cfg);
+}
+
+/** フォーム管理ナビカードのバッジ: 公開状態を表示（設定読込済みデータから判定・軽量） */
+function updateFormBadge_(cfg) {
+  const open = cfg.formOpenAt ? new Date(cfg.formOpenAt) : null;
+  const now  = new Date();
+  if (!open) {
+    setBadge_('badge-form', 'todo', '未設定');
+  } else if (now >= open) {
+    setBadge_('badge-form', 'done', '✓ 公開中');
+  } else {
+    setBadge_('badge-form', 'init', `${open.getMonth() + 1}/${open.getDate()} 公開`);
+  }
 }
 
 // 確認メールの既定文面（CONFIG未設定時に表示・保存されるテンプレ）
@@ -394,10 +424,10 @@ const PREREG_MAIL_BODY_DEFAULT =
   '登録内容に変更がある場合は事務局までご連絡ください。\n\n' +
   '── FORMULA GYMKHANA 事務局';
 
-async function handleSaveConfig_() {
+async function saveConfig_(btnId, fbId) {
   if (!curEvent_) return;
-  const btn = id_('btn-save-config');
-  const fb  = id_('save-feedback');
+  const btn = id_(btnId);
+  const fb  = id_(fbId);
   btn.disabled = true; fb.className = 'save-fb'; fb.textContent = '';
 
   const toIso_ = v => v ? fromDtLocal_(v) : '';
@@ -1161,4 +1191,101 @@ function setBadge_(eid, type, label) {
   const base = el.classList.contains('nav-card-count') ? 'nav-card-count' : 'step-badge';
   el.className = base + ' ' + type;
   el.textContent = label;
+}
+
+// ── 大学マスター（要確認レビュー）─────────────────
+// ポケベルコード化: 1桁目=行(あ=1…ら=9,わ=0)、2桁目=段(あいうえお=1〜5)。
+// 連番(下2桁)は確定時にGAS側が既存コードを見て採番する。
+const POKEBELL_ = {
+  あ:'11',い:'12',う:'13',え:'14',お:'15',
+  か:'21',き:'22',く:'23',け:'24',こ:'25',
+  さ:'31',し:'32',す:'33',せ:'34',そ:'35',
+  た:'41',ち:'42',つ:'43',て:'44',と:'45',
+  な:'51',に:'52',ぬ:'53',ね:'54',の:'55',
+  は:'61',ひ:'62',ふ:'63',へ:'64',ほ:'65',
+  ま:'71',み:'72',む:'73',め:'74',も:'75',
+  や:'81',ゆ:'83',よ:'85',
+  ら:'91',り:'92',る:'93',れ:'94',ろ:'95',
+  わ:'01',を:'05',ん:'00',
+};
+// 濁音・半濁音・小書き → 清音ベースに正規化（同志社=ど→と と同じ扱い）
+const KANA_BASE_ = (() => {
+  const m = { ぁ:'あ',ぃ:'い',ぅ:'う',ぇ:'え',ぉ:'お',っ:'つ',ゃ:'や',ゅ:'ゆ',ょ:'よ',ゎ:'わ' };
+  'がぎぐげござじずぜぞだぢづでどばびぶべぼ'.split('').forEach(c =>
+    m[c] = String.fromCharCode(c.charCodeAt(0) - 1));
+  'ぱぴぷぺぽ'.split('').forEach(c =>
+    m[c] = String.fromCharCode(c.charCodeAt(0) - 2));
+  return m;
+})();
+/** 読みの頭文字 → ポケベルコード上2桁。判定不能なら '' */
+function pokebellPrefix_(reading) {
+  if (!reading) return '';
+  let c = reading.trim().charAt(0);
+  if (c >= 'ァ' && c <= 'ヶ') c = String.fromCharCode(c.charCodeAt(0) - 0x60); // カタカナ→ひらがな
+  c = KANA_BASE_[c] || c;
+  return POKEBELL_[c] || '';
+}
+
+/** 大学マスターナビカードのバッジ: 要確認の校数 */
+async function updateUniBadge_(gen) {
+  const res = await adminCall_('adminGetPendingUniversities', { event: curEvent_ });
+  if (gen !== loadGen_) return;
+  if (!res.ok) { setBadge_('badge-uni', 'init', '—'); return; }
+  const n = (res.data.universities || []).length;
+  setBadge_('badge-uni', n > 0 ? 'todo' : 'done', n > 0 ? `要確認 ${n}` : '✓ 完了');
+}
+
+/** 大学マスターページ: 要確認の大学一覧を表示 */
+async function loadPendingUniversities_() {
+  const wrap = id_('uni-pending-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<p style="font-size:12px;color:var(--gray);text-align:center;padding:20px 0">読み込み中...</p>';
+  const res = await adminCall_('adminGetPendingUniversities', { event: curEvent_ });
+  if (!res.ok) {
+    wrap.innerHTML = '<p style="font-size:12px;color:var(--fg-warning);text-align:center;padding:20px 0">読み込みに失敗しました</p>';
+    return;
+  }
+  const list = res.data.universities || [];
+  if (!list.length) {
+    wrap.innerHTML = '<p style="font-size:12px;color:var(--gray);text-align:center;padding:20px 0">確認が必要な大学はありません。</p>';
+    return;
+  }
+  wrap.innerHTML =
+    `<p class="uni-alert">⚠ 確認が必要な大学が ${list.length}校 あります</p>` +
+    list.map(u => `
+      <div class="uni-row" data-name="${esc_(u.name)}">
+        <div class="uni-name">${esc_(u.name)}<span class="uni-tmp">仮 ${esc_(u.code)}</span></div>
+        <div class="uni-ctrl">
+          <input class="uni-reading" maxlength="2" placeholder="読み" autocomplete="off">
+          <span class="uni-prev">—</span>
+          <button class="sm-btn uni-confirm">確定</button>
+        </div>
+      </div>`).join('');
+  wrap.querySelectorAll('.uni-row').forEach(row => {
+    const inp  = row.querySelector('.uni-reading');
+    const prev = row.querySelector('.uni-prev');
+    inp.addEventListener('input', () => {
+      const p = pokebellPrefix_(inp.value);
+      prev.textContent = p ? `${p}xx` : '—';
+    });
+    row.querySelector('.uni-confirm').addEventListener('click', () => confirmUniversity_(row));
+  });
+}
+
+/** 読みを送ってコードを確定（連番採番はGAS側） */
+async function confirmUniversity_(row) {
+  const name    = row.dataset.name;
+  const reading = row.querySelector('.uni-reading').value.trim();
+  if (!pokebellPrefix_(reading)) { showToast_('読みの頭文字をひらがなで入力してください'); return; }
+  const btn = row.querySelector('.uni-confirm');
+  btn.disabled = true; btn.textContent = '…';
+  const res = await adminCall_('adminConfirmUniversity', { event: curEvent_, name, reading });
+  if (!res.ok) {
+    btn.disabled = false; btn.textContent = '確定';
+    showToast_(res.message || '確定に失敗しました');
+    return;
+  }
+  row.querySelector('.uni-ctrl').innerHTML = `<span class="uni-done">✓ ${esc_(res.data.code)}</span>`;
+  showToast_(`✓ ${name} → ${res.data.code}`);
+  updateUniBadge_(loadGen_);
 }

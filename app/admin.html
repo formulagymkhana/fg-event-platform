@@ -140,6 +140,20 @@
     .tbl-wrap{overflow-x:auto}
     .empty-msg{text-align:center;color:var(--gray);padding:20px;font-size:13px}
 
+    /* ── 大学マスター（要確認レビュー）── */
+    .uni-alert{background:var(--fg-warning-bg);color:var(--fg-warning);font-size:12px;font-weight:700;
+      padding:10px 12px;border-radius:8px;margin-bottom:12px}
+    .uni-row{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px}
+    .uni-name{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .uni-tmp{font-size:10px;font-weight:600;color:var(--gray);background:var(--gray-light);padding:2px 7px;border-radius:100px}
+    .uni-ctrl{display:flex;align-items:center;gap:8px}
+    .uni-reading{width:56px;padding:8px 10px;border:1.5px solid var(--border);border-radius:7px;
+      font-size:15px;text-align:center;color:var(--fg-text)}
+    .uni-reading:focus{outline:none;border-color:var(--navy)}
+    .uni-prev{font-family:monospace;font-size:13px;color:var(--navy-mid);min-width:42px}
+    .uni-confirm{flex-shrink:0}
+    .uni-done{font-size:14px;font-weight:700;color:var(--fg-success,#1A6640);font-family:monospace}
+
     /* ── Config form ── */
     .cfg-group{margin-bottom:18px}
     .cfg-group:last-child{margin-bottom:0}
@@ -321,6 +335,16 @@
           <span class="nav-card-label">学生管理</span>
           <span class="nav-card-count init" id="badge-step3">確認中</span>
         </a>
+        <a class="nav-card" id="nav-form-card" href="#">
+          <span class="nav-card-icon">📝</span>
+          <span class="nav-card-label">フォーム管理</span>
+          <span class="nav-card-count init" id="badge-form">確認中</span>
+        </a>
+        <a class="nav-card" id="nav-uni-card" href="#">
+          <span class="nav-card-icon">🎓</span>
+          <span class="nav-card-label">大学マスター</span>
+          <span class="nav-card-count init" id="badge-uni">確認中</span>
+        </a>
       </div>
 
       <!-- URL発行（Step4） -->
@@ -431,56 +455,6 @@
               <div class="cfg-row">
                 <label>最大景品数</label>
                 <input type="number" class="cfg-input" id="cfg-maxPrizes" min="1" max="20">
-              </div>
-            </div>
-          </div>
-
-          <div class="cfg-group">
-            <div class="cfg-group-title">事前登録 確認メール</div>
-            <div class="cfg-hint" style="margin-bottom:8px">使える差し込み: <code>{name}</code>＝氏名、<code>{eventName}</code>＝大会名</div>
-            <div class="cfg-row">
-              <label>件名</label>
-              <input type="text" class="cfg-input" id="cfg-preRegMailSubject" placeholder="【{eventName}】学生参加 事前登録を受け付けました">
-            </div>
-            <div class="cfg-row">
-              <label>本文</label>
-              <textarea class="cfg-input" id="cfg-preRegMailBody" rows="8" style="resize:vertical;line-height:1.6"></textarea>
-            </div>
-          </div>
-
-          <div class="cfg-group">
-            <div class="cfg-group-title">事前登録フォーム設定</div>
-            <div class="cfg-hint" style="margin-bottom:8px">締切を過ぎた区分はフォーム上で選択不可になります。空欄＝制限なし。</div>
-            <div class="cfg-row">
-              <label>フォーム公開開始日時</label>
-              <input type="datetime-local" class="cfg-input" id="cfg-formOpenAt">
-            </div>
-            <div class="cfg-row">
-              <label>FGクラスドライバー 締切</label>
-              <input type="datetime-local" class="cfg-input" id="cfg-deadlineDriver">
-            </div>
-            <div class="cfg-row">
-              <label>女子クラスドライバー 締切</label>
-              <input type="datetime-local" class="cfg-input" id="cfg-deadlineWomenDriver">
-            </div>
-            <div class="cfg-row">
-              <label>補欠ドライバー 締切</label>
-              <input type="datetime-local" class="cfg-input" id="cfg-deadlineReserve">
-            </div>
-            <div class="cfg-row">
-              <label>見学・応援学生 締切</label>
-              <input type="datetime-local" class="cfg-input" id="cfg-deadlineMechanic">
-            </div>
-            <div class="cfg-row">
-              <label>「所属校は出場しますか？」の文言</label>
-              <input type="text" class="cfg-input" id="cfg-competingLabel" placeholder="所属する学校は、予選会 Rd.1に出場しますか？">
-              <div class="cfg-hint">見学・応援学生フォームに表示される質問文。大会ごとに変更可。</div>
-            </div>
-            <div class="cfg-row" style="margin-top:8px">
-              <label>事前登録フォームURL</label>
-              <div class="url-box">
-                <div class="url-val" id="prereg-form-url">—</div>
-                <button class="sm-btn" id="btn-copy-prereg-url">URLをコピー</button>
               </div>
             </div>
           </div>
@@ -614,6 +588,105 @@
       </div>
     </div>
   </div><!-- /page-students -->
+
+  <!-- ─────────────────────────────────────
+       PAGE: フォーム管理
+  ───────────────────────────────────── -->
+  <div id="page-forms" style="display:none">
+    <header class="page-hd">
+      <a class="page-back" id="back-dash-form" href="#">← ダッシュボード</a>
+      <span class="page-title">フォーム管理</span>
+    </header>
+    <div class="app-body">
+      <p class="step-desc" style="margin-top:4px">事前登録フォームの公開日時・締切・文言・確認メールを設定します。</p>
+
+      <div class="section">
+        <div class="section-hd" data-section="f-form">
+          <span class="section-title">📝 事前登録フォーム設定</span>
+          <span class="section-toggle open" id="toggle-f-form">▼</span>
+        </div>
+        <div class="section-body open" id="body-f-form">
+          <div class="cfg-group" style="margin-top:0">
+            <div class="cfg-hint" style="margin-bottom:8px">締切を過ぎた区分はフォーム上で選択不可になります。空欄＝制限なし。</div>
+            <div class="cfg-row">
+              <label>フォーム公開開始日時</label>
+              <input type="datetime-local" class="cfg-input" id="cfg-formOpenAt">
+            </div>
+            <div class="cfg-row">
+              <label>FGクラスドライバー 締切</label>
+              <input type="datetime-local" class="cfg-input" id="cfg-deadlineDriver">
+            </div>
+            <div class="cfg-row">
+              <label>女子クラスドライバー 締切</label>
+              <input type="datetime-local" class="cfg-input" id="cfg-deadlineWomenDriver">
+            </div>
+            <div class="cfg-row">
+              <label>補欠ドライバー 締切</label>
+              <input type="datetime-local" class="cfg-input" id="cfg-deadlineReserve">
+            </div>
+            <div class="cfg-row">
+              <label>見学・応援学生 締切</label>
+              <input type="datetime-local" class="cfg-input" id="cfg-deadlineMechanic">
+            </div>
+            <div class="cfg-row">
+              <label>「所属校は出場しますか？」の文言</label>
+              <input type="text" class="cfg-input" id="cfg-competingLabel" placeholder="所属する学校は、予選会 Rd.1に出場しますか？">
+              <div class="cfg-hint">見学・応援学生フォームに表示される質問文。大会ごとに変更可。</div>
+            </div>
+            <div class="cfg-row" style="margin-top:8px">
+              <label>事前登録フォームURL</label>
+              <div class="url-box">
+                <div class="url-val" id="prereg-form-url">—</div>
+                <button class="sm-btn" id="btn-copy-prereg-url">URLをコピー</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-hd" data-section="f-mail">
+          <span class="section-title">✉️ 事前登録 確認メール</span>
+          <span class="section-toggle" id="toggle-f-mail">▼</span>
+        </div>
+        <div class="section-body" id="body-f-mail">
+          <div class="cfg-group" style="margin-top:0">
+            <div class="cfg-hint" style="margin-bottom:8px">使える差し込み: <code>{name}</code>＝氏名、<code>{eventName}</code>＝大会名</div>
+            <div class="cfg-row">
+              <label>件名</label>
+              <input type="text" class="cfg-input" id="cfg-preRegMailSubject" placeholder="【{eventName}】学生参加 事前登録を受け付けました">
+            </div>
+            <div class="cfg-row">
+              <label>本文</label>
+              <textarea class="cfg-input" id="cfg-preRegMailBody" rows="8" style="resize:vertical;line-height:1.6"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cfg-group">
+        <button class="save-btn" id="btn-save-form-config">保存</button>
+        <span class="save-fb" id="form-save-feedback"></span>
+      </div>
+    </div>
+  </div><!-- /page-forms -->
+
+  <!-- ─────────────────────────────────────
+       PAGE: 大学マスター
+  ───────────────────────────────────── -->
+  <div id="page-universities" style="display:none">
+    <header class="page-hd">
+      <a class="page-back" id="back-dash-uni" href="#">← ダッシュボード</a>
+      <span class="page-title">大学マスター</span>
+    </header>
+    <div class="app-body">
+      <p class="step-desc" style="margin-top:4px">新規登録された大学にコードを割り当てて確定します。読みの頭1文字を入力するとコードが自動生成されます。</p>
+
+      <div id="uni-pending-wrap">
+        <p style="font-size:12px;color:var(--gray);text-align:center;padding:20px 0">読み込み中...</p>
+      </div>
+    </div>
+  </div><!-- /page-universities -->
 
   <!-- ─────────────────────────────────────
        PAGE: 全体設定

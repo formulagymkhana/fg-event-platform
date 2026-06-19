@@ -117,6 +117,8 @@ function dispatch_(e) {
       case 'adminImportCompanies': return actionAdminImportCompanies_(p);
       case 'adminUpdateKey':    return actionAdminUpdateKey_(p);
       case 'adminResendWalkInMail': return actionAdminResendWalkInMail_(p);
+      case 'adminGetPendingUniversities': return actionAdminGetPendingUniversities_(p);
+      case 'adminConfirmUniversity':      return actionAdminConfirmUniversity_(p);
       default:                        return err_('unknown_action');
     }
   } catch (e) {
@@ -838,6 +840,8 @@ function err_(code) {
     admin_key_not_configured: 'ADMIN_KEYがGASスクリプトプロパティに未設定です',
     invalid_admin_key:        '管理者キーが正しくありません',
     event_already_exists:     '同じイベントIDが既に存在します',
+    invalid_reading:          '読みの頭文字が判定できません',
+    university_not_found:      '対象の大学が見つかりません',
     server_error:          'サーバーエラーが発生しました',
   };
   return { ok: false, error: code, message: MSG[code] || code };
@@ -1278,6 +1282,102 @@ function validateAdmin_(p) {
   if (!valid) return err_('admin_key_not_configured');
   if (String(p.adminKey || '').trim() !== String(valid).trim()) return err_('invalid_admin_key');
   return null;
+}
+
+// ============================================================
+// 大学マスター: 要確認の大学一覧 / コード確定
+// ============================================================
+
+// ポケベルコード上2桁: 1桁目=行(あ=1…ら=9,わ=0)、2桁目=段(あいうえお=1〜5)。
+var POKEBELL_TABLE_ = {
+  'あ':'11','い':'12','う':'13','え':'14','お':'15',
+  'か':'21','き':'22','く':'23','け':'24','こ':'25',
+  'さ':'31','し':'32','す':'33','せ':'34','そ':'35',
+  'た':'41','ち':'42','つ':'43','て':'44','と':'45',
+  'な':'51','に':'52','ぬ':'53','ね':'54','の':'55',
+  'は':'61','ひ':'62','ふ':'63','へ':'64','ほ':'65',
+  'ま':'71','み':'72','む':'73','め':'74','も':'75',
+  'や':'81','ゆ':'83','よ':'85',
+  'ら':'91','り':'92','る':'93','れ':'94','ろ':'95',
+  'わ':'01','を':'05','ん':'00'
+};
+// 濁音・半濁音・小書き → 清音ベースへ正規化（同志社=ど→と と同じ扱い）
+var KANA_BASE_TABLE_ = (function () {
+  var m = {'ぁ':'あ','ぃ':'い','ぅ':'う','ぇ':'え','ぉ':'お','っ':'つ','ゃ':'や','ゅ':'ゆ','ょ':'よ','ゎ':'わ'};
+  'がぎぐげござじずぜぞだぢづでどばびぶべぼ'.split('').forEach(function (c) {
+    m[c] = String.fromCharCode(c.charCodeAt(0) - 1);
+  });
+  'ぱぴぷぺぽ'.split('').forEach(function (c) {
+    m[c] = String.fromCharCode(c.charCodeAt(0) - 2);
+  });
+  return m;
+})();
+
+function pokebellPrefix_(reading) {
+  if (!reading) return '';
+  var c = String(reading).trim().charAt(0);
+  if (c >= 'ァ' && c <= 'ヶ') c = String.fromCharCode(c.charCodeAt(0) - 0x60); // カタカナ→ひらがな
+  c = KANA_BASE_TABLE_[c] || c;
+  return POKEBELL_TABLE_[c] || '';
+}
+
+// 状態が「確定」でない大学（自動割当(要確認) など）を返す
+function actionAdminGetPendingUniversities_(p) {
+  var e = validateAdmin_(p);
+  if (e) return e;
+  var sheet = masterSs_().getSheetByName(SHEET.UNI_MASTER);
+  if (!sheet || sheet.getLastRow() < 2) return ok_({ universities: [] });
+  var data      = sheet.getDataRange().getValues();
+  var headers   = data[0].map(String);
+  var nameCol   = headers.indexOf('大学名');
+  var codeCol   = headers.indexOf('コード');
+  var statusCol = headers.indexOf('状態');
+  var out = [];
+  data.slice(1).forEach(function (row) {
+    var name   = String(row[nameCol] || '').trim();
+    var status = statusCol >= 0 ? String(row[statusCol] || '').trim() : '';
+    if (name && status && status !== '確定') {
+      out.push({ name: name, code: String(row[codeCol] || '').trim(), status: status });
+    }
+  });
+  return ok_({ universities: out });
+}
+
+// 読みの頭文字からポケベルコードを生成し、既存コードを見て連番採番して確定する
+function actionAdminConfirmUniversity_(p) {
+  var e = validateAdmin_(p);
+  if (e) return e;
+  var name    = String(p.name || '').trim();
+  var prefix  = pokebellPrefix_(p.reading);
+  if (!name) return err_('missing_params');
+  if (!prefix) return err_('invalid_reading');
+
+  var sheet = masterSs_().getSheetByName(SHEET.UNI_MASTER);
+  if (!sheet || sheet.getLastRow() < 2) return err_('university_not_found');
+  var data      = sheet.getDataRange().getValues();
+  var headers   = data[0].map(String);
+  var nameCol   = headers.indexOf('大学名');
+  var codeCol   = headers.indexOf('コード');
+  var statusCol = headers.indexOf('状態');
+
+  // 同じ上2桁を持つ既存コードの最大連番 +1 で採番
+  var maxSeq = 0;
+  var targetRow = -1;
+  data.slice(1).forEach(function (row, i) {
+    var code = String(row[codeCol] || '').trim().padStart(4, '0');
+    if (code.substring(0, 2) === prefix) {
+      var seq = Number(code.substring(2));
+      if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+    }
+    if (String(row[nameCol] || '').trim() === name) targetRow = i + 2; // 1始まり+ヘッダ
+  });
+  if (targetRow < 0) return err_('university_not_found');
+
+  var newCode = prefix + String(maxSeq + 1).padStart(2, '0');
+  sheet.getRange(targetRow, codeCol + 1).setValue("'" + newCode); // 先頭0保持のため文字列化
+  if (statusCol >= 0) sheet.getRange(targetRow, statusCol + 1).setValue('確定');
+
+  return ok_({ code: newCode });
 }
 
 // イベント一覧取得 + WALK_IN_CODE を返す
