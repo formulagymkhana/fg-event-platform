@@ -1235,19 +1235,24 @@ async function updateUniBadge_(gen) {
   setBadge_('badge-uni', n > 0 ? 'todo' : 'done', n > 0 ? `要確認 ${n}` : '✓ 完了');
 }
 
-/** 大学管理ページ: 参加大学一覧＋承認待ちを並行ロード */
-async function loadUniversities_() {
+/** 大学管理ページ: 参加大学一覧＋承認待ちを独立にロード
+ *  （承認待ちは未デプロイ時にタイムアウトしうるので、一覧の描画をブロックしない） */
+function loadUniversities_() {
   const gen = ++loadGen_;
-  // 学生データとpending一覧を並行取得
-  const [stuRes, pendRes] = await Promise.all([
-    studentData_.length
-      ? Promise.resolve({ ok: true, data: { students: studentData_ } })
-      : adminCall_('adminGetStudents', { event: curEvent_ }),
-    adminCall_('adminGetPendingUniversities', { event: curEvent_ }),
-  ]);
-  if (gen !== loadGen_) return;
-  renderUniList_(stuRes);
-  renderUniPending_(pendRes);
+  // 参加大学一覧（学生集計）
+  (async () => {
+    const res = studentData_.length
+      ? { ok: true, data: { students: studentData_ } }
+      : await adminCall_('adminGetStudents', { event: curEvent_ });
+    if (gen !== loadGen_) return;
+    renderUniList_(res);
+  })();
+  // 承認待ち
+  (async () => {
+    const res = await adminCall_('adminGetPendingUniversities', { event: curEvent_ });
+    if (gen !== loadGen_) return;
+    renderUniPending_(res);
+  })();
 }
 
 /** 参加大学一覧をレンダリング */
