@@ -58,7 +58,7 @@ function createEvent_(eventId, eventName, startDate, endDate) {
   const ss = SpreadsheetApp.create(eventName);
   setupEventSpreadsheet_(ss, eventId, eventName, startDate, endDate);
   masterSs_().getSheetByName(SHEET.EVENT_LIST).appendRow([
-    eventId, eventName, ss.getId(), startDate, endDate, '準備中'
+    eventId, eventName, ss.getId(), startDate, endDate, '公開中'
   ]);
   const url = ss.getUrl();
   console.log('✅ ' + eventName + '\nURL: ' + url);
