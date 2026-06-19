@@ -461,6 +461,16 @@ function replaceDays_(d1, d2) {
   });
 }
 
+// ── 大学候補リストを五十音順にソート ────────────
+(function sortUniversities_() {
+  const dl = document.getElementById('dl-universities');
+  if (!dl) return;
+  const opts = Array.from(dl.options).sort((a, b) =>
+    a.value.localeCompare(b.value, 'ja-JP', { sensitivity: 'base' }));
+  dl.innerHTML = '';
+  opts.forEach(o => dl.appendChild(o));
+})();
+
 // ── 状態切替 ────────────────────────────────────
 function showState(state) {
   ['no-event', 'loading', 'not-open', 'form', 'success', 'error'].forEach(s => {
