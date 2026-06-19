@@ -20,7 +20,7 @@
     .form-section { margin-bottom: 20px; }
     .section-label { font-size: 11px; font-weight: 700; color: var(--fg-muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--fg-line); }
     .form-row { margin-bottom: 14px; }
-    .form-row label { display: block; font-size: 12px; font-weight: 600; color: var(--fg-text); margin-bottom: 5px; }
+    .form-row label { display: block; font-size: 12px; font-weight: 600; color: var(--fg-text); margin-bottom: 5px; text-wrap: balance; }
     .form-row label .req { color: var(--fg-error); margin-left: 3px; }
     .form-row input, .form-row select {
       width: 100%; padding: 11px 13px; border: 1.5px solid var(--fg-line); border-radius: 8px;
@@ -35,8 +35,9 @@
 
     .radio-group { display: flex; gap: 12px; flex-wrap: wrap; }
     .radio-group.col { flex-direction: column; gap: 8px; }
-    .radio-group label { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--fg-text); font-weight: 400; cursor: pointer; }
-    .radio-group input[type="radio"] { width: 16px; height: 16px; flex-shrink: 0; padding: 0; border: 0; appearance: auto; -webkit-appearance: auto; accent-color: var(--fg-blue); cursor: pointer; }
+    .radio-group label { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--fg-text); font-weight: 400; cursor: pointer; white-space: nowrap; }
+    .radio-group input[type="radio"],
+    .radio-group input[type="checkbox"] { width: 16px; height: 16px; flex-shrink: 0; padding: 0; border: 0; appearance: auto; -webkit-appearance: auto; accent-color: var(--fg-blue); cursor: pointer; }
 
     .consent-box { background: var(--fg-bg); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
     .consent-box label { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: var(--fg-text); line-height: 1.6; cursor: pointer; }
@@ -485,7 +486,7 @@
           <p class="field-err" id="err-sLunchSun">選択してください</p>
         </div>
         <div class="form-row">
-          <label>所属する学校は、予選会 Rd.1に出場しますか？<span class="req">*</span></label>
+          <label><span id="label-competing">所属する学校は、予選会 Rd.1に出場しますか？</span><span class="req">*</span></label>
           <div class="radio-group" id="rg-sCompeting">
             <label><input type="radio" name="sCompeting" value="はい"> はい</label>
             <label><input type="radio" name="sCompeting" value="いいえ"> いいえ</label>
@@ -535,6 +536,11 @@
           </div>
         </div>
 
+      </div>
+
+      <!-- 同意 -->
+      <div class="form-section">
+        <p class="section-label">同意事項</p>
         <div class="consent-box" id="cb-wrap-media">
           <label>
             <input type="checkbox" id="cb-media">
@@ -542,11 +548,6 @@
           </label>
         </div>
         <p class="field-err" id="err-media" style="margin-top:-8px">同意が必要です</p>
-      </div>
-
-      <!-- 同意 -->
-      <div class="form-section">
-        <p class="section-label">同意事項</p>
         <div class="consent-box" id="cb-wrap-rules">
           <label>
             <input type="checkbox" id="cb-rules">

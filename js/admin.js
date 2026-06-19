@@ -381,6 +381,7 @@ async function loadConfig_(gen, ev) {
   setVal_('cfg-deadlineWomenDriver',toDtLocal_(cfg.deadlineWomenDriver));
   setVal_('cfg-deadlineReserve',    toDtLocal_(cfg.deadlineReserve));
   setVal_('cfg-deadlineMechanic',   toDtLocal_(cfg.deadlineMechanic));
+  setVal_('cfg-competingLabel',     cfg.competingLabel || '');
   updatePreRegFormUrl_();
 }
 
@@ -410,6 +411,7 @@ async function handleSaveConfig_() {
     deadlineWomenDriver:  toIso_(getVal_('cfg-deadlineWomenDriver')),
     deadlineReserve:      toIso_(getVal_('cfg-deadlineReserve')),
     deadlineMechanic:     toIso_(getVal_('cfg-deadlineMechanic')),
+    competingLabel:       getVal_('cfg-competingLabel'),
   };
 
   let failed = false;

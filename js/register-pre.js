@@ -43,6 +43,12 @@ let _formConfig = {};
     _formConfig = cfgRes.data || {};
     const now = new Date();
 
+    // 「所属校は出場しますか？」ラベルをイベントごとに差し替え
+    if (_formConfig.competingLabel) {
+      const el = $('label-competing');
+      if (el) el.textContent = _formConfig.competingLabel;
+    }
+
     // フォーム公開開始前
     if (_formConfig.formOpenAt && now < new Date(_formConfig.formOpenAt)) {
       showState('not-open');
