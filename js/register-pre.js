@@ -53,16 +53,13 @@ let _formConfig = {};
   // フォーム内の「土曜日」「日曜日」を実際の日付に置換
   replaceDays_(_day1, _day2);
 
+  // 「所属校は出場しますか？」ラベルはイベント名から自動生成
+  const compEl = $('label-competing');
+  if (compEl) compEl.textContent = `所属する学校は、${_eventName}に出場しますか？`;
+
   if (cfgRes.ok) {
     _formConfig = cfgRes.data || {};
     const now = new Date();
-
-    // 「所属校は出場しますか？」ラベルをイベント名から自動生成（管理画面設定が優先）
-    const compEl = $('label-competing');
-    if (compEl) {
-      compEl.textContent = _formConfig.competingLabel ||
-        `所属する学校は、${_eventName}に出場しますか？`;
-    }
 
     // フォーム公開開始前
     if (_formConfig.formOpenAt && now < new Date(_formConfig.formOpenAt)) {

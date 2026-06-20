@@ -36,11 +36,16 @@ const FG_API = (() => {
     return FG_CONFIG.EVENT_ID;
   }
 
+  // イベントID不要のアクション（全件取得系・当日判定）。
+  // これらを当日イベント解決のゲートに掛けると、会期前(事前登録期間)は
+  // アクティブなイベントが無いため no_active_event で打ち切られてしまう。
+  const EVENT_OPTIONAL_ACTIONS = ['getCurrentEvent', 'getEventList', 'getSchoolList'];
+
   async function call_(action, params = {}) {
     const url = new URL(FG_CONFIG.API_BASE_URL);
     url.searchParams.set('action', action);
-    // getCurrentEvent 自身はイベントID不要。それ以外は自動解決。
-    if (action !== 'getCurrentEvent' && !params.event) {
+    // 上記以外でイベント未指定なら当日イベントを自動解決。
+    if (!EVENT_OPTIONAL_ACTIONS.includes(action) && !params.event) {
       const eventId = await getOrFetchEventId_();
       if (eventId === null) return { ok: false, error: 'no_active_event', message: '現在開催中のイベントはありません' };
       params = { event: eventId, ...params };
