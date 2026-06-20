@@ -256,13 +256,12 @@ function formatToday_() {
   return `${d.getMonth() + 1}月${d.getDate()}日（${days[d.getDay()]}）`;
 }
 
-// ── 大学候補リスト（五十音順）─────────────────────
+// ── 大学候補リスト ────────────────────────────────
+// 並び順はGAS側でコード順（＝頭文字の五十音順）に整列済み。
 function fillSchoolList_(schools) {
   const dl = document.getElementById('dl-universities');
   if (!dl) return;
-  const sorted = [...schools].sort((a, b) =>
-    a.localeCompare(b, 'ja-JP', { sensitivity: 'base' }));
-  dl.innerHTML = sorted.map(s => `<option value="${s.replace(/"/g, '&quot;')}"></option>`).join('');
+  dl.innerHTML = schools.map(s => `<option value="${s.replace(/"/g, '&quot;')}"></option>`).join('');
 }
 
 // ── ユーティリティ ────────────────────────────────
