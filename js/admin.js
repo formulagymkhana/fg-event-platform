@@ -397,7 +397,6 @@ async function loadConfig_(gen, ev) {
   setVal_('cfg-deadlineWomenDriver',toDtLocal_(cfg.deadlineWomenDriver));
   setVal_('cfg-deadlineReserve',    toDtLocal_(cfg.deadlineReserve));
   setVal_('cfg-deadlineMechanic',   toDtLocal_(cfg.deadlineMechanic));
-  setVal_('cfg-competingLabel',     cfg.competingLabel || '');
   updatePreRegFormUrl_();
   updateFormBadge_(cfg);
 }
@@ -441,7 +440,6 @@ async function saveConfig_(btnId, fbId) {
     deadlineWomenDriver:  toIso_(getVal_('cfg-deadlineWomenDriver')),
     deadlineReserve:      toIso_(getVal_('cfg-deadlineReserve')),
     deadlineMechanic:     toIso_(getVal_('cfg-deadlineMechanic')),
-    competingLabel:       getVal_('cfg-competingLabel'),
   };
 
   let failed = false;
@@ -1283,6 +1281,12 @@ function renderUniList_(res) {
     wrap.innerHTML = '<p style="font-size:12px;color:var(--gray);text-align:center;padding:16px 0">登録学生がいません</p>';
     return;
   }
+  // 数値セル: 0 は薄い半角ハイフン、実数は少し大きめで視認性を上げる
+  const numCell = (n, bold) => {
+    const style = `text-align:right;font-size:14px${bold ? ';font-weight:700' : ''}`;
+    const val = n ? n : '<span style="color:var(--gray);font-size:12px">-</span>';
+    return `<td style="${style}">${val}</td>`;
+  };
   wrap.innerHTML =
     `<table class="data-tbl" style="width:100%">
       <thead><tr>
@@ -1296,10 +1300,10 @@ function renderUniList_(res) {
     sorted.map(([name, r]) =>
       `<tr>
         <td>${esc_(name)}</td>
-        <td style="text-align:right">${r.driver || '—'}</td>
-        <td style="text-align:right">${r.spectator || '—'}</td>
-        <td style="text-align:right">${r.walkin || '—'}</td>
-        <td style="text-align:right;font-weight:700">${r.total}</td>
+        ${numCell(r.driver)}
+        ${numCell(r.spectator)}
+        ${numCell(r.walkin)}
+        ${numCell(r.total, true)}
       </tr>`).join('') +
     `</tbody></table>`;
 }

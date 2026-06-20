@@ -568,7 +568,6 @@ function actionGetFormConfig_(p) {
     deadlineWomenDriver: fmt(cfg.deadlineWomenDriver),
     deadlineReserve:     fmt(cfg.deadlineReserve),
     deadlineMechanic:    fmt(cfg.deadlineMechanic),
-    competingLabel:      cfg.competingLabel || '',
   });
 }
 
