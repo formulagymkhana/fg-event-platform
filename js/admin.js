@@ -1357,6 +1357,7 @@ async function confirmUniversity_(row) {
     return;
   }
   row.querySelector('.uni-ctrl').innerHTML = `<span class="uni-done">✓ ${esc_(res.data.code)}</span>`;
-  showToast_(`✓ ${name} → ${res.data.code}`);
+  const rw = res.data.rewritten || 0;
+  showToast_(`✓ ${name} → ${res.data.code}` + (rw ? `（学生ID ${rw}件を更新）` : ''));
   updateUniBadge_(loadGen_);
 }

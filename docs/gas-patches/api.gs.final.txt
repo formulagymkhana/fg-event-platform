@@ -549,8 +549,21 @@ function actionGetCompanyStampVisitors_(p) {
 // ============================================================
 
 function actionGetSchoolList_(p) {
+  // コード順に並べる。コード先頭2桁は読み頭文字のポケベル値（行→段）なので、
+  // コード昇順 ≒ 五十音順（頭文字基準）。漢字名でも正しい五十音順で並ぶ。
+  // ただし わ/を/ん は 01/05/00、仮コードは 0001〜 と先頭桁が 0 で、そのままだと
+  // 先頭に来てしまう。先頭桁 '0' を '9' の後ろ（':'）に送るキーで末尾側へ補正する。
+  const sortKey = c => {
+    c = String(c).padStart(4, '0');
+    return (c.charAt(0) === '0' ? ':' : c.charAt(0)) + c.substring(1);
+  };
   const { uniMap } = loadUniversityMaster_();
-  const schools = Array.from(uniMap.keys()).sort();
+  const schools = Array.from(uniMap.entries())
+    .sort((a, b) => {
+      const ka = sortKey(a[1]), kb = sortKey(b[1]);
+      return ka < kb ? -1 : ka > kb ? 1 : 0; // localeCompareは':'を特殊扱いするためコードポイント比較
+    })
+    .map(e => e[0]);
   return ok_({ schools });
 }
 
@@ -967,11 +980,11 @@ function actionRegisterWalkIn_(p) {
     uniCode = String(maxAutoCode + 1).padStart(4, '0');
     saveNewUniversities_([[schoolName, uniCode, '自動割当(要確認)']]);
   }
-  const vCount  = sData.slice(1).filter(r =>
-    String(r[sHeaders.indexOf('属性')]) === '一般参加学生' &&
-    String(r[sHeaders.indexOf('登録種別')]) === '当日'
-  ).length;
-  const studentId = yearSuffix + uniCode + 'V' + String(vCount + 1).padStart(2, '0');
+  // 連番は「西暦+大学コード+区分文字(=V)」で始まる既存IDの最大連番+1（＝同一大学・同一区分のみ）。
+  // 全件通算ではなく大学・区分単位で 01 から採番。max+1 なので既存IDの歯抜けとも衝突しない。
+  // （sidCol は上で宣言済み）
+  const idPrefix  = yearSuffix + uniCode + 'V';
+  const studentId = idPrefix + String(nextStudentSeq_(sData, sidCol, idPrefix)).padStart(2, '0');
   const token     = Utilities.getUuid();
 
   // 学生マスターに追加
@@ -1062,8 +1075,11 @@ function actionRegisterPreStudent_(p) {
     uniCode = String(maxAutoCode + 1).padStart(4, '0');
     saveNewUniversities_([[schoolName, uniCode, '自動割当(要確認)']]);
   }
-  const seq         = sData.slice(1).filter(r => String(r[idx('属性')]) === attr).length + 1;
-  const studentId   = yearSuffix + uniCode + classCode + String(seq).padStart(2, '0');
+  // 連番は「西暦+大学コード+区分文字」で始まる既存IDの最大連番+1。
+  // 属性ではなく studentId 接頭辞で数えるため、同一文字に集約される区分
+  // （補欠/メカニック/応援＝S）どうしの衝突も防げる。max+1 で歯抜けとも衝突しない。
+  const idPrefix    = yearSuffix + uniCode + classCode;
+  const studentId   = idPrefix + String(nextStudentSeq_(sData, idx('studentId'), idPrefix)).padStart(2, '0');
   const cardToken   = Utilities.getUuid();
 
   // STUDENTS upsert（本人確認サブセット）
@@ -1113,6 +1129,21 @@ function actionRegisterPreStudent_(p) {
   }
 
   return ok_({ studentId, cardToken, registered: true, filesSaved, mailSent });
+}
+
+// studentId 採番ヘルパー: idPrefix（西暦+大学コード+区分文字）で始まる既存IDの
+// 連番部の最大値+1 を返す。該当なしは 1（=01）。歯抜けがあっても衝突しない。
+function nextStudentSeq_(sData, sidCol, idPrefix) {
+  if (sidCol < 0) return 1;
+  let maxSeq = 0;
+  for (let i = 1; i < sData.length; i++) {
+    const s = String(sData[i][sidCol] || '');
+    if (s.startsWith(idPrefix)) {
+      const n = Number(s.substring(idPrefix.length));
+      if (!isNaN(n) && n > maxSeq) maxSeq = n;
+    }
+  }
+  return maxSeq + 1;
 }
 
 // 参加区分(＋ドライバー登録区分) → 属性
@@ -1362,13 +1393,17 @@ function actionAdminConfirmUniversity_(p) {
   // 同じ上2桁を持つ既存コードの最大連番 +1 で採番
   var maxSeq = 0;
   var targetRow = -1;
+  var oldCode = '';
   data.slice(1).forEach(function (row, i) {
     var code = String(row[codeCol] || '').trim().padStart(4, '0');
     if (code.substring(0, 2) === prefix) {
       var seq = Number(code.substring(2));
       if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
     }
-    if (String(row[nameCol] || '').trim() === name) targetRow = i + 2; // 1始まり+ヘッダ
+    if (String(row[nameCol] || '').trim() === name) {
+      targetRow = i + 2;           // 1始まり+ヘッダ
+      oldCode   = code;            // 書き換え対象の旧（仮）コード
+    }
   });
   if (targetRow < 0) return err_('university_not_found');
 
@@ -1376,7 +1411,51 @@ function actionAdminConfirmUniversity_(p) {
   sheet.getRange(targetRow, codeCol + 1).setValue("'" + newCode); // 先頭0保持のため文字列化
   if (statusCol >= 0) sheet.getRange(targetRow, statusCol + 1).setValue('確定');
 
-  return ok_({ code: newCode });
+  // 仮コードで発行済みの学生IDを確定コードへ全シート横断で書き換える
+  var rewritten = (oldCode && oldCode !== newCode) ? rewriteStudentUniCode_(oldCode, newCode) : 0;
+
+  return ok_({ code: newCode, rewritten: rewritten });
+}
+
+// 大学コード確定時、旧（仮）コードで発行済みの学生IDを確定コードへ全シート横断で書き換える。
+// studentId = 西暦(1) + 大学コード(4) + 区分(1) + 連番(2)。大学コード部のみ差し替える。
+// studentId を持つ全シート（学生マスター/スタンプログ/参加者/景品/事前登録）を全イベント分走査。
+// 確定コードは新規採番なので未使用 → 連番衝突は起きない。
+function rewriteStudentUniCode_(oldCode, newCode) {
+  oldCode = String(oldCode).padStart(4, '0');
+  newCode = String(newCode).padStart(4, '0');
+  if (oldCode === newCode) return 0;
+
+  var SHEETS_WITH_SID = [SHEET.STUDENTS, SHEET.STAMP_LOG, SHEET.STAMP_PARTICIPANTS, SHEET.PRIZE_LOG, SHEET.PRE_REG];
+  var evSheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+  if (!evSheet || evSheet.getLastRow() < 2) return 0;
+  var evData    = evSheet.getDataRange().getValues();
+  var evIdCol   = evData[0].map(String).indexOf('eventId');
+  var updated   = 0;
+
+  evData.slice(1).forEach(function (evRow) {
+    var eventId = String(evRow[evIdCol] || '').trim();
+    if (!eventId) return;
+    var ss;
+    try { ss = eventSs_(eventId); } catch (e) { return; }
+
+    SHEETS_WITH_SID.forEach(function (sheetName) {
+      var sheet = ss.getSheetByName(sheetName);
+      if (!sheet || sheet.getLastRow() < 2) return;
+      var data   = sheet.getDataRange().getValues();
+      var sidCol = data[0].map(String).indexOf('studentId');
+      if (sidCol < 0) return;
+      for (var i = 1; i < data.length; i++) {
+        var s = String(data[i][sidCol] || '');
+        if (s.length >= 5 && s.substring(1, 5) === oldCode) {
+          var nid = s[0] + newCode + s.substring(5);
+          sheet.getRange(i + 1, sidCol + 1).setValue("'" + nid); // 文字列保持
+          updated++;
+        }
+      }
+    });
+  });
+  return updated;
 }
 
 // イベント一覧取得 + WALK_IN_CODE を返す
