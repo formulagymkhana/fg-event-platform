@@ -292,45 +292,51 @@ function actionSaveStamp_(p) {
   const company = findCompanyByStampKey_(p.ct, p.event);
   if (!company) return err_('invalid_company_key');
 
-  const sheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_LOG);
-  const rows  = sheet.getLastRow() > 1
-    ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).getValues()
-    : [];
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(6000); } catch (e) { return err_('lock_timeout'); }
+  try {
+    const sheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_LOG);
+    const rows  = sheet.getLastRow() > 1
+      ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).getValues()
+      : [];
 
-  const dup = rows.some(r =>
-    String(r[1]) === String(p.event) &&
-    String(r[2]) === String(student.studentId) &&
-    String(r[7]) === String(company.companyId)
-  );
-  if (dup) return err_('already_stamped');
-
-  if (p.nc) {
-    const ncUsed = rows.some(r =>
-      String(r[7]) === String(company.companyId) &&
-      String(r[8]) === String(p.nc)
+    const dup = rows.some(r =>
+      String(r[1]) === String(p.event) &&
+      String(r[2]) === String(student.studentId) &&
+      String(r[7]) === String(company.companyId)
     );
-    if (ncUsed) return err_('used_nfc');
+    if (dup) return err_('already_stamped');
+
+    if (p.nc) {
+      const ncUsed = rows.some(r =>
+        String(r[7]) === String(company.companyId) &&
+        String(r[8]) === String(p.nc)
+      );
+      if (ncUsed) return err_('used_nfc');
+    }
+
+    sheet.appendRow([
+      new Date(), p.event, student.studentId,
+      student.name, student.school, student.category,
+      company.companyName, company.companyId, p.nc || '',
+    ]);
+
+    const prevCount = rows.filter(r =>
+      String(r[1]) === String(p.event) && String(r[2]) === String(student.studentId)
+    ).length;
+    const count = prevCount + 1;
+
+    // 今回のスタンプで景品条件を達成したか (cfg は上で取得済み)
+    const threshold = Number(cfg.prizeThreshold) || Number(cfg.prizeCriteria) || 5;
+    const justCleared = prevCount < threshold && count >= threshold;
+
+    return ok_(buildStampResult_(p.event, student.studentId, count, {
+      company: company.companyName,
+      justCleared,
+    }));
+  } finally {
+    lock.releaseLock();
   }
-
-  sheet.appendRow([
-    new Date(), p.event, student.studentId,
-    student.name, student.school, student.category,
-    company.companyName, company.companyId, p.nc || '',
-  ]);
-
-  const prevCount = rows.filter(r =>
-    String(r[1]) === String(p.event) && String(r[2]) === String(student.studentId)
-  ).length;
-  const count = prevCount + 1;
-
-  // 今回のスタンプで景品条件を達成したか (cfg は上で取得済み)
-  const threshold = Number(cfg.prizeThreshold) || Number(cfg.prizeCriteria) || 5;
-  const justCleared = prevCount < threshold && count >= threshold;
-
-  return ok_(buildStampResult_(p.event, student.studentId, count, {
-    company: company.companyName,
-    justCleared,
-  }));
 }
 
 // ============================================================
@@ -465,24 +471,30 @@ function actionMarkPrizeExchanged_(p) {
   const student = findStudentByCardToken_(p.token, p.event);
   if (!student) return err_('invalid_token');
 
-  const count  = countStamps_(p.event, student.studentId);
-  const result = buildStampResult_(p.event, student.studentId, count, {});
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(6000); } catch (e) { return err_('lock_timeout'); }
+  try {
+    const count  = countStamps_(p.event, student.studentId);
+    const result = buildStampResult_(p.event, student.studentId, count, {});
 
-  if (result.claimableNow <= 0) return err_('nothing_to_claim');
+    if (result.claimableNow <= 0) return err_('nothing_to_claim');
 
-  eventSs_(p.event).getSheetByName(SHEET.PRIZE_LOG).appendRow([
-    new Date(), p.event, student.studentId, student.name,
-    count, p.staff || '', result.claimableNow,
-  ]);
+    eventSs_(p.event).getSheetByName(SHEET.PRIZE_LOG).appendRow([
+      new Date(), p.event, student.studentId, student.name,
+      count, p.staff || '', result.claimableNow,
+    ]);
 
-  return ok_({
-    studentId:     student.studentId,
-    name:          student.name,
-    stampCount:    count,
-    claimedNow:    result.claimableNow,
-    exchangedCount: result.exchangedCount + result.claimableNow,
-    exchanged:     (result.exchangedCount + result.claimableNow) >= result.maxPrizes,
-  });
+    return ok_({
+      studentId:     student.studentId,
+      name:          student.name,
+      stampCount:    count,
+      claimedNow:    result.claimableNow,
+      exchangedCount: result.exchangedCount + result.claimableNow,
+      exchanged:     (result.exchangedCount + result.claimableNow) >= result.maxPrizes,
+    });
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================
@@ -653,7 +665,7 @@ function countStamps_(eventId, studentId) {
   const rows  = sheet.getLastRow() > 1
     ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).getValues()
     : [];
-  return rows.filter(r => r[1] === eventId && r[2] === studentId).length;
+  return rows.filter(r => String(r[1]) === String(eventId) && String(r[2]) === String(studentId)).length;
 }
 
 /**

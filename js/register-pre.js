@@ -208,6 +208,7 @@ function checkedVals(name) {
 // 参加区分ごとの追加項目を収集
 function collectBranch(cat) {
   const b = {};
+  b.mediaConsent = $('cb-media').checked ? 'true' : 'false';
   if (cat === '出場選手(FGクラスドライバー)') {
     b.driverClass = radioVal('driverClass');
     b.simDate = $('f-fg-simdate').value;
@@ -234,7 +235,6 @@ function collectBranch(cat) {
     b.lunchSat     = radioVal('sLunchSat');
     b.lunchSun     = radioVal('sLunchSun');
     b.competing    = radioVal('sCompeting');
-    b.mediaConsent = $('cb-media').checked ? 'true' : 'false';
   }
   return b;
 }

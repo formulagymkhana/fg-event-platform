@@ -233,6 +233,7 @@ async function loadAll_() {
   loadPrizeLog_(gen, ev);
   loadConfig_(gen, ev);
   loadCompanies_(gen, ev);
+  loadWalkIns_(gen, ev);
   updateUniBadge_(gen);
 }
 
