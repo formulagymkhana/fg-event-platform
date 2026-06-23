@@ -668,6 +668,35 @@ body {
   margin-top: 1px;
 }
 
+/* コンプリート演出 */
+@keyframes milestone-shimmer {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.65; }
+  100% { opacity: 1; }
+}
+@keyframes milestone-pulse {
+  0%   { box-shadow: 0 0 0 0px rgba(30, 90, 200, 0.5), 0 0 0 2px var(--fg-blue); }
+  70%  { box-shadow: 0 0 0 7px rgba(30, 90, 200, 0),   0 0 0 2px var(--fg-blue); }
+  100% { box-shadow: 0 0 0 0px rgba(30, 90, 200, 0),   0 0 0 2px var(--fg-blue); }
+}
+.milestone-track.complete .milestone-fill {
+  animation: milestone-shimmer 2s ease-in-out infinite;
+}
+.milestone-marker.complete-star {
+  animation: milestone-pulse 1.6s ease-out infinite;
+  width: 18px;
+  height: 18px;
+}
+.milestone-complete {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--fg-blue);
+  letter-spacing: 0.05em;
+  padding-top: 40px;
+  padding-bottom: 4px;
+}
+
 /* ── fg-list（進捗リスト・公式サイト日程表スタイル） ── */
 .fg-list {
   border-top: 1px solid var(--fg-line);

@@ -166,30 +166,36 @@ function renderMilestoneBar(count, milestones, totalCompanies) {
   const section = document.getElementById('milestone-bar-section');
   if (!section || !milestones || milestones.length === 0) return;
 
-  // バーの100% = 総ブース数。景品閾値はその中の通過点として配置
-  const maxVal = totalCompanies || milestones[milestones.length - 1].threshold;
-  const pct = Math.min(100, Math.round((count / maxVal) * 100));
+  const lastThreshold = milestones[milestones.length - 1].threshold;
+  // 会社数が景品の最終閾値より少ない場合でも全マーカーが収まるよう大きい方を採用
+  const maxVal = Math.max(totalCompanies || 0, lastThreshold);
+  const pct    = Math.min(100, Math.round((count / maxVal) * 100));
+  const allComplete = count >= lastThreshold;
 
   section.innerHTML = `
     <div class="milestone-title">マイルストーン</div>
     <div style="position:relative">
-      <div class="milestone-track">
+      <div class="milestone-track${allComplete ? ' complete' : ''}">
         <div class="milestone-fill" style="width:${pct}%"></div>
         ${milestones.map((m, i) => {
-          // 出展社数が景品閾値より少ない場合でも目盛りがバー外へ出ないようclamp
-          const pos     = Math.min(100, Math.round((m.threshold / maxVal) * 100));
-          const reached = count >= m.threshold;
-          const remain  = Math.max(0, m.threshold - count);
-          const labelMod = i === milestones.length - 1 ? ' last' : (i === 0 ? ' first' : '');
+          const pos      = Math.min(100, Math.round((m.threshold / maxVal) * 100));
+          const reached  = count >= m.threshold;
+          const remain   = Math.max(0, m.threshold - count);
+          const isLast   = i === milestones.length - 1;
+          const labelMod = isLast ? ' last' : (i === 0 ? ' first' : '');
+          const markerClass = reached
+            ? (isLast && allComplete ? 'reached complete-star' : 'reached')
+            : 'unreached';
           return `
-            <div class="milestone-marker ${reached ? 'reached' : 'unreached'}" style="left:${pos}%"></div>
+            <div class="milestone-marker ${markerClass}" style="left:${pos}%"></div>
             <div class="milestone-label${labelMod}" style="left:${pos}%">
-              <span class="m-count">${m.threshold}個達成</span>
-              <span class="m-remain">${reached ? '達成！' : 'あと' + remain + '個'}</span>
+              <span class="m-count">${m.threshold}個</span>
+              <span class="m-remain">${reached ? '✓' : 'あと' + remain}</span>
             </div>`;
         }).join('')}
       </div>
-    </div>`;
+    </div>
+    ${allComplete ? '<div class="milestone-complete">🏁 全マイルストーン達成！</div>' : ''}`;
 }
 
 // ── 取得履歴（fg-list 形式） ──
