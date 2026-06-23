@@ -518,6 +518,27 @@ async function downloadCompanyQrCsv_() {
   showToast_(`✓ ${list.length}社の再閲覧QR URLを出力しました`);
 }
 
+/** 企業QRをPNG(1200×1200)でダウンロード */
+function downloadCompanyQrPng_(url, name) {
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed;left:-9999px;top:-9999px';
+  document.body.appendChild(wrap);
+  new QRCode(wrap, {
+    text: url,
+    width: 1200,
+    height: 1200,
+    colorDark: '#000000',
+    colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M,
+  });
+  const canvas = wrap.querySelector('canvas');
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = `企業QR_${name}.png`;
+  a.click();
+  document.body.removeChild(wrap);
+}
+
 /** 企業QR(登録＋来訪者一覧)のURL: company.html?viewkey=<viewKey>&event=<eventId> */
 function companyQrUrl_(viewKey) {
   const ev = curEvent_ ? `&event=${encodeURIComponent(curEvent_)}` : '';
@@ -572,6 +593,7 @@ async function loadCompanies_(gen = null, ev = null) {
         <span class="url-lbl">企業QR・再閲覧URL</span>
         <span class="url-val">${esc_(companyQrUrl_(c.viewKey))}</span>
         <button class="copy-btn" data-copy="${esc_(companyQrUrl_(c.viewKey))}">コピー</button>
+        <button class="copy-btn" data-qr-url="${esc_(companyQrUrl_(c.viewKey))}" data-qr-name="${esc_(c.name)}">QR</button>
       </div>` : ''}
       <div class="logo-row">
         <span class="logo-lbl">ロゴURL</span>
@@ -584,6 +606,8 @@ async function loadCompanies_(gen = null, ev = null) {
   }).join('');
   container.querySelectorAll('.copy-btn[data-copy]').forEach(b =>
     b.addEventListener('click', () => copyText_(b.dataset.copy)));
+  container.querySelectorAll('.copy-btn[data-qr-url]').forEach(b =>
+    b.addEventListener('click', () => downloadCompanyQrPng_(b.dataset.qrUrl, b.dataset.qrName)));
   container.querySelectorAll('.del-btn[data-del-company]').forEach(b =>
     b.addEventListener('click', () => handleDeleteCompany_(b.dataset.delCompany)));
   container.querySelectorAll('.logo-url-input').forEach(inp =>
