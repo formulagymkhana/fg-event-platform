@@ -180,17 +180,14 @@ function renderMilestoneBar(count, milestones, totalCompanies) {
         ${milestones.map((m, i) => {
           const pos      = Math.min(100, Math.round((m.threshold / maxVal) * 100));
           const reached  = count >= m.threshold;
-          const remain   = Math.max(0, m.threshold - count);
           const isLast   = i === milestones.length - 1;
-          const labelMod = isLast ? ' last' : (i === 0 ? ' first' : '');
           const markerClass = reached
             ? (isLast && allComplete ? 'reached complete-star' : 'reached')
             : 'unreached';
           return `
             <div class="milestone-marker ${markerClass}" style="left:${pos}%"></div>
-            <div class="milestone-label${labelMod}" style="left:${pos}%">
+            <div class="milestone-label" style="left:${pos}%">
               <span class="m-count">${m.threshold}個</span>
-              <span class="m-remain">${reached ? '✓' : 'あと' + remain}</span>
             </div>`;
         }).join('')}
       </div>

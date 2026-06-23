@@ -654,18 +654,10 @@ body {
   top: 18px;
   white-space: nowrap;
 }
-.milestone-label.last  { transform: translateX(-100%); text-align: right; }
-.milestone-label.first { transform: translateX(0);     text-align: left; }
 .milestone-label .m-count {
   font-weight: 800;
   color: var(--fg-blue);
   font-size: 11px;
-}
-.milestone-label .m-remain {
-  color: var(--fg-muted);
-  font-size: 10px;
-  display: block;
-  margin-top: 1px;
 }
 
 /* コンプリート演出 */
