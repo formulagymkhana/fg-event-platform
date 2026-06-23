@@ -759,11 +759,14 @@ function renderStudentList_() {
               </div>
               <div style="font-size:10px;color:var(--gray);margin-top:2px">${esc_(s.school)} · ${esc_(s.category || '—')} · ${esc_(s.year ? s.year + '年' : '—')}</div>
             </div>
-            <span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;
-              background:${s.regType === '事前' ? '#F3F4F6' : '#DBEAFE'};
-              color:${s.regType === '事前' ? '#6B7280' : '#1E40AF'}">
-              ${s.regType === '事前' ? '事前登録' : '当日'}
-            </span>
+            <div style="display:flex;align-items:center;gap:6px">
+              <button class="copy-btn stu-edit-btn" data-sid="${esc_(s.studentId)}" style="font-size:10px;padding:2px 8px">編集</button>
+              <span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;
+                background:${s.regType === '事前' ? '#F3F4F6' : '#DBEAFE'};
+                color:${s.regType === '事前' ? '#6B7280' : '#1E40AF'}">
+                ${s.regType === '事前' ? '事前登録' : '当日'}
+              </span>
+            </div>
           </div>
           ${s.cardToken ? `
           <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
@@ -772,12 +775,59 @@ function renderStudentList_() {
             ${s.regType !== '事前' ? `
             <button class="copy-btn" data-resend="${esc_(s.cardToken)}" style="flex-shrink:0;font-size:10px;padding:2px 8px">メール再送信</button>` : ''}
           </div>` : ''}
+          <div class="stu-edit-form" data-sid="${esc_(s.studentId)}" style="display:none;margin-top:8px;padding:10px;background:var(--fg-bg);border-radius:8px;border:1px solid var(--border)">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+              <div><label style="font-size:10px;color:var(--gray);display:block;margin-bottom:2px">氏名</label>
+                <input class="f-input" style="padding:6px 8px;font-size:12px;margin:0" data-field="name" value="${esc_(s.name)}"></div>
+              <div><label style="font-size:10px;color:var(--gray);display:block;margin-bottom:2px">ふりがな</label>
+                <input class="f-input" style="padding:6px 8px;font-size:12px;margin:0" data-field="furigana" value="${esc_(s.furigana)}"></div>
+              <div><label style="font-size:10px;color:var(--gray);display:block;margin-bottom:2px">大学名</label>
+                <input class="f-input" style="padding:6px 8px;font-size:12px;margin:0" data-field="school" value="${esc_(s.school)}"></div>
+              <div><label style="font-size:10px;color:var(--gray);display:block;margin-bottom:2px">属性</label>
+                <input class="f-input" style="padding:6px 8px;font-size:12px;margin:0" data-field="category" value="${esc_(s.category || '')}"></div>
+              <div style="grid-column:1/-1"><label style="font-size:10px;color:var(--gray);display:block;margin-bottom:2px">メールアドレス</label>
+                <input class="f-input" style="padding:6px 8px;font-size:12px;margin:0" type="email" data-field="email" value="${esc_(s.email || '')}"></div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="copy-btn stu-save-btn" data-sid="${esc_(s.studentId)}" style="font-size:11px;padding:4px 12px;background:var(--fg-blue);color:#fff;border:none;border-radius:6px">保存</button>
+              <button class="copy-btn stu-cancel-btn" data-sid="${esc_(s.studentId)}" style="font-size:11px;padding:4px 10px">キャンセル</button>
+            </div>
+          </div>
         </div>`).join('')}
     </div>`;
   wrap.querySelectorAll('.copy-btn[data-copy]').forEach(b =>
     b.addEventListener('click', () => copyText_(b.dataset.copy)));
   wrap.querySelectorAll('.copy-btn[data-resend]').forEach(b =>
     b.addEventListener('click', () => handleResendWalkInMail_(b)));
+  wrap.querySelectorAll('.stu-edit-btn').forEach(b =>
+    b.addEventListener('click', () => {
+      const form = wrap.querySelector(`.stu-edit-form[data-sid="${b.dataset.sid}"]`);
+      form.style.display = form.style.display === 'none' ? '' : 'none';
+    }));
+  wrap.querySelectorAll('.stu-cancel-btn').forEach(b =>
+    b.addEventListener('click', () => {
+      wrap.querySelector(`.stu-edit-form[data-sid="${b.dataset.sid}"]`).style.display = 'none';
+    }));
+  wrap.querySelectorAll('.stu-save-btn').forEach(b =>
+    b.addEventListener('click', () => handleSaveStudentEdit_(b, wrap)));
+}
+
+/** 学生情報をGASで全シート横断書き換え */
+async function handleSaveStudentEdit_(btn, wrap) {
+  const sid  = btn.dataset.sid;
+  const form = wrap.querySelector(`.stu-edit-form[data-sid="${sid}"]`);
+  const payload = { event: curEvent_, studentId: sid };
+  form.querySelectorAll('input[data-field]').forEach(inp => {
+    payload[inp.dataset.field] = inp.value.trim();
+  });
+  btn.disabled = true; btn.textContent = '保存中…';
+  const res = await adminCall_('adminUpdateStudent', payload);
+  btn.disabled = false; btn.textContent = '保存';
+  if (!res.ok) { showToast_(res.message || '保存に失敗しました'); return; }
+  const u = res.data.updated;
+  showToast_(`✓ 更新完了（学生マスター:${u.students} 事前登録:${u.preReg} スタンプログ:${u.stampLog} 景品:${u.prizeLog}）`);
+  form.style.display = 'none';
+  loadStudents_();
 }
 
 // 当日参加者へ個人ページ(氏名+QR)のリンクをメール再送信する

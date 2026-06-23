@@ -119,6 +119,7 @@ function dispatch_(e) {
       case 'adminResendWalkInMail': return actionAdminResendWalkInMail_(p);
       case 'adminGetPendingUniversities': return actionAdminGetPendingUniversities_(p);
       case 'adminConfirmUniversity':      return actionAdminConfirmUniversity_(p);
+      case 'adminUpdateStudent':          return actionAdminUpdateStudent_(p);
       default:                        return err_('unknown_action');
     }
   } catch (e) {
@@ -1506,6 +1507,100 @@ function rewriteStudentUniCode_(oldCode, newCode) {
     });
   });
   return updated;
+}
+
+// 学生情報を全シート横断で一括修正（氏名/ふりがな/大学名/属性/メールアドレス）
+function actionAdminUpdateStudent_(p) {
+  var e = validateAdmin_(p);
+  if (e) return e;
+
+  var sid = String(p.studentId || '').trim();
+  if (!sid) return err_('missing_params');
+
+  // 渡されたフィールドのみ更新
+  var fields = {};
+  if (p.name     !== undefined) fields.name     = String(p.name).trim();
+  if (p.furigana !== undefined) fields.furigana  = String(p.furigana).trim();
+  if (p.school   !== undefined) fields.school    = String(p.school).trim();
+  if (p.category !== undefined) fields.category  = String(p.category).trim();
+  if (p.email    !== undefined) fields.email     = String(p.email).trim();
+  if (!Object.keys(fields).length) return err_('missing_params');
+
+  // 各シートの列名マッピング
+  var masterMap = { name:'氏名', furigana:'ふりがな', school:'大学名', category:'属性', email:'メールアドレス' };
+  var preMap    = { name:'氏名', furigana:'ふりがな', school:'大学名', email:'メールアドレス' }; // category は事前登録には書かない
+
+  var updated = { students: 0, preReg: 0, stampLog: 0, prizeLog: 0 };
+
+  var evSheet  = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+  if (!evSheet || evSheet.getLastRow() < 2) return err_('no_events');
+  var evData   = evSheet.getDataRange().getValues();
+  var evIdCol  = evData[0].map(String).indexOf('eventId');
+  var eventIds = evData.slice(1).map(function(r) { return String(r[evIdCol] || '').trim(); }).filter(Boolean);
+
+  function updateSheet_(sheet, hdrs, data, sidCol, colMap) {
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][sidCol]) !== sid) continue;
+      Object.keys(colMap).forEach(function(key) {
+        if (fields[key] === undefined) return;
+        var c = hdrs.indexOf(colMap[key]);
+        if (c >= 0) sheet.getRange(i + 1, c + 1).setValue(fields[key]);
+      });
+      return true;
+    }
+    return false;
+  }
+
+  eventIds.forEach(function(eventId) {
+    var ss;
+    try { ss = eventSs_(eventId); } catch (e2) { return; }
+
+    // 学生マスター
+    var stuSheet = ss.getSheetByName(SHEET.STUDENTS);
+    if (stuSheet && stuSheet.getLastRow() > 1) {
+      var d = stuSheet.getDataRange().getValues();
+      var h = d[0].map(String);
+      if (updateSheet_(stuSheet, h, d, h.indexOf('studentId'), masterMap)) updated.students++;
+    }
+
+    // 事前登録
+    var preSheet = ss.getSheetByName(SHEET.PRE_REG);
+    if (preSheet && preSheet.getLastRow() > 1) {
+      var d = preSheet.getDataRange().getValues();
+      var h = d[0].map(String);
+      if (updateSheet_(preSheet, h, d, h.indexOf('studentId'), preMap)) updated.preReg++;
+    }
+
+    // スタンプログ (氏名/大学名/属性のみ)
+    var stmpSheet = ss.getSheetByName(SHEET.STAMP_LOG);
+    if (stmpSheet && stmpSheet.getLastRow() > 1) {
+      var d = stmpSheet.getDataRange().getValues();
+      var h = d[0].map(String);
+      var sidC = h.indexOf('studentId');
+      for (var i = 1; i < d.length; i++) {
+        if (String(d[i][sidC]) !== sid) continue;
+        if (fields.name)     { var c = h.indexOf('氏名');   if (c>=0) stmpSheet.getRange(i+1,c+1).setValue(fields.name); }
+        if (fields.school)   { var c = h.indexOf('大学名'); if (c>=0) stmpSheet.getRange(i+1,c+1).setValue(fields.school); }
+        if (fields.category) { var c = h.indexOf('属性');   if (c>=0) stmpSheet.getRange(i+1,c+1).setValue(fields.category); }
+        updated.stampLog++;
+      }
+    }
+
+    // 景品交換ログ (氏名のみ)
+    var prizeSheet = ss.getSheetByName(SHEET.PRIZE_LOG);
+    if (prizeSheet && prizeSheet.getLastRow() > 1) {
+      var d = prizeSheet.getDataRange().getValues();
+      var h = d[0].map(String);
+      var sidC = h.indexOf('studentId');
+      for (var i = 1; i < d.length; i++) {
+        if (String(d[i][sidC]) !== sid) continue;
+        if (fields.name) { var c = h.indexOf('氏名'); if (c>=0) prizeSheet.getRange(i+1,c+1).setValue(fields.name); }
+        updated.prizeLog++;
+      }
+    }
+  });
+
+  return ok_({ updated: updated });
 }
 
 // イベント一覧取得 + WALK_IN_CODE を返す
