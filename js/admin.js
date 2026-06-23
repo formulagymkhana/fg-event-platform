@@ -307,10 +307,11 @@ function downloadPreRegCsv_(kind) {
     const s = String(v == null ? '' : v);
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   };
-  const head = ['学生ID', '参加区分', '氏名', 'ふりがな', 'トークン', 'QR用URL'];
+  const head = ['学生ID', '参加区分', '苗字', '氏名', 'ふりがな', 'トークン', 'QR用URL'];
   const lines = [head.join(',')].concat(filtered.map(r => [
     r[ci.sid] || '',
     passCategory_(r[ci.cat] || '', r[ci.dc] || ''),
+    (r[ci.name] || '').split(/\s+/)[0],
     r[ci.name] || '',
     r[ci.kana] || '',
     r[ci.token] || '',
