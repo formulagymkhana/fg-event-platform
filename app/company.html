@@ -79,12 +79,16 @@
     .reload-btn:active { background: var(--fg-bg); }
 
     /* 企業QR登録完了バナー */
-    .reg-banner { display: flex; align-items: flex-start; gap: 12px;
-                  margin: 12px 12px 0; padding: 14px 16px; border-radius: 10px;
-                  background: var(--fg-blue-soft); border: 1px solid var(--fg-blue-border); }
-    .reg-banner-icon { font-size: 22px; flex-shrink: 0; }
-    .reg-banner-title { font-size: 14px; font-weight: 700; color: var(--fg-navy); margin-bottom: 3px; }
-    .reg-banner-msg { font-size: 12px; color: var(--fg-text); line-height: 1.6; }
+    .reg-banner { display: flex; align-items: flex-start; gap: 10px;
+                  padding: 12px 20px; background: var(--fg-blue-soft);
+                  border-bottom: 1px solid var(--fg-blue-border); }
+    .reg-banner-check { width: 20px; height: 20px; border-radius: 50%;
+                        background: var(--fg-blue); color: #fff;
+                        font-size: 12px; font-weight: 700; flex-shrink: 0;
+                        display: flex; align-items: center; justify-content: center;
+                        margin-top: 1px; }
+    .reg-banner-title { font-size: 13px; font-weight: 700; color: var(--fg-navy); margin-bottom: 2px; }
+    .reg-banner-msg { font-size: 12px; color: var(--fg-muted); line-height: 1.6; }
   </style>
 </head>
 <body>
@@ -115,10 +119,10 @@
 
     <!-- 企業QR初回スキャン時の登録完了バナー -->
     <div id="reg-banner" style="display:none" class="reg-banner">
-      <div class="reg-banner-icon">🏢</div>
+      <div class="reg-banner-check">✓</div>
       <div>
-        <div class="reg-banner-title" id="reg-banner-name"></div>
-        <div class="reg-banner-msg">端末登録が完了しました。学生QR名刺を読み取ると、この端末での来訪が自動で記録されます。</div>
+        <div class="reg-banner-title">端末登録が完了しました</div>
+        <div class="reg-banner-msg">学生QR名刺を読み取ると、この端末での来訪が自動で記録されます。</div>
       </div>
     </div>
 
