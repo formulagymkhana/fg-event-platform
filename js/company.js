@@ -165,7 +165,7 @@ async function loadStamp() {
   const companyName = (stampRes.ok ? stampRes.data.companyName : null)
     || (qrRes.ok ? qrRes.data.companyName : null)
     || '—';
-  $('co-name').textContent = companyName;
+  $('co-name').textContent = companyName + ' 様';
 
   // スタンプ
   if (stampRes.ok) {

@@ -502,11 +502,6 @@ async function downloadNfcCsv_() {
   showToast_(`✓ ${list.length}社のNFC URLを出力しました`);
 }
 
-/** 企業来訪学生一覧ページ: company.html?key=<viewKey>&event=<eventId> */
-function companyPageUrl_(viewKey) {
-  const ev = curEvent_ ? `&event=${encodeURIComponent(curEvent_)}` : '';
-  return new URL(`company.html?key=${encodeURIComponent(viewKey)}${ev}`, location.href).toString();
-}
 
 /** 企業QR URL（再閲覧用）を CSV 出力 */
 async function downloadCompanyQrCsv_() {
@@ -574,14 +569,9 @@ async function loadCompanies_(gen = null, ev = null) {
       </div>` : ''}
       ${c.viewKey ? `
       <div class="url-row">
-        <span class="url-lbl">企業QR用URL（再閲覧設定）</span>
+        <span class="url-lbl">企業QR・再閲覧URL</span>
         <span class="url-val">${esc_(companyQrUrl_(c.viewKey))}</span>
         <button class="copy-btn" data-copy="${esc_(companyQrUrl_(c.viewKey))}">コピー</button>
-      </div>
-      <div class="url-row">
-        <span class="url-lbl">来訪学生一覧URL</span>
-        <span class="url-val">${esc_(companyPageUrl_(c.viewKey))}</span>
-        <button class="copy-btn" data-copy="${esc_(companyPageUrl_(c.viewKey))}">コピー</button>
       </div>` : ''}
       <div class="logo-row">
         <span class="logo-lbl">ロゴURL</span>
