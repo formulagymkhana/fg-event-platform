@@ -124,6 +124,7 @@ async function loadStamp() {
 
 // ── 初期化 ────────────────────────────────────────
 (async () => {
+  try {
   _event = FG_API.getParam('event') || null;
 
   // viewkey param = 企業QR初回スキャン → cookie保存して登録バナー表示
@@ -184,9 +185,12 @@ async function loadStamp() {
     $('qr-list-wrap').innerHTML = `<div class="err-note">${esc(msg)}</div>`;
   }
 
-  showState('main');
+    showState('main');
 
-  // 更新ボタン
-  $('btn-reload-qr')?.addEventListener('click', loadQr);
-  $('btn-reload-stamp')?.addEventListener('click', loadStamp);
+    // 更新ボタン
+    $('btn-reload-qr')?.addEventListener('click', loadQr);
+    $('btn-reload-stamp')?.addEventListener('click', loadStamp);
+  } catch (e) {
+    showErr('エラーが発生しました', '再読み込みしてもう一度お試しください。');
+  }
 })();
