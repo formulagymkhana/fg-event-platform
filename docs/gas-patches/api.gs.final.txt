@@ -234,6 +234,9 @@ function actionActivateStamp_(p) {
   if (!p.token) return err_('missing_token');
   if (!p.event) return err_('missing_event');
 
+  const cfg = getConfig_(p.event);
+  if (!isStampOpen_(cfg)) return err_('stamp_closed');
+
   const student = findStudentByCardToken_(p.token, p.event);
   if (!student) return err_('invalid_token');
 
