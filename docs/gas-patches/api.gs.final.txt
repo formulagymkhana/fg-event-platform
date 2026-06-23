@@ -1437,8 +1437,12 @@ function actionAdminConfirmUniversity_(p) {
   var maxSeq = 0;
   var targetRow = -1;
   var oldCode = '';
+  var usedCodes = new Set();
   data.slice(1).forEach(function (row, i) {
-    var code = String(row[codeCol] || '').trim().padStart(4, '0');
+    // 全角数字を半角に正規化してから比較
+    var raw  = String(row[codeCol] || '').trim().replace(/[０-９]/g, function(c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); });
+    var code = raw.padStart(4, '0');
+    usedCodes.add(code);
     if (code.substring(0, 2) === prefix) {
       var seq = Number(code.substring(2));
       if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
@@ -1450,7 +1454,10 @@ function actionAdminConfirmUniversity_(p) {
   });
   if (targetRow < 0) return err_('university_not_found');
 
-  var newCode = prefix + String(maxSeq + 1).padStart(2, '0');
+  // 重複しないコードが見つかるまで連番を進める
+  var nextSeq = maxSeq + 1;
+  while (usedCodes.has(prefix + String(nextSeq).padStart(2, '0'))) { nextSeq++; }
+  var newCode = prefix + String(nextSeq).padStart(2, '0');
   sheet.getRange(targetRow, codeCol + 1).setValue("'" + newCode); // 先頭0保持のため文字列化
   if (statusCol >= 0) sheet.getRange(targetRow, statusCol + 1).setValue('確定');
 
