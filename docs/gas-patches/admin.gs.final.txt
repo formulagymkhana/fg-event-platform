@@ -70,7 +70,7 @@ function setupEventSpreadsheet_(ss, eventId, eventName, startDate, endDate) {
     [SHEET.CONFIG]: [
       ['eventId', eventId], ['eventName', eventName],
       ['startDate', startDate], ['endDate', endDate],
-      ['publicDeadline', endDate + ' 23:59'],
+      ['publicDeadline', ''],   // 未設定=終了日+2ヶ月（isPastDeadline_ が下限を適用）。延長したい時のみ日時を入れる
       ['prizeUnitSize', 5],
       ['maxPrizes', 3],
       ['exchangeKey', Utilities.getUuid()],

@@ -347,26 +347,6 @@
         </a>
       </div>
 
-      <!-- URL発行（Step4） -->
-      <div class="section">
-        <div class="section-hd" data-section="step4">
-          <span class="section-title">🔗 QR・NFC URL 発行
-            <span class="step-badge init" id="badge-step4">確認中</span>
-          </span>
-          <span class="section-toggle" id="toggle-step4">▼</span>
-        </div>
-        <div class="section-body" id="body-step4">
-          <div class="cfg-group" style="margin-top:0">
-            <div class="cfg-group-title">当日参加登録URL</div>
-            <div class="url-box">
-              <div style="font-size:11px;color:var(--gray);margin-bottom:4px">会場掲示用QRコードのリンク先</div>
-              <div class="url-val" id="walkin-url">—</div>
-              <button class="sm-btn" id="btn-copy-url">URLをコピー</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- 当日運用 -->
       <div class="area-label">当日運用</div>
 
@@ -429,7 +409,7 @@
             </div>
             <div class="cfg-row">
               <label>QR閲覧公開期限</label>
-              <div class="cfg-hint">企業が学生QRを閲覧できる期限（空欄=終了日時と同じ）</div>
+              <div class="cfg-hint">企業が学生QR・来訪学生一覧を閲覧できる期限（空欄=終了日の2ヶ月後まで／延長したい時のみ日時を指定）</div>
               <input type="datetime-local" class="cfg-input" id="cfg-publicDeadline">
             </div>
             <div class="cfg-row">
@@ -633,6 +613,14 @@
               <div class="url-box">
                 <div class="url-val" id="prereg-form-url">—</div>
                 <button class="sm-btn" id="btn-copy-prereg-url">URLをコピー</button>
+              </div>
+            </div>
+            <div class="cfg-row" style="margin-top:8px">
+              <label>当日参加登録URL</label>
+              <div class="url-box">
+                <div style="font-size:11px;color:var(--gray);margin-bottom:4px">会場掲示用QRコードのリンク先（当日の飛び込み参加登録）</div>
+                <div class="url-val" id="walkin-url">—</div>
+                <button class="sm-btn" id="btn-copy-url">URLをコピー</button>
               </div>
             </div>
           </div>

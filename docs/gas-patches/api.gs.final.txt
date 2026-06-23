@@ -713,9 +713,25 @@ function getConfig_(eventId) {
   return config;
 }
 
+// 企業の来訪学生一覧などの閲覧期限。
+// 既定は「イベント終了日+2ヶ月」を下限とし、管理者がそれより後の publicDeadline を
+// 明示設定した場合のみ延長として採用する（短縮は不可＝最低2ヶ月は閲覧可）。
 function isPastDeadline_(cfg) {
-  if (!cfg.publicDeadline) return false;
-  return new Date() > new Date(cfg.publicDeadline);
+  var deadline = null;
+  if (cfg.endDate) {
+    var end = new Date(cfg.endDate);
+    if (!isNaN(end)) {
+      deadline = new Date(end);
+      deadline.setMonth(deadline.getMonth() + 2);
+      deadline.setHours(23, 59, 59);
+    }
+  }
+  if (cfg.publicDeadline) {
+    var pd = new Date(cfg.publicDeadline);
+    if (!isNaN(pd) && (!deadline || pd > deadline)) deadline = pd; // 2ヶ月後より後なら延長
+  }
+  if (!deadline) return false; // 終了日も期限も不明なら無期限
+  return new Date() > deadline;
 }
 
 /** スタンプ取得可能期間内か（未設定なら常にtrue） */   // T3-b 追加

@@ -158,6 +158,7 @@ function route_() {
   } else if (section === 'forms') {
     showPage_('forms');
     loadConfig_(++loadGen_, curEvent_);
+    updateWalkInUrl_(); // 当日参加登録URLをフォーム管理ページに表示
   } else if (section === 'universities') {
     showPage_('universities');
     loadUniversities_();
@@ -994,7 +995,8 @@ async function handleSaveEventInfo_() {
   });
   btn.disabled = false;
   if (res.ok) {
-    const pdValue = publicDeadline ? fromDtLocal_(publicDeadline) : fromDtLocal_(endDatetime);
+    // 空欄＝終了日+2ヶ月（GAS側 isPastDeadline_ が下限適用）。値があれば延長として保存。
+    const pdValue = publicDeadline ? fromDtLocal_(publicDeadline) : '';
     await adminCall_('adminUpdateConfig', { event: curEvent_, key: 'publicDeadline', value: pdValue });
     const ev = allEvents_.find(e => e.eventId === curEvent_);
     if (ev) { ev.name = eventName; ev.startDate = startDate; ev.endDate = endDate; ev.status = status; }
@@ -1174,13 +1176,6 @@ function updateStepBadges_() {
   const step3Done    = studentCount > 0;
   setBadge_('badge-step3', step3Done ? 'done' : 'todo',
     step3Done ? `✓ ${studentCount}名` : '未登録');
-
-  // Step 4（URL発行アコーディオン）
-  const anyKeyIssued = [...(id_('company-list')?.querySelectorAll('.key-val') || [])]
-    .some(el => el.textContent.trim() !== '未発行');
-  const step4Done = !!(walkInCode_) && anyKeyIssued;
-  setBadge_('badge-step4', step4Done ? 'done' : 'todo',
-    step4Done ? '✓ 完了' : '未完了');
 }
 
 function setBadge_(eid, type, label) {
