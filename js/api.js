@@ -33,7 +33,7 @@ const FG_API = (() => {
       }
       if (res.error === 'no_active_event') return null;
     } catch (e) {}
-    return FG_CONFIG.EVENT_ID;
+    return localStorage.getItem('fg_event_id') || FG_CONFIG.EVENT_ID;
   }
 
   // イベントID不要のアクション（全件取得系・当日判定）。
