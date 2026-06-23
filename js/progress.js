@@ -91,7 +91,7 @@ function renderProgress(d) {
     // 次の閾値に向けて収集中（一部交換済み）
     const remaining  = nextThreshold - count;
     const alreadyNote = exchangedCount > 0 ? `（${exchangedCount} 個交換済み）` : '';
-    setText('status-progress', `あと ${remaining} 個でさらに1個GET！ ${alreadyNote}`);
+    setText('status-progress', `あと ${remaining} スタンプで景品をもう1個ゲット！ ${alreadyNote}`);
     show('status-progress');
   } else {
     // まだ最初の閾値にも届いていない
