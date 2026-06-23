@@ -513,6 +513,7 @@ function actionGetCompanyView_(p) {
         name: s.name, furigana: s.furigana, school: s.school,
         department: s.department, year: s.year,
         category: s.category, email: s.email,
+        cardToken: s.cardToken,
         time: r[0] instanceof Date
           ? Utilities.formatDate(r[0], Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm')
           : String(r[0]),
@@ -530,6 +531,9 @@ function actionGetCompanyStampVisitors_(p) {
   const company = findCompanyByViewKey_(p.key, p.event);
   if (!company) return err_('invalid_key');
 
+  const cfg = getConfig_(p.event);
+  if (isPastDeadline_(cfg)) return err_('expired');
+
   const sheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_LOG);
   const rows  = sheet.getLastRow() > 1
     ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).getValues()
@@ -537,12 +541,20 @@ function actionGetCompanyStampVisitors_(p) {
 
   const visitors = rows
     .filter(r => String(r[1]) === String(p.event) && String(r[7]) === String(company.companyId))
-    .map(r => ({
-      studentId: r[2], name: r[3], school: r[4], category: r[5],
-      time: r[0] instanceof Date
-        ? Utilities.formatDate(r[0], Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm')
-        : String(r[0]),
-    }));
+    .map(r => {
+      const s = findStudentById_(r[2], p.event);
+      return {
+        name: r[3], school: r[4], category: r[5],
+        furigana: s ? s.furigana : '',
+        department: s ? s.department : '',
+        year: s ? s.year : '',
+        email: s ? s.email : '',
+        cardToken: s ? s.cardToken : '',
+        time: r[0] instanceof Date
+          ? Utilities.formatDate(r[0], Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm')
+          : String(r[0]),
+      };
+    });
 
   return ok_({ companyName: company.companyName, visitors, total: visitors.length });
 }
