@@ -77,6 +77,14 @@
     .reload-btn { width: 100%; padding: 10px; background: #fff; border: 1px solid var(--fg-line);
                   border-radius: 8px; font-size: 12px; color: var(--fg-muted); cursor: pointer; }
     .reload-btn:active { background: var(--fg-bg); }
+
+    /* 企業QR登録完了バナー */
+    .reg-banner { display: flex; align-items: flex-start; gap: 12px;
+                  margin: 12px 12px 0; padding: 14px 16px; border-radius: 10px;
+                  background: var(--fg-blue-soft); border: 1px solid var(--fg-blue-border); }
+    .reg-banner-icon { font-size: 22px; flex-shrink: 0; }
+    .reg-banner-title { font-size: 14px; font-weight: 700; color: var(--fg-navy); margin-bottom: 3px; }
+    .reg-banner-msg { font-size: 12px; color: var(--fg-text); line-height: 1.6; }
   </style>
 </head>
 <body>
@@ -103,6 +111,15 @@
       </div>
       <div class="co-name" id="co-name">—</div>
       <div class="co-subtitle">来訪学生一覧</div>
+    </div>
+
+    <!-- 企業QR初回スキャン時の登録完了バナー -->
+    <div id="reg-banner" style="display:none" class="reg-banner">
+      <div class="reg-banner-icon">🏢</div>
+      <div>
+        <div class="reg-banner-title" id="reg-banner-name"></div>
+        <div class="reg-banner-msg">端末登録が完了しました。学生QR名刺を読み取ると、この端末での来訪が自動で記録されます。</div>
+      </div>
     </div>
 
     <div class="tab-bar">

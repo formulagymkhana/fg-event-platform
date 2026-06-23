@@ -124,8 +124,27 @@ async function loadStamp() {
 
 // ── 初期化 ────────────────────────────────────────
 (async () => {
-  _key   = FG_API.getParam('key') || FG_API.getCompanyViewKey() || '';
-  _event = FG_API.getParam('event') || null;   // URLにeventがあれば優先（会期外・複数イベントの取り違え防止）
+  _event = FG_API.getParam('event') || null;
+
+  // viewkey param = 企業QR初回スキャン → cookie保存して登録バナー表示
+  const vkParam = FG_API.getParam('viewkey');
+  if (vkParam) {
+    const vkRes = await FG_API.resolveViewKey(vkParam, _event);
+    if (!vkRes.ok) {
+      showErr('企業QRが無効です', '配布された企業QRを再度ご確認ください。');
+      return;
+    }
+    FG_API.saveCompanyViewKey(vkParam);
+    _key = vkParam;
+    const banner = $('reg-banner');
+    if (banner) {
+      $('reg-banner-name').textContent = vkRes.data.companyName;
+      banner.style.display = '';
+    }
+  } else {
+    _key = FG_API.getParam('key') || FG_API.getCompanyViewKey() || '';
+  }
+
   if (!_key) {
     showErr('閲覧キーがありません', '企業担当者用のURLからアクセスしてください。');
     return;

@@ -523,11 +523,10 @@ async function downloadCompanyQrCsv_() {
   showToast_(`✓ ${list.length}社の再閲覧QR URLを出力しました`);
 }
 
-/** 企業QR(cookie登録用)のURL: card.html?viewkey=<viewKey>&event=<eventId>
- *  eventId を埋めることで、会期外や複数大会でも正しいイベントに解決される。 */
+/** 企業QR(登録＋来訪者一覧)のURL: company.html?viewkey=<viewKey>&event=<eventId> */
 function companyQrUrl_(viewKey) {
   const ev = curEvent_ ? `&event=${encodeURIComponent(curEvent_)}` : '';
-  return new URL(`card.html?viewkey=${encodeURIComponent(viewKey)}${ev}`, location.href).toString();
+  return new URL(`company.html?viewkey=${encodeURIComponent(viewKey)}${ev}`, location.href).toString();
 }
 async function loadCompanies_(gen = null, ev = null) {
   ev = ev ?? curEvent_;

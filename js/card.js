@@ -37,25 +37,11 @@ document.getElementById('btn-scan-cancel')?.addEventListener('click', closeCompa
   // 会期外や複数大会の取り違えを防ぐため、URLに event があれば優先する。
   const pageEvent = FG_API.getParam('event') || null;
 
-  // ── 企業QR登録モード(card.html?viewkey=...&event=...) ──
-  // 企業QRを通常カメラで読むとここに入る。viewKeyをcookieへ保存し、
-  // 以降の学生QR閲覧を自動記録できるようにする。
+  // viewkey が来た場合は company.html へリダイレクト（企業QR登録は company.html に統合済み）
   if (vkParam) {
-    const res = await FG_API.resolveViewKey(vkParam, pageEvent);
-    if (res.ok) {
-      FG_API.saveCompanyViewKey(vkParam);
-      try { localStorage.setItem('fg_company_name', res.data.companyName); } catch (e) {}
-      if (!token) {
-        $('state-loading').style.display = 'none';
-        $('company-done-name').textContent = res.data.companyName;
-        $('state-company').style.display = 'flex';
-        return;
-      }
-      // token併記の場合は登録だけ済ませて通常の学生表示へ続行
-    } else if (!token) {
-      showError('企業QRが無効です。', '配布された企業QRを再度ご確認ください。');
-      return;
-    }
+    const ev = pageEvent ? `&event=${encodeURIComponent(pageEvent)}` : '';
+    location.replace(`company.html?viewkey=${encodeURIComponent(vkParam)}${ev}`);
+    return;
   }
 
   if (!token) {
