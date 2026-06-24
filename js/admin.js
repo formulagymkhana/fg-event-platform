@@ -284,6 +284,12 @@ function cardPassUrl_(cardToken) {
   return new URL(`card.html?token=${encodeURIComponent(cardToken)}${ev}`, location.href).toString();
 }
 
+// マイカードURL（学生自身がQRを確認するページ / 登録完了メールに記載するリンクと同じ）
+function mypassUrl_(cardToken) {
+  const ev = curEvent_ ? `&event=${encodeURIComponent(curEvent_)}` : '';
+  return new URL(`mypass.html?token=${encodeURIComponent(cardToken)}${ev}`, location.href).toString();
+}
+
 // QRパス作成用CSV（A列から：学生ID/参加区分/氏名/ふりがな/トークン/QR用URL）
 // kind: 'driver' | 'spectator' | 'all'
 function downloadPreRegCsv_(kind) {
@@ -770,8 +776,9 @@ function renderStudentList_() {
           </div>
           ${s.cardToken ? `
           <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
-            <a href="${esc_(cardPassUrl_(s.cardToken))}" target="_blank" class="stu-card-link">${esc_(cardPassUrl_(s.cardToken))}</a>
-            <button class="copy-btn" data-copy="${esc_(cardPassUrl_(s.cardToken))}" style="flex-shrink:0;font-size:10px;padding:2px 8px">URLコピー</button>
+            <span style="font-size:9px;color:var(--gray);flex-shrink:0">マイカード</span>
+            <a href="${esc_(mypassUrl_(s.cardToken))}" target="_blank" class="stu-card-link">${esc_(mypassUrl_(s.cardToken))}</a>
+            <button class="copy-btn" data-copy="${esc_(mypassUrl_(s.cardToken))}" style="flex-shrink:0;font-size:10px;padding:2px 8px">URLコピー</button>
             ${s.regType !== '事前' ? `
             <button class="copy-btn" data-resend="${esc_(s.cardToken)}" style="flex-shrink:0;font-size:10px;padding:2px 8px">メール再送信</button>` : ''}
           </div>` : ''}
