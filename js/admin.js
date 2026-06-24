@@ -783,7 +783,7 @@ function renderStudentList_() {
             <button class="copy-btn" data-resend="${esc_(s.cardToken)}" style="flex-shrink:0;font-size:10px;padding:2px 8px">メール再送信</button>` : ''}
           </div>
           <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
-            <span style="font-size:9px;color:var(--gray);flex-shrink:0;width:52px">CARD</span>
+            <span style="font-size:9px;color:var(--gray);flex-shrink:0;width:52px">学生カード</span>
             <a href="${esc_(cardPassUrl_(s.cardToken))}" target="_blank" class="stu-card-link">${esc_(cardPassUrl_(s.cardToken))}</a>
             <button class="copy-btn" data-copy="${esc_(cardPassUrl_(s.cardToken))}" style="flex-shrink:0;font-size:10px;padding:2px 8px">コピー</button>
           </div>` : ''}
