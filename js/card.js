@@ -114,7 +114,7 @@ function render(d) {
   $('furigana').textContent   = d.furigana;
   $('name').textContent       = d.name;
   $('school').textContent     = d.school;
-  $('school-sub').textContent = d.department + '　' + (d.year ? d.year + '年' : '');
+  $('school-sub').textContent = d.department + '　' + (d.year || '');
 
   $('club-years').textContent = d.clubYears;
   $('prefecture').textContent = d.prefecture;
