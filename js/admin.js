@@ -763,7 +763,7 @@ function renderStudentList_() {
               <div style="font-size:13px;font-weight:600;color:var(--navy)">${esc_(s.name)}
                 <span style="font-size:10px;font-weight:400;color:var(--gray);margin-left:4px">${esc_(s.furigana)}</span>
               </div>
-              <div style="font-size:10px;color:var(--gray);margin-top:2px">${esc_(s.school)} · ${esc_(s.category || '—')} · ${esc_(s.year ? s.year + '年' : '—')}</div>
+              <div style="font-size:10px;color:var(--gray);margin-top:2px">${esc_(s.school)} · ${esc_(s.category || '—')} · ${s.year ? `学年: ${esc_(String(s.year).replace(/年$/, ''))}年（大学・短大等）` : '学年: —'}</div>
             </div>
             <div style="display:flex;align-items:center;gap:6px">
               <button class="copy-btn stu-edit-btn" data-sid="${esc_(s.studentId)}" style="font-size:10px;padding:2px 8px">編集</button>
