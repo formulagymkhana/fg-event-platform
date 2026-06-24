@@ -57,7 +57,11 @@ function renderProgress(d) {
   const exchanged      = d.exchanged      || false;  // exchangedCount >= maxPrizes
 
   // 固定ヘッダー: 取得ブース数 / 全ブース数（スタンプ帳の枠組み）
-  const companies = d.companies || fallbackCompanies_(stamps);
+  // 空配列は truthy のため length で判定。GASが companies を返さない/空の場合は
+  // 取得済みスタンプから企業を復元する（交換APIの簡易レスポンス対策も兼ねる）。
+  const companies = (Array.isArray(d.companies) && d.companies.length)
+    ? d.companies
+    : fallbackCompanies_(stamps);
   const gotSet  = new Set(stamps.map(s => String(s.companyId || s.company)));
   const visited = companies.filter(co => gotSet.has(String(co.companyId || co.name))).length;
   const total   = companies.length || visited;
@@ -167,8 +171,9 @@ function renderMilestoneBar(count, milestones, totalCompanies) {
   if (!section || !milestones || milestones.length === 0) return;
 
   const lastThreshold = milestones[milestones.length - 1].threshold;
-  // 会社数が景品の最終閾値より少ない場合でも全マーカーが収まるよう大きい方を採用
-  const maxVal = Math.max(totalCompanies || 0, lastThreshold);
+  // バーは景品の最終閾値を100%としてスケールする。企業数基準にすると
+  // 閾値（例:1個,2個）が左端に潰れて「全達成」表示と矛盾するため、閾値基準に統一。
+  const maxVal = lastThreshold || 1;
   const pct    = Math.min(100, Math.round((count / maxVal) * 100));
   const allComplete = count >= lastThreshold;
 
@@ -248,9 +253,9 @@ async function doExchange() {
   btn.textContent = 'はい、受け取りました';
 
   if (res.ok) {
-    // 進捗を再読み込み(交換済み表示に切り替わる)
-    renderProgress(res.data);
-    showState('progress');
+    // 交換APIのレスポンスは stamps/companies を含まないため、全データを再取得して
+    // 取得ブース数・スタンプ帳・取得履歴を正しい状態で再描画する。
+    await loadProgress();
   } else if (res.error === 'nothing_to_claim' || res.error === 'already_exchanged') {
     loadProgress(); // 交換可能数なし → 最新状態を再取得
   } else {

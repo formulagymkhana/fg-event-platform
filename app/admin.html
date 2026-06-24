@@ -12,7 +12,7 @@
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src 'self' https://fonts.gstatic.com;">
   <title>FG 管理パネル</title>
-  <link rel="stylesheet" href="../js/style.css?v=20260624a">
+  <link rel="stylesheet" href="../js/style.css?v=20260624d">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     :root{
@@ -656,6 +656,26 @@
         </div>
       </div>
 
+      <div class="section">
+        <div class="section-hd" data-section="f-walkin-mail">
+          <span class="section-title">✉️ 当日参加 受付メール</span>
+          <span class="section-toggle" id="toggle-f-walkin-mail">▼</span>
+        </div>
+        <div class="section-body" id="body-f-walkin-mail">
+          <div class="cfg-group" style="margin-top:0">
+            <div class="cfg-hint" style="margin-bottom:8px">使える差し込み: <code>{name}</code>＝氏名、<code>{eventName}</code>＝大会名、<code>{passUrl}</code>＝MY PASSのURL</div>
+            <div class="cfg-row">
+              <label>件名</label>
+              <input type="text" class="cfg-input" id="cfg-walkInMailSubject" placeholder="【{eventName}】当日参加 受付完了（あなたのMY PASS）">
+            </div>
+            <div class="cfg-row">
+              <label>本文</label>
+              <textarea class="cfg-input" id="cfg-walkInMailBody" rows="9" style="resize:vertical;line-height:1.6"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="cfg-group">
         <button class="save-btn" id="btn-save-form-config">保存</button>
         <span class="save-fb" id="form-save-feedback"></span>
@@ -801,6 +821,6 @@
 <div class="toast" id="toast"></div>
 <script src="../js/vendor/qrcode.min.js"></script>
 <script src="../js/config.js?v=20260623a"></script>
-<script src="../js/admin.js?v=20260624c"></script>
+<script src="../js/admin.js?v=20260624d"></script>
 </body>
 </html>

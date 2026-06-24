@@ -14,7 +14,7 @@
   <title>FORMULA GYMKHANA — MY PASS</title>
   <link rel="preconnect" href="https://script.google.com">
   <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
-  <link rel="stylesheet" href="../js/style.css?v=20260624a">
+  <link rel="stylesheet" href="../js/style.css?v=20260624d">
   <style>
     body { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 24px 16px 40px; }
     .card { width: 100%; max-width: 360px; }
@@ -36,6 +36,9 @@
     .keep-note b { color: var(--fg-navy); }
 
     .pass-actions { padding: 16px 20px 4px; }
+
+    /* カード下端の余白（最終要素が下端に貼り付くのを防ぐ） */
+    .card { padding-bottom: 22px; }
   </style>
 </head>
 <body>
@@ -56,7 +59,7 @@
   <div class="card" id="state-ready" style="display:none">
     <div class="fg-header">
       <div class="fg-logo"><div class="fg-logo-mark">FORMULA <span>GYMKHANA</span></div><div class="fg-logo-sub">College Students RD</div></div>
-      <div class="fg-page-name" id="event-name">マイページ</div>
+      <div class="fg-page-name" id="event-name">MY PASS</div>
     </div>
 
     <div class="pass-name-block">
@@ -96,6 +99,6 @@
   <script src="../js/config.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/vendor/qrcode.min.js"></script>
-  <script src="../js/mypass.js"></script>
+  <script src="../js/mypass.js?v=20260624d"></script>
 </body>
 </html>

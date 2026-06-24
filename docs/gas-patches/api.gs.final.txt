@@ -1289,22 +1289,25 @@ function sendWalkInPassMail_(to, name, eventId, passUrl) {
   try {
     const cfg    = getConfig_(eventId);
     const evName = cfg.eventName || eventId;
-    const subject = '【' + evName + '】当日参加 受付完了（あなたのマイページ）';
-    const body = [
-      (name || '') + ' 様',
-      '',
-      evName + ' の当日参加登録を受け付けました。スタンプラリーにご参加いただけます。',
-      '',
-      '▼あなたのマイページ（氏名・QRコード）',
-      passUrl || '（リンクの発行に失敗しました。会場スタッフにお問い合わせください）',
-      '',
-      '・このページをブックマーク／ホーム画面に追加しておくと、いつでも開けます。',
-      '・企業ブースの方には、このページのQRコードを見せてください。',
-      '・スタンプの進捗が消えてしまった場合も、このページから元に戻せます。',
-      '',
-      '── FORMULA GYMKHANA 事務局',
-    ].join('\n');
-    MailApp.sendEmail({ to: String(to), subject: subject, body: body });
+    // 件名・本文は設定シート(walkInMailSubject/walkInMailBody)で編集可。未設定なら既定文面。
+    // 差し込み: {name}＝氏名、{eventName}＝大会名、{passUrl}＝マイページURL。
+    const subjTpl = cfg.walkInMailSubject ||
+      '【{eventName}】当日参加 受付完了（あなたのMY PASS）';
+    const bodyTpl = cfg.walkInMailBody ||
+      ('{name} 様\n\n' +
+       '{eventName} の当日参加登録を受け付けました。スタンプラリーにご参加いただけます。\n\n' +
+       '▼あなたのMY PASS（氏名・QRコード）\n' +
+       '{passUrl}\n\n' +
+       '・このページをブックマーク／ホーム画面に追加しておくと、いつでも開けます。\n' +
+       '・企業ブースの方には、このページのQRコードを見せてください。\n' +
+       '・スタンプの進捗が消えてしまった場合も、このページから元に戻せます。\n\n' +
+       '── FORMULA GYMKHANA 事務局');
+    const safeUrl = passUrl || '（リンクの発行に失敗しました。会場スタッフにお問い合わせください）';
+    const fill = s => String(s)
+      .replace(/\{name\}/g, name || '')
+      .replace(/\{eventName\}/g, evName)
+      .replace(/\{passUrl\}/g, safeUrl);
+    MailApp.sendEmail({ to: String(to), subject: fill(subjTpl), body: fill(bodyTpl) });
   } catch (err) {
     console.error('sendWalkInPassMail_ error:', err);
   }

@@ -401,6 +401,8 @@ async function loadConfig_(gen, ev) {
   setVal_('cfg-maxPrizes',    cfg.maxPrizes     || cfg.prizeCount    || 3);
   setVal_('cfg-preRegMailSubject', cfg.preRegMailSubject || PREREG_MAIL_SUBJECT_DEFAULT);
   setVal_('cfg-preRegMailBody',    cfg.preRegMailBody    || PREREG_MAIL_BODY_DEFAULT);
+  setVal_('cfg-walkInMailSubject', cfg.walkInMailSubject || WALKIN_MAIL_SUBJECT_DEFAULT);
+  setVal_('cfg-walkInMailBody',    cfg.walkInMailBody    || WALKIN_MAIL_BODY_DEFAULT);
   setVal_('cfg-formOpenAt',         toDtLocal_(cfg.formOpenAt));
   setVal_('cfg-deadlineDriver',     toDtLocal_(cfg.deadlineDriver));
   setVal_('cfg-deadlineWomenDriver',toDtLocal_(cfg.deadlineWomenDriver));
@@ -432,6 +434,18 @@ const PREREG_MAIL_BODY_DEFAULT =
   '登録内容に変更がある場合は事務局までご連絡ください。\n\n' +
   '── FORMULA GYMKHANA 事務局';
 
+// 当日参加 受付メールの既定文面（GAS sendWalkInPassMail_ のフォールバックと一致させる）
+const WALKIN_MAIL_SUBJECT_DEFAULT = '【{eventName}】当日参加 受付完了（あなたのMY PASS）';
+const WALKIN_MAIL_BODY_DEFAULT =
+  '{name} 様\n\n' +
+  '{eventName} の当日参加登録を受け付けました。スタンプラリーにご参加いただけます。\n\n' +
+  '▼あなたのMY PASS（氏名・QRコード）\n' +
+  '{passUrl}\n\n' +
+  '・このページをブックマーク／ホーム画面に追加しておくと、いつでも開けます。\n' +
+  '・企業ブースの方には、このページのQRコードを見せてください。\n' +
+  '・スタンプの進捗が消えてしまった場合も、このページから元に戻せます。\n\n' +
+  '── FORMULA GYMKHANA 事務局';
+
 async function saveConfig_(btnId, fbId) {
   if (!curEvent_) return;
   const btn = id_(btnId);
@@ -444,6 +458,8 @@ async function saveConfig_(btnId, fbId) {
     maxPrizes:            getVal_('cfg-maxPrizes'),
     preRegMailSubject:    getVal_('cfg-preRegMailSubject'),
     preRegMailBody:       getVal_('cfg-preRegMailBody'),
+    walkInMailSubject:    getVal_('cfg-walkInMailSubject'),
+    walkInMailBody:       getVal_('cfg-walkInMailBody'),
     formOpenAt:           toIso_(getVal_('cfg-formOpenAt')),
     deadlineDriver:       toIso_(getVal_('cfg-deadlineDriver')),
     deadlineWomenDriver:  toIso_(getVal_('cfg-deadlineWomenDriver')),
