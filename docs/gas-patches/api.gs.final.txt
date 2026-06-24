@@ -705,15 +705,28 @@ function buildStampResult_(eventId, studentId, stampCount, extra) {
 // ============================================================
 // スプレッドシートアクセス
 // ============================================================
+//
+// SpreadsheetApp.openById は GAS で最も重い操作の一つ。1リクエストで eventSs_ が
+// 4〜5回呼ばれ、毎回マスター＋イベントの2回 openById ＋ EVENT_LIST 全読みが走る。
+// doGet/doPost ごとに新しいJSコンテキストになるため、モジュール変数でリクエスト単位に
+// メモ化しても他リクエストと衝突しない（同一インスタンス再利用時も Spreadsheet は
+// ライブ参照なので最新データを返し整合性は保たれる）。
+
+var SS_CACHE_      = null;   // master Spreadsheet をメモ化
+var EVENT_SS_CACHE_ = {};    // eventId → Spreadsheet をメモ化
 
 function masterSs_() {
+  if (SS_CACHE_) return SS_CACHE_;
   const id = PropertiesService.getScriptProperties()
     .getProperty('MASTER_SPREADSHEET_ID');
   if (!id) throw new Error('MASTER_SPREADSHEET_IDが未設定です。initializeMaster()を実行してください。');
-  return SpreadsheetApp.openById(id);
+  SS_CACHE_ = SpreadsheetApp.openById(id);
+  return SS_CACHE_;
 }
 
 function eventSs_(eventId) {
+  const key = String(eventId);
+  if (EVENT_SS_CACHE_[key]) return EVENT_SS_CACHE_[key];
   const sheet   = masterSs_().getSheetByName(SHEET.EVENT_LIST);
   const data    = sheet.getDataRange().getValues();
   const headers = data[0].map(String);
@@ -721,7 +734,9 @@ function eventSs_(eventId) {
   const ssIdCol = headers.indexOf('スプレッドシートID');
   const row     = data.slice(1).find(r => String(r[idCol]) === String(eventId));
   if (!row) throw new Error('イベントが見つかりません: ' + eventId);
-  return SpreadsheetApp.openById(row[ssIdCol]);
+  const ss = SpreadsheetApp.openById(row[ssIdCol]);
+  EVENT_SS_CACHE_[key] = ss;
+  return ss;
 }
 
 // ============================================================
@@ -898,6 +913,7 @@ function err_(code) {
     event_already_exists:     '同じイベントIDが既に存在します',
     invalid_reading:          '読みの頭文字が判定できません',
     university_not_found:      '対象の大学が見つかりません',
+    no_events:             'イベントが1件も登録されていません',
     server_error:          'サーバーエラーが発生しました',
   };
   return { ok: false, error: code, message: MSG[code] || code };
