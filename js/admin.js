@@ -586,13 +586,13 @@ async function loadCompanies_(gen = null, ev = null) {
       ${c.stampKey ? `
       <div class="url-row">
         <span class="url-lbl">NFC用URL（スタンプ）</span>
-        <span class="url-val">${esc_(nfcUrl_(c.stampKey))}</span>
+        <a class="url-val" href="${esc_(nfcUrl_(c.stampKey))}" target="_blank">${esc_(nfcUrl_(c.stampKey))}</a>
         <button class="copy-btn" data-copy="${esc_(nfcUrl_(c.stampKey))}">コピー</button>
       </div>` : ''}
       ${c.viewKey ? `
       <div class="url-row">
         <span class="url-lbl">企業QR・再閲覧URL</span>
-        <span class="url-val">${esc_(companyQrUrl_(c.viewKey))}</span>
+        <a class="url-val" href="${esc_(companyQrUrl_(c.viewKey))}" target="_blank">${esc_(companyQrUrl_(c.viewKey))}</a>
         <button class="copy-btn" data-copy="${esc_(companyQrUrl_(c.viewKey))}">コピー</button>
         <button class="copy-btn" data-qr-url="${esc_(companyQrUrl_(c.viewKey))}" data-qr-name="${esc_(c.name)}">QR</button>
       </div>` : ''}
@@ -770,8 +770,7 @@ function renderStudentList_() {
           </div>
           ${s.cardToken ? `
           <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
-            <span style="font-size:9px;color:var(--gray);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc_(cardPassUrl_(s.cardToken))}</span>
-            <a href="${esc_(cardPassUrl_(s.cardToken))}" target="_blank" class="copy-btn" style="flex-shrink:0;font-size:10px;padding:2px 8px;text-decoration:none">カードを開く</a>
+            <a href="${esc_(cardPassUrl_(s.cardToken))}" target="_blank" class="stu-card-link">${esc_(cardPassUrl_(s.cardToken))}</a>
             <button class="copy-btn" data-copy="${esc_(cardPassUrl_(s.cardToken))}" style="flex-shrink:0;font-size:10px;padding:2px 8px">URLコピー</button>
             ${s.regType !== '事前' ? `
             <button class="copy-btn" data-resend="${esc_(s.cardToken)}" style="flex-shrink:0;font-size:10px;padding:2px 8px">メール再送信</button>` : ''}
@@ -931,14 +930,16 @@ function updatePreRegFormUrl_() {
   if (!el) return;
   if (!curEvent_) { el.textContent = '（イベント未選択）'; return; }
   const base = location.origin + location.pathname.replace(/[^/]+$/, 'register-pre.html');
-  el.textContent = `${base}?event=${encodeURIComponent(curEvent_)}`;
+  const url = `${base}?event=${encodeURIComponent(curEvent_)}`;
+  el.innerHTML = `<a href="${url}" target="_blank" class="url-anchor">${url}</a>`;
 }
 
 function updateWalkInUrl_() {
   const el = id_('walkin-url');
   if (!el) return;
   // 当日受付コードは撤廃済み（開放）。素の register.html を当日の受付URLとして表示する。
-  el.textContent = location.origin + location.pathname.replace(/[^/]+$/, 'register.html');
+  const url = location.origin + location.pathname.replace(/[^/]+$/, 'register.html');
+  el.innerHTML = `<a href="${url}" target="_blank" class="url-anchor">${url}</a>`;
 }
 
 function handleCopyUrl_() {
