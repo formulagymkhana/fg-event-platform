@@ -3,6 +3,8 @@
  * 大会カラー / CSS変数 / 共通コンポーネント
  */
 
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@700&display=swap');
+
 /* ── CSS変数 ────────────────────────────────────── */
 :root {
   --fg-blue:         #004ECC;   /* 公式サイト寄せ（旧 #0057B8） */
@@ -78,14 +80,14 @@ body {
 }
 
 .fg-logo-mark {
-  font-family: Impact, 'Arial Narrow Bold', sans-serif;
+  font-family: 'Oswald', Impact, 'Arial Narrow Bold', sans-serif;
   font-size: 22px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.03em;
   color: #111827;
   line-height: 1;
   display: flex;
-  align-items: stretch;
+  align-items: center;
 }
 
 .fg-logo-mark span {

@@ -771,6 +771,7 @@ function renderStudentList_() {
           ${s.cardToken ? `
           <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
             <span style="font-size:9px;color:var(--gray);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc_(cardPassUrl_(s.cardToken))}</span>
+            <a href="${esc_(cardPassUrl_(s.cardToken))}" target="_blank" class="copy-btn" style="flex-shrink:0;font-size:10px;padding:2px 8px;text-decoration:none">カードを開く</a>
             <button class="copy-btn" data-copy="${esc_(cardPassUrl_(s.cardToken))}" style="flex-shrink:0;font-size:10px;padding:2px 8px">URLコピー</button>
             ${s.regType !== '事前' ? `
             <button class="copy-btn" data-resend="${esc_(s.cardToken)}" style="flex-shrink:0;font-size:10px;padding:2px 8px">メール再送信</button>` : ''}

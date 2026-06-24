@@ -9,9 +9,10 @@
              connect-src https://script.google.com
                          https://script.googleusercontent.com;
              img-src 'self' https: data:;
-             style-src 'self' 'unsafe-inline';">
+             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+             font-src 'self' https://fonts.gstatic.com;">
   <title>FG 管理パネル</title>
-  <link rel="stylesheet" href="../js/style.css">
+  <link rel="stylesheet" href="../js/style.css?v=20260624a">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     :root{
@@ -33,7 +34,7 @@
     .login-card{background:#fff;border-radius:var(--radius-card);width:100%;max-width:360px;
       box-shadow:var(--shadow-card);overflow:hidden}
     .login-hd{background:#fff;padding:18px 22px;border-bottom:3px solid var(--fg-blue)}
-    .fg-logo-mark{font-family:Impact,'Arial Narrow Bold',sans-serif;font-size:14px;font-weight:900;letter-spacing:.05em;color:#111827;display:flex;align-items:stretch;line-height:1}
+    .fg-logo-mark{font-family:'Oswald',Impact,'Arial Narrow Bold',sans-serif;font-size:14px;font-weight:700;letter-spacing:.05em;color:#111827;display:flex;align-items:center;line-height:1}
     .fg-logo-mark span{background:var(--fg-blue);color:#fff;padding:0 5px;border-radius:0;margin-left:3px;display:flex;align-items:center}
     .fg-logo-sub{font-family:Arial,Helvetica,sans-serif;font-size:8px;color:#111827;letter-spacing:.06em;margin-top:2px}
     .login-sub{font-size:11px;color:var(--gray);margin-top:3px}
@@ -792,6 +793,6 @@
 <div class="toast" id="toast"></div>
 <script src="../js/vendor/qrcode.min.js"></script>
 <script src="../js/config.js?v=20260623a"></script>
-<script src="../js/admin.js?v=20260623f"></script>
+<script src="../js/admin.js?v=20260624a"></script>
 </body>
 </html>
