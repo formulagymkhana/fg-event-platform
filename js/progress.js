@@ -187,8 +187,13 @@ function renderMilestoneBar(count, visited, prizeMilestones, totalCompanies) {
     .map(m => ({ threshold: m.threshold, kind: 'prize' }));
   markers.push({ threshold: goal, kind: 'goal' });
 
-  const maxVal      = goal;
-  const pct         = Math.min(100, Math.round((count / maxVal) * 100));
+  // マーカーは閾値の実数値ではなく等間隔に配置（i番目→(i+1)/n%、末尾＝100%）。
+  // これで景品マーカーが前半に密集せず、最後の「→全制覇」区間だけ実距離が長くなる。
+  const n = markers.length;
+  markers.forEach((m, i) => { m.pos = Math.round(((i + 1) / n) * 100); });
+
+  // 進捗フィルは区分線形でマーカー位置へマッピング（区切り間の実スタンプ数で按分）。
+  const pct         = milestoneFill_(count, markers);
   const allComplete = visited >= goal;   // 全出店企業を回った時のみ全達成
 
   section.innerHTML = `
@@ -197,7 +202,6 @@ function renderMilestoneBar(count, visited, prizeMilestones, totalCompanies) {
       <div class="milestone-track${allComplete ? ' complete' : ''}">
         <div class="milestone-fill" style="width:${pct}%"></div>
         ${markers.map(m => {
-          const pos     = Math.min(100, Math.round((m.threshold / maxVal) * 100));
           const isGoal  = m.kind === 'goal';
           const reached = isGoal ? allComplete : count >= m.threshold;
           const markerClass = reached
@@ -205,14 +209,29 @@ function renderMilestoneBar(count, visited, prizeMilestones, totalCompanies) {
             : 'unreached';
           const label = isGoal ? '全制覇' : `${m.threshold}個`;
           return `
-            <div class="milestone-marker ${markerClass}" style="left:${pos}%"></div>
-            <div class="milestone-label" style="left:${pos}%">
+            <div class="milestone-marker ${markerClass}" style="left:${m.pos}%"></div>
+            <div class="milestone-label" style="left:${m.pos}%">
               <span class="m-count">${label}</span>
             </div>`;
         }).join('')}
       </div>
     </div>
     ${allComplete ? '<div class="milestone-complete">🏁 全ブース制覇！</div>' : ''}`;
+}
+
+// 取得スタンプ数を、等間隔マーカー位置へ区分線形でマッピングしてフィル%を返す。
+// 区切り: (0スタンプ,0%) →(markers[0].threshold,markers[0].pos)→…→(goal,100%)
+function milestoneFill_(count, markers) {
+  let prevT = 0, prevP = 0;
+  for (const m of markers) {
+    if (count <= m.threshold) {
+      const span = m.threshold - prevT;
+      const frac = span > 0 ? (count - prevT) / span : 1;
+      return Math.round(prevP + frac * (m.pos - prevP));
+    }
+    prevT = m.threshold; prevP = m.pos;
+  }
+  return 100;  // count >= goal
 }
 
 // ── 取得履歴（fg-list 形式） ──
