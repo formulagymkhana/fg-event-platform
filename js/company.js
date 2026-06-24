@@ -137,11 +137,9 @@ async function loadStamp() {
     }
     FG_API.saveCompanyViewKey(vkParam);
     _key = vkParam;
+    // 登録完了バナー表示（タイトル・本文はHTMLに固定。企業名はヘッダーの co-name に表示される）
     const banner = $('reg-banner');
-    if (banner) {
-      $('reg-banner-name').textContent = vkRes.data.companyName;
-      banner.style.display = '';
-    }
+    if (banner) banner.style.display = '';
   } else {
     _key = FG_API.getParam('key') || FG_API.getCompanyViewKey() || '';
   }

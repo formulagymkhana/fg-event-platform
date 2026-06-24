@@ -827,7 +827,7 @@ async function handleSaveStudentEdit_(btn, wrap) {
   const u = res.data.updated;
   showToast_(`✓ 更新完了（学生マスター:${u.students} 事前登録:${u.preReg} スタンプログ:${u.stampLog} 景品:${u.prizeLog}）`);
   form.style.display = 'none';
-  loadStudents_();
+  loadStudents_(++loadGen_, curEvent_);
 }
 
 // 当日参加者へ個人ページ(氏名+QR)のリンクをメール再送信する
