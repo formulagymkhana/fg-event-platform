@@ -29,7 +29,7 @@
   const res = await FG_API.getStudent(token, event);
   if (!res.ok) {
     if (res.error === 'expired') {
-      showError('公開期限が終了しました。', 'マイページの公開期間が終了しています。');
+      showError('公開期限が終了しました。', 'MY PASSの公開期間が終了しています。');
     } else if (res.error === 'timeout' || res.error === 'network_error') {
       showError('接続に失敗しました。', '電波の良い場所でもう一度お試しください。');
     } else {
@@ -47,7 +47,7 @@
 
 // ── 描画 ──────────────────────────────────────────
 function renderPass_(d, token, event) {
-  setText('event-name', d.eventName || 'マイページ');
+  setText('event-name', d.eventName || 'MY PASS');
   setText('furigana', d.furigana || '');
   setText('name', d.name || '');
   const school = [d.school, d.department].filter(Boolean).join(' ');
