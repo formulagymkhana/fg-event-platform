@@ -106,7 +106,8 @@ function renderProgress(d) {
 
   // スタンプ帳グリッド・マイルストーンバー・取得履歴リスト
   renderStampGrid(stamps, companies);
-  renderMilestoneBar(count, buildMilestones_(prizeUnitSize, maxPrizes), total);
+  // マイルストーンの「全達成」は全出店企業を回った時。景品閾値は途中の中間マーカー。
+  renderMilestoneBar(count, visited, buildMilestones_(prizeUnitSize, maxPrizes), total);
   renderStampList(stamps);
 }
 
@@ -166,38 +167,52 @@ function renderStampGrid(stamps, companies) {
 }
 
 // ── マイルストーンバー ──
-function renderMilestoneBar(count, milestones, totalCompanies) {
+// count          … 取得スタンプ数（景品閾値マーカーの判定用）
+// visited        … 出店企業のうち実際に回った数（全制覇判定用）
+// prizeMilestones… 景品の交換閾値（中間マーカー）
+// totalCompanies … 出店中の全企業数（＝全制覇のゴール／バー100%）
+function renderMilestoneBar(count, visited, prizeMilestones, totalCompanies) {
   const section = document.getElementById('milestone-bar-section');
-  if (!section || !milestones || milestones.length === 0) return;
+  if (!section) return;
 
-  const lastThreshold = milestones[milestones.length - 1].threshold;
-  // バーは景品の最終閾値を100%としてスケールする。企業数基準にすると
-  // 閾値（例:1個,2個）が左端に潰れて「全達成」表示と矛盾するため、閾値基準に統一。
-  const maxVal = lastThreshold || 1;
-  const pct    = Math.min(100, Math.round((count / maxVal) * 100));
-  const allComplete = count >= lastThreshold;
+  // 全制覇ゴール＝出店中の全企業数。企業数が取得できない場合は景品最終閾値で代替。
+  const lastPrize = (prizeMilestones && prizeMilestones.length)
+    ? prizeMilestones[prizeMilestones.length - 1].threshold : 0;
+  const goal = totalCompanies > 0 ? totalCompanies : lastPrize;
+  if (goal <= 0) { section.innerHTML = ''; return; }
+
+  // マーカー: ゴール未満の景品閾値（中間）＋ 末尾に全制覇ゴール
+  const markers = (prizeMilestones || [])
+    .filter(m => m.threshold < goal)
+    .map(m => ({ threshold: m.threshold, kind: 'prize' }));
+  markers.push({ threshold: goal, kind: 'goal' });
+
+  const maxVal      = goal;
+  const pct         = Math.min(100, Math.round((count / maxVal) * 100));
+  const allComplete = visited >= goal;   // 全出店企業を回った時のみ全達成
 
   section.innerHTML = `
     <div class="milestone-title">マイルストーン</div>
     <div style="position:relative">
       <div class="milestone-track${allComplete ? ' complete' : ''}">
         <div class="milestone-fill" style="width:${pct}%"></div>
-        ${milestones.map((m, i) => {
-          const pos      = Math.min(100, Math.round((m.threshold / maxVal) * 100));
-          const reached  = count >= m.threshold;
-          const isLast   = i === milestones.length - 1;
+        ${markers.map(m => {
+          const pos     = Math.min(100, Math.round((m.threshold / maxVal) * 100));
+          const isGoal  = m.kind === 'goal';
+          const reached = isGoal ? allComplete : count >= m.threshold;
           const markerClass = reached
-            ? (isLast && allComplete ? 'reached complete-star' : 'reached')
+            ? (isGoal ? 'reached complete-star' : 'reached')
             : 'unreached';
+          const label = isGoal ? '全制覇' : `${m.threshold}個`;
           return `
             <div class="milestone-marker ${markerClass}" style="left:${pos}%"></div>
             <div class="milestone-label" style="left:${pos}%">
-              <span class="m-count">${m.threshold}個</span>
+              <span class="m-count">${label}</span>
             </div>`;
         }).join('')}
       </div>
     </div>
-    ${allComplete ? '<div class="milestone-complete">🏁 全マイルストーン達成！</div>' : ''}`;
+    ${allComplete ? '<div class="milestone-complete">🏁 全ブース制覇！</div>' : ''}`;
 }
 
 // ── 取得履歴（fg-list 形式） ──
