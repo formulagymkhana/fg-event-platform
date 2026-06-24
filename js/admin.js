@@ -776,11 +776,16 @@ function renderStudentList_() {
           </div>
           ${s.cardToken ? `
           <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
-            <span style="font-size:9px;color:var(--gray);flex-shrink:0">マイカード</span>
+            <span style="font-size:9px;color:var(--gray);flex-shrink:0;width:52px">MY PASS</span>
             <a href="${esc_(mypassUrl_(s.cardToken))}" target="_blank" class="stu-card-link">${esc_(mypassUrl_(s.cardToken))}</a>
-            <button class="copy-btn" data-copy="${esc_(mypassUrl_(s.cardToken))}" style="flex-shrink:0;font-size:10px;padding:2px 8px">URLコピー</button>
+            <button class="copy-btn" data-copy="${esc_(mypassUrl_(s.cardToken))}" style="flex-shrink:0;font-size:10px;padding:2px 8px">コピー</button>
             ${s.regType !== '事前' ? `
             <button class="copy-btn" data-resend="${esc_(s.cardToken)}" style="flex-shrink:0;font-size:10px;padding:2px 8px">メール再送信</button>` : ''}
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+            <span style="font-size:9px;color:var(--gray);flex-shrink:0;width:52px">CARD</span>
+            <a href="${esc_(cardPassUrl_(s.cardToken))}" target="_blank" class="stu-card-link">${esc_(cardPassUrl_(s.cardToken))}</a>
+            <button class="copy-btn" data-copy="${esc_(cardPassUrl_(s.cardToken))}" style="flex-shrink:0;font-size:10px;padding:2px 8px">コピー</button>
           </div>` : ''}
           <div class="stu-edit-form" data-sid="${esc_(s.studentId)}" style="display:none;margin-top:8px;padding:10px;background:var(--fg-bg);border-radius:8px;border:1px solid var(--border)">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
