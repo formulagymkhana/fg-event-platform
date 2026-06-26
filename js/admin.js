@@ -77,6 +77,10 @@ window.addEventListener('DOMContentLoaded', () => {
   id_('btn-entry-reload')?.addEventListener('click', loadCompanyEntries_);
   id_('btn-entry-csv')?.addEventListener('click', downloadEntryCsv_);
   id_('modal-entry-close')?.addEventListener('click', () => { id_('modal-entry').style.display = 'none'; });
+  id_('btn-copy-entry-url')?.addEventListener('click', () => {
+    const txt = id_('entry-form-url')?.textContent;
+    if (txt && !txt.startsWith('（') && txt !== '—') copyText_(txt);
+  });
 
   // 準備中ボタン: トースト案内
   document.addEventListener('click', e => {
@@ -175,6 +179,7 @@ function route_() {
     loadUniversities_();
   } else if (section === 'entries') {
     showPage_('entries');
+    updateEntryFormUrl_();
     loadCompanyEntries_();
   } else {
     showPage_('dashboard');
@@ -969,6 +974,13 @@ async function handleGenerateKeys_() {
   btn.disabled = false; btn.textContent = '🔑 未発行キーを一括発行';
   if (res.ok) { showToast_('✓ キーを発行しました'); loadCompanies_(); }
   else showToast_('⚠ 失敗: ' + (res.message || ''));
+}
+
+function updateEntryFormUrl_() {
+  const el = id_('entry-form-url');
+  if (!el) return;
+  const url = location.origin + location.pathname.replace(/[^/]+$/, 'company-entry.html');
+  el.innerHTML = `<a href="${url}" target="_blank" class="url-anchor">${url}</a>`;
 }
 
 function updatePreRegFormUrl_() {
