@@ -13,6 +13,13 @@ document.getElementById('btn-retry')?.addEventListener('click', () => {
   showState('form');
 });
 
+// メールアドレス欄はコピー＆ペースト・ドラッグ＆ドロップを禁止し、確実に手入力させる
+['f-email', 'f-email-confirm'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  ['paste', 'drop'].forEach(ev => el.addEventListener(ev, e => e.preventDefault()));
+});
+
 // 成功画面のマイページリンク組み立て用に、解決済みイベントIDを保持
 let pageEvent_ = null;
 
@@ -151,6 +158,15 @@ function validateForm_() {
   const email = val_('f-email').trim();
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     showErr_('err-email', 'f-email'); ok = false;
+  }
+  // メールアドレス（確認）: 必須 + 上の入力と完全一致
+  const emailConfirm = val_('f-email-confirm').trim();
+  if (!emailConfirm) {
+    setErrText_('err-email-confirm', '確認のためもう一度入力してください');
+    showErr_('err-email-confirm', 'f-email-confirm'); ok = false;
+  } else if (email !== emailConfirm) {
+    setErrText_('err-email-confirm', 'メールアドレスが一致しません');
+    showErr_('err-email-confirm', 'f-email-confirm'); ok = false;
   }
   // 電話番号: 必須 + ハイフン無し半角数字のみ（フォーム規則）
   const phone = val_('f-phone').trim();

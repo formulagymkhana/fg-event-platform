@@ -90,6 +90,13 @@ let _formConfig = {};
 
 $('btn-submit')?.addEventListener('click', submitForm);
 
+// メールアドレス欄はコピー＆ペースト・ドラッグ＆ドロップを禁止し、確実に手入力させる
+['f-email', 'f-email-confirm'].forEach(id => {
+  const el = $(id);
+  if (!el) return;
+  ['paste', 'drop'].forEach(ev => el.addEventListener(ev, e => e.preventDefault()));
+});
+
 // ── 参加区分による分岐表示 ──────────────────────
 const BRANCH_BY_CAT = {
   '出場選手(FGクラスドライバー)':       'sec-fg',
@@ -286,6 +293,7 @@ function collect() {
     gender:     $('f-gender').value,
     birthday:   $('f-birthday').value,
     email:      $('f-email').value.trim(),
+    emailConfirm: $('f-email-confirm').value.trim(),
     phone:      $('f-phone').value.trim(),
     postal:     $('f-postal').value.trim(),
     prefecture: $('f-prefecture').value,
@@ -309,6 +317,7 @@ function validate(d) {
   fail('gender',     !d.gender);
   fail('birthday',   !d.birthday);
   fail('email',      !EMAIL_RE.test(d.email));
+  fail('email-confirm', !d.emailConfirm || d.email !== d.emailConfirm);
   fail('phone',      !PHONE_RE.test(d.phone));
   fail('postal',     !POSTAL_RE.test(d.postal));
   fail('prefecture', !d.prefecture);

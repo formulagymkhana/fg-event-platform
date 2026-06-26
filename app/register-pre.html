@@ -210,6 +210,12 @@
           <p class="field-err" id="err-email">有効なメールアドレスを入力してください</p>
         </div>
         <div class="form-row">
+          <label>メールアドレス（確認）<span class="req">*</span></label>
+          <input type="email" id="f-email-confirm" placeholder="もう一度入力してください" autocomplete="off" inputmode="email">
+          <p class="hint">入力ミス防止のため、コピー＆ペーストせず再度ご入力ください</p>
+          <p class="field-err" id="err-email-confirm">メールアドレスが一致しません</p>
+        </div>
+        <div class="form-row">
           <label>電話番号<span class="req">*</span></label>
           <input type="tel" id="f-phone" placeholder="例：09012345678" autocomplete="tel" inputmode="numeric" maxlength="11">
           <p class="hint">ハイフン無しの半角数字（10〜11桁）</p>
@@ -584,6 +590,6 @@
 
   <script src="../js/config.js?v=20260612f"></script>
   <script src="../js/api.js?v=20260612f"></script>
-  <script src="../js/register-pre.js?v=20260612f"></script>
+  <script src="../js/register-pre.js?v=20260624f"></script>
 </body>
 </html>
