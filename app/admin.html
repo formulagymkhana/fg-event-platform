@@ -12,7 +12,7 @@
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src 'self' https://fonts.gstatic.com;">
   <title>FG 管理パネル</title>
-  <link rel="stylesheet" href="../js/style.css?v=20260624d">
+  <link rel="stylesheet" href="../js/style.css?v=20260626a">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     :root{
@@ -56,6 +56,7 @@
       display:flex;align-items:center;height:48px;position:sticky;top:0;z-index:100;gap:10px}
     .app-logo{font-size:11px;font-weight:700;letter-spacing:.15em;color:#111827;flex:1}
     .app-logo span{background:var(--fg-blue);color:#fff;padding:1px 5px;border-radius:2px;margin-left:2px}
+    .app-logo-img{height:26px;width:auto;display:block}
     .hd-btn{background:#fff;border:1px solid var(--border);color:var(--gray);
       font-size:11px;padding:5px 10px;border-radius:5px;cursor:pointer;white-space:nowrap}
 
@@ -278,7 +279,7 @@
   <div class="login-wrap">
     <div class="login-card">
       <div class="login-hd">
-        <div class="fg-logo"><div class="fg-logo-mark">FORMULA <span>GYMKHANA</span></div><div class="fg-logo-sub">College Students RD</div></div>
+        <div class="fg-logo"><img class="fg-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
         <div class="login-sub">管理パネル</div>
       </div>
       <div class="login-bd" id="login-panel">
@@ -322,7 +323,7 @@
   ───────────────────────────────────── -->
   <div id="page-events">
     <header class="app-hd">
-      <div class="app-logo">FORMULA <span>GYMKHANA</span></div>
+      <div class="app-logo"><img class="app-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
       <a class="hd-btn" href="#settings">⚙ 設定</a>
       <button class="hd-btn" id="btn-logout">ログアウト</button>
     </header>
