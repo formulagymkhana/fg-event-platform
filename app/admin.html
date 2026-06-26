@@ -281,13 +281,34 @@
         <div class="fg-logo"><div class="fg-logo-mark">FORMULA <span>GYMKHANA</span></div><div class="fg-logo-sub">College Students RD</div></div>
         <div class="login-sub">管理パネル</div>
       </div>
-      <div class="login-bd">
+      <div class="login-bd" id="login-panel">
         <div class="login-icon">🔐</div>
         <p class="login-desc">GASスクリプトプロパティの<br><strong>ADMIN_KEY</strong> を入力してください</p>
         <label class="f-label" for="login-key">ADMIN KEY</label>
         <input type="password" class="f-input" id="login-key" placeholder="管理者キー" autocomplete="current-password">
         <p class="f-err" id="login-err"></p>
         <button class="primary-btn" id="btn-login">ログイン</button>
+        <p style="text-align:center;margin-top:14px">
+          <a href="#" id="link-forgot" style="font-size:12px;color:var(--fg-blue);text-decoration:underline">パスワードをお忘れですか？</a>
+        </p>
+      </div>
+
+      <!-- パスワード復旧（メール宛リセット） -->
+      <div class="login-bd" id="reset-panel" style="display:none">
+        <div class="login-icon">✉️</div>
+        <p class="login-desc">登録済みの<strong>復旧用メール</strong>に<br>再設定コードを送信します。</p>
+        <button class="primary-btn" id="btn-reset-send" style="margin-bottom:8px">復旧コードを送信</button>
+        <p class="login-desc" id="reset-sent-note" style="display:none;color:var(--green)">✓ 送信しました。メールが届かない場合は復旧用メールが未設定です（手順書参照）。</p>
+
+        <label class="f-label" for="reset-code" style="margin-top:8px">再設定コード（メール記載・8文字）</label>
+        <input type="text" class="f-input" id="reset-code" placeholder="例: A3F90B2C" autocomplete="off" maxlength="8" style="text-transform:uppercase;letter-spacing:.15em">
+        <label class="f-label" for="reset-newkey">新しい管理者キー</label>
+        <input type="password" class="f-input" id="reset-newkey" placeholder="新しいパスワード" autocomplete="new-password">
+        <p class="f-err" id="reset-err"></p>
+        <button class="primary-btn" id="btn-reset-confirm">パスワードを再設定</button>
+        <p style="text-align:center;margin-top:14px">
+          <a href="#" id="link-back-login" style="font-size:12px;color:var(--gray);text-decoration:underline">ログインに戻る</a>
+        </p>
       </div>
     </div>
   </div>
@@ -821,6 +842,6 @@
 <div class="toast" id="toast"></div>
 <script src="../js/vendor/qrcode.min.js"></script>
 <script src="../js/config.js?v=20260623a"></script>
-<script src="../js/admin.js?v=20260624d"></script>
+<script src="../js/admin.js?v=20260624g"></script>
 </body>
 </html>

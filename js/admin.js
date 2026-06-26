@@ -21,6 +21,12 @@ window.addEventListener('DOMContentLoaded', () => {
   id_('btn-login')?.addEventListener('click', handleLogin_);
   id_('login-key')?.addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin_(); });
 
+  // パスワード復旧（メール宛リセット）
+  id_('link-forgot')?.addEventListener('click', e => { e.preventDefault(); toggleResetPanel_(true); });
+  id_('link-back-login')?.addEventListener('click', e => { e.preventDefault(); toggleResetPanel_(false); });
+  id_('btn-reset-send')?.addEventListener('click', handleResetSend_);
+  id_('btn-reset-confirm')?.addEventListener('click', handleResetConfirm_);
+
   // Logout (イベント一覧ページ)
   id_('btn-logout')?.addEventListener('click', handleLogout_);
 
@@ -1024,6 +1030,72 @@ async function handleChangeKey_() {
   } else {
     fb.textContent = '⚠ 失敗: ' + (res.message || '');
     fb.className = 'save-fb err';
+  }
+}
+
+// ── パスワード復旧（メール宛リセット） ──────────────
+// 認証不要の公開アクション。コード/新キーはURLに載せないため POST で送信。
+async function publicPost_(action, params) {
+  try {
+    const ctrl  = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 20000);
+    const res   = await fetch(FG_CONFIG.API_BASE_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action, ...params }),
+      redirect: 'follow',
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    return await res.json();
+  } catch (e) {
+    if (e.name === 'AbortError') return { ok: false, error: 'timeout', message: 'タイムアウト' };
+    return { ok: false, error: 'network_error', message: '通信エラー' };
+  }
+}
+
+function toggleResetPanel_(show) {
+  id_('login-panel').style.display = show ? 'none' : '';
+  id_('reset-panel').style.display = show ? '' : 'none';
+  id_('reset-err')?.classList.remove('show');
+}
+
+async function handleResetSend_() {
+  const btn = id_('btn-reset-send');
+  btn.disabled = true; btn.textContent = '送信中...';
+  // サーバは（メール未設定でも情報を漏らさないため）常に成功を返す
+  await publicPost_('adminRequestReset', {});
+  btn.disabled = false; btn.textContent = '復旧コードを再送信';
+  const note = id_('reset-sent-note');
+  if (note) note.style.display = '';
+}
+
+async function handleResetConfirm_() {
+  const code   = getVal_('reset-code').trim().toUpperCase();
+  const newKey = getVal_('reset-newkey').trim();
+  const err    = id_('reset-err');
+  err.classList.remove('show');
+
+  if (!code || !newKey) {
+    err.textContent = 'コードと新しいキーを入力してください';
+    err.classList.add('show'); return;
+  }
+
+  const btn = id_('btn-reset-confirm');
+  btn.disabled = true; btn.textContent = '再設定中...';
+  const res = await publicPost_('adminConfirmReset', { code, newKey });
+  btn.disabled = false; btn.textContent = 'パスワードを再設定';
+
+  if (res.ok) {
+    // 再設定成功 → ログイン画面に戻し、新キーで入れる状態にする
+    toggleResetPanel_(false);
+    setVal_('reset-code', ''); setVal_('reset-newkey', '');
+    id_('reset-sent-note').style.display = 'none';
+    setVal_('login-key', newKey);
+    showLoginErr_('✓ パスワードを再設定しました。このキーでログインしてください。');
+    id_('login-err')?.classList.add('show');
+  } else {
+    err.textContent = '⚠ ' + (res.message || '再設定に失敗しました');
+    err.classList.add('show');
   }
 }
 

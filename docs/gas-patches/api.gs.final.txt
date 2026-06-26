@@ -95,6 +95,9 @@ function dispatch_(e) {
       case 'registerPreStudent':      return actionRegisterPreStudent_(p); // 事前登録(脱Googleフォーム)
       case 'getFormConfig':           return actionGetFormConfig_(p);      // 事前登録フォーム設定(公開)
       case 'getSchoolList':           return actionGetSchoolList_(p);      // 大学候補リスト(公開)
+      // 管理者パスワード復旧(公開・ロックアウト時用。認証不要)
+      case 'adminRequestReset':       return actionAdminRequestReset_(p);
+      case 'adminConfirmReset':       return actionAdminConfirmReset_(p);
       // ── admin (T12) ───────────────────────────────────────────────────
       case 'adminGetEvents':    return actionAdminGetEvents_(p);
       case 'adminGetConfig':    return actionAdminGetConfig_(p);
@@ -914,6 +917,11 @@ function err_(code) {
     invalid_reading:          '読みの頭文字が判定できません',
     university_not_found:      '対象の大学が見つかりません',
     no_events:             'イベントが1件も登録されていません',
+    // 管理者パスワード復旧
+    reset_not_requested:   '再設定コードが発行されていません。先にコードを送信してください',
+    reset_expired:         '再設定コードの有効期限が切れています。もう一度送信してください',
+    reset_locked:          '試行回数の上限を超えました。もう一度コードを送信してください',
+    reset_invalid_code:    '再設定コードが正しくありません',
     server_error:          'サーバーエラーが発生しました',
   };
   return { ok: false, error: code, message: MSG[code] || code };
@@ -2060,6 +2068,124 @@ function actionAdminUpdateKey_(p) {
   if (!p.newKey) return err_('missing_params');
   PropertiesService.getScriptProperties().setProperty('ADMIN_KEY', String(p.newKey));
   return ok_({ updated: true });
+}
+
+// ============================================================
+// 管理者パスワード復旧（メール宛リセット）
+// ロックアウト時用の公開フロー。認証は「事前設定した復旧用メール受信」で担保。
+//   1) adminRequestReset … 復旧用メールへ再設定コードを送信
+//   2) adminConfirmReset  … コード＋新パスワードで ADMIN_KEY を再設定
+// 最終フォールバックとして resetAdminKey()（エディタ実行）も用意。
+// ============================================================
+
+var ADMIN_RESET_TTL_MS_    = 15 * 60 * 1000;  // コード有効期限: 15分
+var ADMIN_RESET_RESEND_MS_ = 60 * 1000;       // 再送制限: 60秒
+var ADMIN_RESET_MAX_TRIES_ = 5;               // 検証失敗の上限
+
+// 暗号学的乱数(UUID)由来の8文字コード（紛らわしい文字を避けるため16進大文字）
+function genResetCode_() {
+  return Utilities.getUuid().replace(/-/g, '').slice(0, 8).toUpperCase();
+}
+
+function sha256Hex_(s) {
+  var bytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256, String(s), Utilities.Charset.UTF_8);
+  return bytes.map(function (b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('');
+}
+
+function clearAdminReset_() {
+  var props = PropertiesService.getScriptProperties();
+  ['ADMIN_RESET_HASH', 'ADMIN_RESET_EXPIRES', 'ADMIN_RESET_ATTEMPTS', 'ADMIN_RESET_SENT_AT']
+    .forEach(function (k) { props.deleteProperty(k); });
+}
+
+// 公開: 復旧用メール宛に再設定コードを送信
+function actionAdminRequestReset_(p) {
+  var props = PropertiesService.getScriptProperties();
+  var email = props.getProperty('ADMIN_RECOVERY_EMAIL');
+  // 復旧用メール未設定でも、設定有無を外部に漏らさないため一律 ok を返す
+  if (!email) return ok_({ requested: true });
+  // 再送レート制限（連続送信によるメール爆撃を防ぐ）
+  var lastSent = Number(props.getProperty('ADMIN_RESET_SENT_AT') || 0);
+  if (Date.now() - lastSent < ADMIN_RESET_RESEND_MS_) return ok_({ requested: true });
+
+  var code = genResetCode_();
+  props.setProperty('ADMIN_RESET_HASH', sha256Hex_(code));   // 平文は保存しない
+  props.setProperty('ADMIN_RESET_EXPIRES', String(Date.now() + ADMIN_RESET_TTL_MS_));
+  props.setProperty('ADMIN_RESET_ATTEMPTS', '0');
+  props.setProperty('ADMIN_RESET_SENT_AT', String(Date.now()));
+
+  try {
+    MailApp.sendEmail({
+      to: String(email),
+      subject: '【FG管理パネル】パスワード再設定コード',
+      body: [
+        '管理パネルのパスワード再設定がリクエストされました。',
+        '',
+        '再設定コード: ' + code,
+        '（有効期限: 15分・1回限り有効）',
+        '',
+        '管理パネルのログイン画面で、このコードと新しいパスワードを入力してください。',
+        'お心当たりがない場合は、このメールを破棄してください。',
+        '',
+        '── FORMULA GYMKHANA 事務局システム',
+      ].join('\n'),
+    });
+  } catch (err) {
+    console.error('actionAdminRequestReset_ mail error:', err);
+  }
+  return ok_({ requested: true });
+}
+
+// 公開: コード＋新パスワードで ADMIN_KEY を再設定
+function actionAdminConfirmReset_(p) {
+  if (!p.code || !p.newKey) return err_('missing_params');
+  var props = PropertiesService.getScriptProperties();
+  var hash  = props.getProperty('ADMIN_RESET_HASH');
+  var exp   = Number(props.getProperty('ADMIN_RESET_EXPIRES') || 0);
+  var tries = Number(props.getProperty('ADMIN_RESET_ATTEMPTS') || 0);
+
+  if (!hash || !exp)            return err_('reset_not_requested');
+  if (Date.now() > exp)         { clearAdminReset_(); return err_('reset_expired'); }
+  if (tries >= ADMIN_RESET_MAX_TRIES_) { clearAdminReset_(); return err_('reset_locked'); }
+
+  if (sha256Hex_(String(p.code).trim().toUpperCase()) !== hash) {
+    props.setProperty('ADMIN_RESET_ATTEMPTS', String(tries + 1));
+    return err_('reset_invalid_code');
+  }
+
+  props.setProperty('ADMIN_KEY', String(p.newKey).trim());
+  clearAdminReset_();
+  return ok_({ reset: true });
+}
+
+// ── GASエディタから直接実行する保守用関数（最終フォールバック） ──
+// Apps Scriptエディタで関数を選んで実行する。GASを所有するGoogleアカウントでのみ
+// 実行可能なため、パネルから締め出されても確実に復旧できる。
+// 使い方: 関数 resetAdminKey を選び実行 → 実行ログに新しいキーが出る。
+//        引数付きで呼ぶには一時的に resetAdminKey('好きなキー') と書いて実行。
+function resetAdminKey(newKey) {
+  var key = (newKey && String(newKey).trim()) || (genResetCode_() + genResetCode_());
+  PropertiesService.getScriptProperties().setProperty('ADMIN_KEY', String(key));
+  clearAdminReset_();
+  Logger.log('ADMIN_KEY を再設定しました。新しいキー: ' + key);
+  return key;
+}
+
+// 復旧用メールアドレスを設定する（メール宛リセットを使う前に一度実行）。
+// 使い方: setAdminRecoveryEmail('you@example.com') と書いて実行。
+function setAdminRecoveryEmail(email) {
+  if (!email) { Logger.log('使い方: setAdminRecoveryEmail("you@example.com")'); return; }
+  PropertiesService.getScriptProperties().setProperty('ADMIN_RECOVERY_EMAIL', String(email).trim());
+  Logger.log('復旧用メールを設定しました: ' + email);
+}
+
+// 現在の復旧用メールアドレスを確認する。
+function showAdminRecoveryEmail() {
+  var e = PropertiesService.getScriptProperties().getProperty('ADMIN_RECOVERY_EMAIL');
+  Logger.log(e ? ('復旧用メール: ' + e)
+              : '復旧用メールは未設定です。setAdminRecoveryEmail("you@example.com") で設定してください。');
+  return e;
 }
 
 // 前回イベントから企業を引き継ぎ（stampKey/viewKey/logoUrl を保持）
