@@ -205,6 +205,11 @@ const FG_API = (() => {
     return postCall_('registerPreStudent', params);
   }
 
+  /** 企業ブース出展申込（公開）。POST送信。params.event を含めること。 */
+  function submitCompanyEntry(params) {
+    return postCall_('submitCompanyEntry', params);
+  }
+
   // ── 景品交換API(スタッフ用) ──────────────────
 
   /** 学生cardTokenとスタッフキーで景品交換状況を取得 */
@@ -310,6 +315,8 @@ const FG_API = (() => {
     registerPreStudent,
     getFormConfig,
     getSchoolList,
+    // 企業出展申込
+    submitCompanyEntry,
     // 企業閲覧
     getCompanyView,
     getCompanyStampVisitors,

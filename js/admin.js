@@ -77,6 +77,10 @@ window.addEventListener('DOMContentLoaded', () => {
   id_('btn-entry-reload')?.addEventListener('click', loadCompanyEntries_);
   id_('btn-entry-csv')?.addEventListener('click', downloadEntryCsv_);
   id_('modal-entry-close')?.addEventListener('click', () => { id_('modal-entry').style.display = 'none'; });
+  id_('modal-entry-body')?.addEventListener('click', e => {
+    const btn = e.target.closest('[data-copy]');
+    if (btn) copyText_(btn.dataset.copy);
+  });
   id_('btn-copy-entry-url')?.addEventListener('click', () => {
     const txt = id_('entry-form-url')?.textContent;
     if (txt && !txt.startsWith('（') && txt !== '—') copyText_(txt);
@@ -979,7 +983,9 @@ async function handleGenerateKeys_() {
 function updateEntryFormUrl_() {
   const el = id_('entry-form-url');
   if (!el) return;
-  const url = location.origin + location.pathname.replace(/[^/]+$/, 'company-entry.html');
+  if (!curEvent_) { el.textContent = '（イベント未選択）'; return; }
+  const base = location.origin + location.pathname.replace(/[^/]+$/, 'company-entry.html');
+  const url = `${base}?event=${encodeURIComponent(curEvent_)}`;
   el.innerHTML = `<a href="${url}" target="_blank" class="url-anchor">${url}</a>`;
 }
 
@@ -1576,81 +1582,103 @@ async function loadCompanyEntries_() {
 
 function renderEntries_(entries) {
   const sumN = k => entries.reduce((s, e) => s + (Number(e[k]) || 0), 0);
-  const boothCount = entries.filter(e => e['ブース区画'] === 'あり').length;
-  const demoCount  = entries.filter(e => e['デモ走行'] === 'あり').length;
 
-  setText_('es-total', entries.length);
-  setText_('es-booth', boothCount);
-  setText_('es-car',   sumN('展示車両数'));
-  setText_('es-demo',  demoCount);
-  setText_('es-ppass', sumN('人パス'));
-  setText_('es-cpass', sumN('車両パス'));
-  setText_('es-lsat',  sumN('昼食土'));
-  setText_('es-lsun',  sumN('昼食日'));
-  id_('entry-summary').style.display = '';
+  id_('entry-summary').style.display = entries.length ? '' : 'none';
   id_('entry-section').style.display = '';
   setText_('entry-list-count', entries.length + '件');
 
-  const tbody = id_('entry-tbody');
+  if (entries.length) {
+    setText_('es-total', entries.length);
+    setText_('es-booth', entries.filter(e => e['ブース区画'] === 'あり').length);
+    setText_('es-car',   sumN('展示車両数'));
+    setText_('es-demo',  entries.filter(e => e['デモ走行'] === 'あり').length);
+    setText_('es-ppass', sumN('人パス'));
+    setText_('es-cpass', sumN('車両パス'));
+    setText_('es-lsat',  sumN('昼食土'));
+    setText_('es-lsun',  sumN('昼食日'));
+  }
+
+  const list = id_('entry-card-list');
+  if (!list) return;
+
   if (!entries.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="empty-msg">出展申込はまだありません</td></tr>';
+    list.innerHTML = '<p class="empty-msg">出展申込はまだありません</p>';
     return;
   }
 
-  const demoCell = v => v === 'あり' ? '<span style="color:var(--fg-success);font-weight:700">あり</span>'
-                      : v === '未定'  ? '<span style="color:var(--fg-warning);font-weight:700">未定</span>'
-                      : (v || '—');
+  const demoChip = v => {
+    if (v === 'あり') return '<span class="entry-chip demo-yes">デモ: あり</span>';
+    if (v === '未定') return '<span class="entry-chip demo-maybe">デモ: 未定</span>';
+    return '<span class="entry-chip">デモ: なし</span>';
+  };
 
-  tbody.innerHTML = entries.map((e, i) => `
-    <tr style="cursor:pointer" data-idx="${i}">
-      <td style="font-weight:700">${esc_(e['社名略称'] || e['企業名正式'])}</td>
-      <td style="font-size:10px;color:var(--gray)">${esc_(e['企業名正式'])}</td>
-      <td style="font-size:11px">${esc_(e['担当者名'])}</td>
-      <td style="text-align:center">${e['ブース区画'] === 'あり' ? '✓' : '—'}</td>
-      <td style="text-align:center">${e['展示車両数'] || 0}</td>
-      <td style="text-align:center">${demoCell(e['デモ走行'])}</td>
-      <td style="text-align:center">${e['人パス'] || 0}</td>
-      <td style="text-align:center">${e['車両パス'] || 0}</td>
-      <td style="text-align:center">${e['昼食土'] || 0}</td>
-      <td style="text-align:center">${e['昼食日'] || 0}</td>
-    </tr>`).join('');
+  list.innerHTML = entries.map((e, i) => {
+    const lunchTotal = (Number(e['昼食土']) || 0) + (Number(e['昼食日']) || 0);
+    const boothClass = e['ブース区画'] === 'あり' ? 'entry-chip booth-yes' : 'entry-chip';
+    return `
+      <div class="entry-card" data-idx="${i}">
+        <div class="entry-card-top">
+          <span class="entry-card-name">${esc_(e['社名略称'] || e['企業名正式'] || '—')}</span>
+          ${demoChip(e['デモ走行'])}
+        </div>
+        <div class="entry-card-contact">${esc_(e['担当者名'] || '—')} / ${esc_(e['電話番号'] || '—')}</div>
+        <div class="entry-card-chips">
+          <span class="${boothClass}">ブース: ${e['ブース区画'] || '—'}</span>
+          <span class="entry-chip">展示 ${Number(e['展示車両数']) || 0}台</span>
+          <span class="entry-chip">人P:${Number(e['人パス']) || 0} 車P:${Number(e['車両パス']) || 0}</span>
+          <span class="entry-chip">昼食 ${lunchTotal}食</span>
+        </div>
+      </div>`;
+  }).join('');
 
-  tbody.querySelectorAll('tr').forEach(tr => {
-    tr.addEventListener('click', () => showEntryDetail_(companyEntries_[+tr.dataset.idx]));
+  list.querySelectorAll('.entry-card').forEach(card => {
+    card.addEventListener('click', () => showEntryDetail_(companyEntries_[+card.dataset.idx]));
   });
 }
 
 function showEntryDetail_(e) {
-  const row = (k, v) => v !== undefined && v !== '' && v !== null
-    ? `<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:2px">${esc_(k)}</div><div style="font-size:13px;line-height:1.6">${esc_(String(v))}</div></div>`
-    : '';
+  const drow = (lbl, val, copyVal) => {
+    if (val === undefined || val === null || val === '') return '';
+    const copy = copyVal ? ` <button class="detail-copy" data-copy="${esc_(String(copyVal))}">コピー</button>` : '';
+    return `<div class="detail-row"><span class="detail-lbl">${esc_(lbl)}</span><span class="detail-val">${esc_(String(val))}${copy}</span></div>`;
+  };
+  const grp = (title, rows) => `<div class="detail-group"><div class="detail-group-title">${title}</div>${rows}</div>`;
 
-  id_('modal-entry-title').textContent = (e['社名略称'] || e['企業名正式']) + ' 申込詳細';
+  id_('modal-entry-title').textContent = (e['社名略称'] || e['企業名正式'] || '') + ' 申込詳細';
   id_('modal-entry-body').innerHTML = [
-    row('企業名（正式）', e['企業名正式']),
-    row('社名略称',       e['社名略称']),
-    row('代表者名',       e['代表者名']),
-    row('担当者名',       e['担当者名']),
-    row('電話番号',       e['電話番号']),
-    row('担当者電話',     e['担当者電話']),
-    row('メールアドレス', e['メールアドレス']),
-    row('郵便番号',       e['郵便番号']),
-    row('住所',           (e['都道府県'] || '') + (e['住所'] || '')),
-    '<hr style="border:none;border-top:1px solid var(--fg-line);margin:12px 0">',
-    row('出展内容',       e['出展内容']),
-    row('ブース区画',     e['ブース区画']),
-    row('展示車両数',     e['展示車両数'] + '台'),
-    row('デモ走行',       e['デモ走行']),
-    row('デモ走行詳細',   e['デモ走行詳細']),
-    '<hr style="border:none;border-top:1px solid var(--fg-line);margin:12px 0">',
-    row('人パス',   e['人パス'] + '枚'),
-    row('車両パス', e['車両パス'] + '枚'),
-    row('昼食（土）', e['昼食土'] + '食'),
-    row('昼食（日）', e['昼食日'] + '食'),
-    row('備考',     e['備考']),
-    '<hr style="border:none;border-top:1px solid var(--fg-line);margin:12px 0">',
-    row('申込日時', e['申込日時']),
-    row('状態',     e['状態']),
+    grp('企業情報', [
+      drow('正式名称', e['企業名正式']),
+      drow('社名略称', e['社名略称']),
+      drow('代表者名', e['代表者名']),
+      drow('担当者名', e['担当者名']),
+    ].join('')),
+    grp('連絡先', [
+      drow('代表電話', e['電話番号'], e['電話番号']),
+      drow('担当者電話', e['担当者電話'], e['担当者電話']),
+      drow('メール', e['メールアドレス'], e['メールアドレス']),
+    ].join('')),
+    grp('送付先住所', [
+      drow('郵便番号', e['郵便番号']),
+      drow('住所', (e['都道府県'] || '') + (e['住所'] || '')),
+    ].join('')),
+    grp('出展内容', [
+      drow('出展内容', e['出展内容']),
+      drow('ブース区画', e['ブース区画']),
+      drow('展示車両数', (Number(e['展示車両数']) || 0) + '台'),
+      drow('デモ走行', e['デモ走行']),
+      drow('デモ走行詳細', e['デモ走行詳細']),
+    ].join('')),
+    grp('パス・昼食', [
+      drow('人パス', (Number(e['人パス']) || 0) + '枚'),
+      drow('車両パス', (Number(e['車両パス']) || 0) + '枚'),
+      drow('昼食（土）', (Number(e['昼食土']) || 0) + '食'),
+      drow('昼食（日）', (Number(e['昼食日']) || 0) + '食'),
+      drow('備考', e['備考']),
+    ].join('')),
+    grp('申込情報', [
+      drow('申込日時', e['申込日時']),
+      drow('状態', e['状態']),
+    ].join('')),
   ].join('');
   id_('modal-entry').style.display = '';
 }

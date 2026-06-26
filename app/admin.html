@@ -265,6 +265,27 @@
       border-radius:50%;animation:spin .8s linear infinite;margin:12px auto}
     @keyframes spin{to{transform:rotate(360deg)}}
     .loading-msg{text-align:center;color:var(--gray);font-size:13px;padding:28px}
+    /* ── 出展申込カード ── */
+    .entry-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;cursor:pointer;transition:border-color .15s}
+    .entry-card:hover{border-color:var(--navy)}
+    .entry-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
+    .entry-card-name{font-size:14px;font-weight:700;color:var(--navy)}
+    .entry-card-contact{font-size:12px;color:var(--gray);margin-bottom:8px}
+    .entry-card-chips{display:flex;gap:6px;flex-wrap:wrap}
+    .entry-chip{font-size:11px;font-weight:600;padding:3px 9px;border-radius:100px;background:var(--gray-light);color:var(--gray)}
+    .entry-chip.booth-yes{background:#EBF2FF;color:var(--navy)}
+    .entry-chip.demo-yes{background:var(--fg-success-bg,#EAF8F0);color:var(--fg-success,#1A6640)}
+    .entry-chip.demo-maybe{background:var(--fg-warning-bg);color:var(--fg-warning)}
+    /* ── 詳細モーダル グループ ── */
+    .detail-group{margin-bottom:14px}
+    .detail-group:last-child{margin-bottom:0}
+    .detail-group-title{font-size:10px;font-weight:700;color:var(--gray);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+    .detail-row{display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--gray-light);font-size:13px}
+    .detail-row:last-child{border-bottom:none}
+    .detail-lbl{font-size:11px;color:var(--gray);width:78px;flex-shrink:0;padding-top:1px}
+    .detail-val{flex:1;color:var(--fg-text);line-height:1.5;word-break:break-all}
+    .detail-copy{padding:2px 8px;border:1px solid var(--border);border-radius:4px;font-size:10px;background:#fff;color:var(--navy);cursor:pointer;margin-left:4px;flex-shrink:0;white-space:nowrap}
+
     .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
       background:var(--navy);color:#fff;padding:9px 18px;border-radius:20px;
       font-size:13px;font-weight:600;z-index:300;opacity:0;transition:opacity .2s;
@@ -791,32 +812,14 @@
         </div>
       </div>
 
-      <!-- 一覧テーブル -->
+      <!-- 申込カード一覧 -->
       <div class="section" id="entry-section" style="display:none">
         <div class="section-hd" data-section="entry-list">
           <span class="section-title">📋 申込一覧 <span class="section-count" id="entry-list-count"></span></span>
           <span class="section-toggle" id="toggle-entry-list">▼</span>
         </div>
         <div class="section-body open" id="body-entry-list">
-          <div class="tbl-wrap">
-            <table class="data-tbl">
-              <thead>
-                <tr>
-                  <th>略称</th>
-                  <th>正式名称</th>
-                  <th>担当者</th>
-                  <th>ブース</th>
-                  <th>展示</th>
-                  <th>デモ</th>
-                  <th>人P</th>
-                  <th>車P</th>
-                  <th>昼土</th>
-                  <th>昼日</th>
-                </tr>
-              </thead>
-              <tbody id="entry-tbody"></tbody>
-            </table>
-          </div>
+          <div id="entry-card-list"></div>
         </div>
       </div>
 
@@ -932,6 +935,6 @@
 <div class="toast" id="toast"></div>
 <script src="../js/vendor/qrcode.min.js"></script>
 <script src="../js/config.js?v=20260623a"></script>
-<script src="../js/admin.js?v=20260626d"></script>
+<script src="../js/admin.js?v=20260626e"></script>
 </body>
 </html>
