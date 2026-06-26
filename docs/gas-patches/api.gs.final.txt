@@ -24,6 +24,7 @@ const SHEET = {
   EVENT_LIST:         'イベント一覧',
   UNI_MASTER:         '大学マスター',
   PRE_REG:            '事前登録',
+  COMPANY_ENTRIES:    '出展申込',
 };
 
 // 事前登録シートのフル列（共通＋区分別＋同意＋ファイルURL）
@@ -96,6 +97,7 @@ function dispatch_(e) {
       case 'getFormConfig':           return actionGetFormConfig_(p);      // 事前登録フォーム設定(公開)
       case 'getSchoolList':           return actionGetSchoolList_(p);      // 大学候補リスト(公開)
       // 管理者パスワード復旧(公開・ロックアウト時用。認証不要)
+      case 'submitCompanyEntry':      return actionSubmitCompanyEntry_(p);
       case 'adminRequestReset':       return actionAdminRequestReset_(p);
       case 'adminConfirmReset':       return actionAdminConfirmReset_(p);
       // ── admin (T12) ───────────────────────────────────────────────────
@@ -123,6 +125,7 @@ function dispatch_(e) {
       case 'adminGetPendingUniversities': return actionAdminGetPendingUniversities_(p);
       case 'adminConfirmUniversity':      return actionAdminConfirmUniversity_(p);
       case 'adminUpdateStudent':          return actionAdminUpdateStudent_(p);
+      case 'adminGetCompanyEntries':      return actionAdminGetCompanyEntries_(p);
       default:                        return err_('unknown_action');
     }
   } catch (e) {
@@ -2241,4 +2244,103 @@ function actionAdminGenerateKeys_(p) {
   if (!p.event) return err_('missing_event');
   generateCompanyKeys(p.event);
   return ok_({ generated: true });
+}
+
+// ============================================================
+// アクション: submitCompanyEntry（企業ブース出展申込・公開POST）
+// ============================================================
+
+function actionSubmitCompanyEntry_(p) {
+  const required = ['companyName','director','contact','tel','contactTel','email','zip','address','content','booth','demo'];
+  for (const f of required) if (!p[f]) return err_('missing_params');
+
+  // イベント解決: パラメータ優先、なければ当日のアクティブイベント
+  let eventId = p.event;
+  if (!eventId) {
+    const evSheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+    if (!evSheet || evSheet.getLastRow() < 2) return err_('no_active_event');
+    const evData    = evSheet.getDataRange().getValues();
+    const evHeaders = evData[0].map(String);
+    const idCol     = evHeaders.indexOf('eventId');
+    const startCol  = evHeaders.indexOf('開始日');
+    const endCol    = evHeaders.indexOf('終了日');
+    const statCol   = evHeaders.indexOf('状態');
+    const today = new Date(); today.setHours(0,0,0,0);
+    const evRow = evData.slice(1).find(r => {
+      if (statCol >= 0 && (r[statCol] === '公開停止' || r[statCol] === '完了')) return false;
+      const s = new Date(r[startCol]); s.setHours(0,0,0,0);
+      const e = new Date(r[endCol]);   e.setHours(23,59,59,999);
+      return today >= s && today <= e;
+    });
+    if (!evRow) return err_('no_active_event');
+    eventId = String(evRow[idCol]);
+  }
+
+  const ss    = eventSs_(eventId);
+  let   sheet = ss.getSheetByName(SHEET.COMPANY_ENTRIES);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET.COMPANY_ENTRIES);
+    sheet.appendRow([
+      '申込日時','eventId','企業名','代表者名','担当者名',
+      '電話番号','担当者電話','メールアドレス',
+      '郵便番号','住所','出展内容',
+      'ブース区画','ブースその他希望',
+      'デモ走行','デモ走行詳細','状態',
+    ]);
+    sheet.setFrozenRows(1);
+  }
+
+  sheet.appendRow([
+    new Date(), eventId,
+    p.companyName, p.director, p.contact, p.tel, p.contactTel, p.email,
+    p.zip, p.address, p.content,
+    p.booth, p.boothNote || '',
+    p.demo, p.demoDetail || '',
+    '受付済',
+  ]);
+
+  return ok_({ message: '受付しました' });
+}
+
+// ============================================================
+// アクション: adminGetCompanyEntries（管理者向け出展申込一覧）
+// ============================================================
+
+function actionAdminGetCompanyEntries_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.event) return err_('missing_event');
+
+  const sheet = eventSs_(p.event).getSheetByName(SHEET.COMPANY_ENTRIES);
+  if (!sheet || sheet.getLastRow() < 2) return ok_({ entries: [] });
+
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const g = (row, name) => { const i = headers.indexOf(name); return i >= 0 ? String(row[i] || '') : ''; };
+
+  const tz  = Session.getScriptTimeZone();
+  const fmtDate = v => {
+    try { return v instanceof Date && !isNaN(v) ? Utilities.formatDate(v, tz, 'MM/dd HH:mm') : String(v || ''); }
+    catch (_) { return String(v || ''); }
+  };
+
+  const entries = data.slice(1).map(row => ({
+    申込日時:     fmtDate(row[headers.indexOf('申込日時')]),
+    企業名:       g(row, '企業名'),
+    代表者名:     g(row, '代表者名'),
+    担当者名:     g(row, '担当者名'),
+    電話番号:     g(row, '電話番号'),
+    担当者電話:   g(row, '担当者電話'),
+    メールアドレス: g(row, 'メールアドレス'),
+    郵便番号:     g(row, '郵便番号'),
+    住所:         g(row, '住所'),
+    出展内容:     g(row, '出展内容'),
+    ブース区画:   g(row, 'ブース区画'),
+    ブースその他希望: g(row, 'ブースその他希望'),
+    デモ走行:     g(row, 'デモ走行'),
+    デモ走行詳細: g(row, 'デモ走行詳細'),
+    状態:         g(row, '状態'),
+  }));
+
+  return ok_({ entries });
 }

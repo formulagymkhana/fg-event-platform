@@ -73,6 +73,11 @@ window.addEventListener('DOMContentLoaded', () => {
   id_('btn-prereg-csv-all')?.addEventListener('click', () => downloadPreRegCsv_('all'));
   id_('btn-student-qr-csv')?.addEventListener('click', downloadStudentQrCsv_);
 
+  // 出展申込ページ
+  id_('btn-entry-reload')?.addEventListener('click', loadCompanyEntries_);
+  id_('btn-entry-csv')?.addEventListener('click', downloadEntryCsv_);
+  id_('modal-entry-close')?.addEventListener('click', () => { id_('modal-entry').style.display = 'none'; });
+
   // 準備中ボタン: トースト案内
   document.addEventListener('click', e => {
     if (e.target.hasAttribute('data-wip')) {
@@ -168,6 +173,9 @@ function route_() {
   } else if (section === 'universities') {
     showPage_('universities');
     loadUniversities_();
+  } else if (section === 'entries') {
+    showPage_('entries');
+    loadCompanyEntries_();
   } else {
     showPage_('dashboard');
     const ev = allEvents_.find(e => e.eventId === curEvent_);
@@ -179,7 +187,7 @@ function route_() {
 }
 
 function showPage_(name) {
-  ['events', 'dashboard', 'companies', 'students', 'forms', 'universities', 'settings'].forEach(p => {
+  ['events', 'dashboard', 'companies', 'students', 'forms', 'universities', 'entries', 'settings'].forEach(p => {
     const el = id_('page-' + p);
     if (el) el.style.display = p === name ? '' : 'none';
   });
@@ -215,18 +223,22 @@ function updateNavLinks_() {
   const st = id_('nav-st-card');
   const fm = id_('nav-form-card');
   const un = id_('nav-uni-card');
-  const backCo = id_('back-dash-co');
-  const backSt = id_('back-dash-st');
-  const backFm = id_('back-dash-form');
-  const backUn = id_('back-dash-uni');
+  const en = id_('nav-entry-card');
+  const backCo    = id_('back-dash-co');
+  const backSt    = id_('back-dash-st');
+  const backFm    = id_('back-dash-form');
+  const backUn    = id_('back-dash-uni');
+  const backEntry = id_('back-dash-entry');
   if (co) co.href = '#' + curEvent_ + '/companies';
   if (st) st.href = '#' + curEvent_ + '/students';
   if (fm) fm.href = '#' + curEvent_ + '/forms';
   if (un) un.href = '#' + curEvent_ + '/universities';
-  if (backCo) backCo.href = '#' + curEvent_;
-  if (backSt) backSt.href = '#' + curEvent_;
-  if (backFm) backFm.href = '#' + curEvent_;
-  if (backUn) backUn.href = '#' + curEvent_;
+  if (en) en.href = '#' + curEvent_ + '/entries';
+  if (backCo)    backCo.href    = '#' + curEvent_;
+  if (backSt)    backSt.href    = '#' + curEvent_;
+  if (backFm)    backFm.href    = '#' + curEvent_;
+  if (backUn)    backUn.href    = '#' + curEvent_;
+  if (backEntry) backEntry.href = '#' + curEvent_;
 }
 
 // ── Load all data ─────────────────────────────────
@@ -1522,4 +1534,105 @@ async function confirmUniversity_(row) {
   const rw = res.data.rewritten || 0;
   showToast_(`✓ ${name} → ${res.data.code}` + (rw ? `（学生ID ${rw}件を更新）` : ''));
   updateUniBadge_(loadGen_);
+}
+
+// ── 出展申込 ──────────────────────────────────────
+let companyEntries_ = [];
+
+async function loadCompanyEntries_() {
+  if (!curEvent_) return;
+  id_('entry-loading').style.display = '';
+  id_('entry-summary').style.display  = 'none';
+  id_('entry-section').style.display  = 'none';
+
+  const res = await adminCall_('adminGetCompanyEntries', { event: curEvent_ });
+  id_('entry-loading').style.display = 'none';
+
+  if (!res.ok) { showToast_('出展申込の読み込みに失敗しました'); return; }
+
+  companyEntries_ = res.data.entries || [];
+  renderEntries_(companyEntries_);
+
+  // ダッシュボードバッジ更新
+  const badge = id_('badge-entry');
+  if (badge) {
+    const n = companyEntries_.length;
+    badge.textContent = n + '件';
+    badge.className   = 'nav-card-count ' + (n > 0 ? 'todo' : 'init');
+  }
+}
+
+function renderEntries_(entries) {
+  const boothCount    = entries.filter(e => e['ブース区画'] === 'あり').length;
+  const demoCount     = entries.filter(e => e['デモ走行'] && e['デモ走行'] !== 'なし').length;
+  const demoRideCount = entries.filter(e => e['デモ走行'] === 'あり(学生同乗あり)').length;
+
+  setText_('entry-count-total',     entries.length);
+  setText_('entry-count-booth',     boothCount);
+  setText_('entry-count-demo',      demoCount);
+  setText_('entry-count-demo-ride', demoRideCount);
+  id_('entry-summary').style.display = '';
+  id_('entry-section').style.display = '';
+  setText_('entry-list-count', entries.length + '件');
+
+  const tbody = id_('entry-tbody');
+  if (!entries.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-msg">出展申込はまだありません</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = entries.map((e, i) => `
+    <tr style="cursor:pointer" data-idx="${i}">
+      <td>${esc_(e['申込日時'])}</td>
+      <td><strong>${esc_(e['企業名'])}</strong></td>
+      <td>${esc_(e['担当者名'])}</td>
+      <td style="font-size:11px">${esc_(e['メールアドレス'])}</td>
+      <td>${esc_(e['ブース区画'] || '—')}</td>
+      <td style="font-size:11px">${esc_(e['デモ走行'] || '—')}</td>
+      <td><span style="font-size:11px;font-weight:600;color:var(--fg-success)">${esc_(e['状態'] || '—')}</span></td>
+    </tr>`).join('');
+
+  tbody.querySelectorAll('tr').forEach(tr => {
+    tr.addEventListener('click', () => showEntryDetail_(companyEntries_[+tr.dataset.idx]));
+  });
+}
+
+function showEntryDetail_(e) {
+  const fields = [
+    ['企業名',       e['企業名']],
+    ['代表者名',     e['代表者名']],
+    ['担当者名',     e['担当者名']],
+    ['電話番号',     e['電話番号']],
+    ['担当者電話',   e['担当者電話']],
+    ['メールアドレス', e['メールアドレス']],
+    ['郵便番号',     e['郵便番号']],
+    ['住所',         e['住所']],
+    ['出展内容',     e['出展内容']],
+    ['ブース区画',   e['ブース区画']],
+    ['ブースその他', e['ブースその他希望']],
+    ['デモ走行',     e['デモ走行']],
+    ['デモ走行詳細', e['デモ走行詳細']],
+    ['申込日時',     e['申込日時']],
+    ['状態',         e['状態']],
+  ];
+
+  id_('modal-entry-title').textContent = e['企業名'] || '詳細';
+  id_('modal-entry-body').innerHTML = fields.map(([k, v]) => v
+    ? `<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:2px">${esc_(k)}</div><div style="font-size:13px;line-height:1.6">${esc_(v)}</div></div>`
+    : '').join('');
+  id_('modal-entry').style.display = '';
+}
+
+function downloadEntryCsv_() {
+  if (!companyEntries_.length) { showToast_('申込データがありません'); return; }
+  const cols = ['申込日時','企業名','代表者名','担当者名','電話番号','担当者電話','メールアドレス','郵便番号','住所','出展内容','ブース区画','ブースその他希望','デモ走行','デモ走行詳細','状態'];
+  const header = cols.join(',');
+  const rows   = companyEntries_.map(e => cols.map(c => '"' + (e[c] || '').replace(/"/g, '""') + '"').join(','));
+  const csv    = '﻿' + [header, ...rows].join('\r\n');
+  const blob   = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a      = document.createElement('a');
+  a.href       = URL.createObjectURL(blob);
+  a.download   = '出展申込_' + curEvent_ + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
 }

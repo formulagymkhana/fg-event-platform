@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self';
+             script-src 'self';
+             connect-src https://script.google.com
+                         https://script.googleusercontent.com;
+             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+             font-src 'self' https://fonts.gstatic.com;">
+  <title>FORMULA GYMKHANA — ブース出展申込</title>
+  <link rel="preconnect" href="https://script.google.com">
+  <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+  <link rel="stylesheet" href="../js/style.css?v=20260626a">
+  <style>
+    body { display: flex; flex-direction: column; align-items: center; padding: 24px 16px 60px; }
+    .card { width: 100%; max-width: 480px; }
+    .card-body { padding: 28px 24px 32px; }
+
+    .form-section { margin-bottom: 24px; }
+    .section-label {
+      font-size: 11px; font-weight: 700; color: var(--fg-muted);
+      letter-spacing: 0.1em; text-transform: uppercase;
+      margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--fg-line);
+    }
+    .form-row { margin-bottom: 14px; }
+    .form-row label { display: block; font-size: 12px; font-weight: 600; color: var(--fg-text); margin-bottom: 5px; }
+    .form-row label .req { color: #C0392B; margin-left: 3px; }
+    .form-row input, .form-row textarea, .form-row select {
+      width: 100%; padding: 11px 13px; border: 1.5px solid var(--fg-line); border-radius: 8px;
+      font-size: 16px; color: var(--fg-text); background: #fff;
+      appearance: none; -webkit-appearance: none; transition: border-color 0.15s;
+      font-family: inherit;
+    }
+    .form-row textarea { resize: vertical; min-height: 88px; line-height: 1.6; }
+    .form-row input:focus, .form-row textarea:focus { outline: none; border-color: var(--fg-blue); }
+    .form-row input.error, .form-row textarea.error { border-color: #C0392B; }
+    .form-row .hint { font-size: 11px; color: var(--fg-muted); margin-top: 4px; line-height: 1.5; }
+    .form-row-half { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .form-row-half .form-row { margin-bottom: 0; }
+
+    .radio-group { display: flex; flex-direction: column; gap: 10px; }
+    .radio-label { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; color: var(--fg-text); cursor: pointer; }
+    .radio-label input[type="radio"] { width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px; padding: 0; border: 0; appearance: auto; -webkit-appearance: auto; accent-color: var(--fg-blue); cursor: pointer; }
+    .radio-label span { line-height: 1.5; }
+
+    .event-badge {
+      background: var(--fg-blue-soft); border-radius: 8px; padding: 10px 14px;
+      font-size: 13px; color: var(--fg-navy); font-weight: 600;
+      display: flex; align-items: center; gap: 8px; margin-bottom: 20px;
+      border: 1px solid var(--fg-blue-border);
+    }
+    .event-badge .label { font-size: 11px; color: var(--fg-muted); font-weight: 400; }
+
+    .terms-box {
+      background: var(--fg-bg); border: 1px solid var(--fg-line); border-radius: 10px;
+      padding: 14px 16px; margin-bottom: 14px; max-height: 240px; overflow-y: auto;
+    }
+    .terms-box p { font-size: 12px; color: var(--fg-text); line-height: 1.8; margin-bottom: 6px; }
+    .terms-box p:last-child { margin-bottom: 0; }
+
+    .consent-box { background: var(--fg-bg); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
+    .consent-box label { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: var(--fg-text); line-height: 1.6; cursor: pointer; }
+    .consent-box input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; accent-color: var(--fg-blue); cursor: pointer; }
+    .consent-box.error { border: 1.5px solid #C0392B; }
+
+    .submit-btn {
+      width: 100%; padding: 16px; background: var(--fg-blue); color: #fff; border: none;
+      border-radius: var(--radius-ui); font-size: 16px; font-weight: 600; cursor: pointer;
+      letter-spacing: 0.04em; transition: background 0.15s; margin-top: 4px;
+    }
+    .submit-btn:active   { background: #0047A0; }
+    .submit-btn:disabled { background: #B0BAC8; cursor: not-allowed; }
+
+    .field-err { font-size: 11px; color: #C0392B; margin-top: 4px; display: none; }
+    .field-err.show { display: block; }
+    .form-error-banner { background: #FBEAEA; border-radius: 8px; padding: 12px 14px; font-size: 13px; color: #9A2A2A; margin-bottom: 16px; display: none; }
+    .form-error-banner.show { display: block; }
+
+    .success-icon {
+      width: 72px; height: 72px; border-radius: 20px;
+      background: var(--fg-blue-soft); color: var(--fg-blue);
+      font-size: 32px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    .success-note { background: var(--fg-bg); border-radius: 10px; padding: 14px 16px; font-size: 13px; color: var(--fg-text); line-height: 1.7; }
+
+    /* デモ走行詳細: 条件付き表示 */
+    #row-demo-detail { display: none; }
+    #row-demo-detail.show { display: block; }
+  </style>
+</head>
+<body>
+
+  <!-- ローディング -->
+  <div class="card" id="state-loading">
+    <div class="fg-header">
+      <div class="fg-logo"><img class="fg-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
+      <div class="fg-page-name">ブース出展申込</div>
+    </div>
+    <div class="card-body" style="text-align:center;padding:40px 24px;">
+      <div class="spinner"></div>
+      <p style="font-size:13px;color:var(--fg-muted);">読み込み中...</p>
+    </div>
+  </div>
+
+  <!-- フォーム -->
+  <div class="card" id="state-form" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo"><img class="fg-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
+      <div class="fg-page-name">ブース出展申込</div>
+    </div>
+    <div class="card-body">
+      <p class="state-title" style="margin-bottom:6px;">ブース出展申込フォーム</p>
+      <p class="state-msg" style="margin-bottom:16px;">出展はオフィシャル協賛企業様に限ります。<br>必要事項をご記入のうえお申し込みください。</p>
+
+      <div class="event-badge">
+        <span>🏁</span>
+        <span><span class="label">対象イベント </span><span id="event-label">—</span></span>
+      </div>
+
+      <div id="form-error-banner" class="form-error-banner"></div>
+
+      <!-- 企業情報 -->
+      <div class="form-section">
+        <p class="section-label">企業・団体情報</p>
+
+        <div class="form-row">
+          <label>出展企業名・団体名<span class="req">*</span></label>
+          <input type="text" id="f-company" placeholder="例：株式会社○○" autocomplete="organization">
+          <p class="field-err" id="err-company">企業名・団体名を入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>代表者名<span class="req">*</span></label>
+          <input type="text" id="f-director" placeholder="例：山田 太郎" autocomplete="name">
+          <p class="field-err" id="err-director">代表者名を入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>担当者名<span class="req">*</span></label>
+          <input type="text" id="f-contact" placeholder="例：鈴木 花子" autocomplete="name">
+          <p class="field-err" id="err-contact">担当者名を入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>代表電話番号<span class="req">*</span></label>
+          <input type="tel" id="f-tel" placeholder="例：03-1234-5678" autocomplete="tel" inputmode="tel">
+          <p class="field-err" id="err-tel">電話番号を入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>担当者連絡先（携帯等）<span class="req">*</span></label>
+          <input type="tel" id="f-contact-tel" placeholder="例：090-1234-5678" autocomplete="tel" inputmode="tel">
+          <p class="field-err" id="err-contact-tel">担当者連絡先を入力してください</p>
+        </div>
+      </div>
+
+      <!-- 連絡先メール -->
+      <div class="form-section">
+        <p class="section-label">担当者メールアドレス</p>
+
+        <div class="form-row">
+          <label>メールアドレス<span class="req">*</span></label>
+          <input type="email" id="f-email" placeholder="例：info@example.com" autocomplete="email" inputmode="email">
+          <p class="field-err" id="err-email">メールアドレスを入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>メールアドレス（確認）<span class="req">*</span></label>
+          <input type="email" id="f-email-confirm" placeholder="もう一度入力してください" autocomplete="off" inputmode="email">
+          <p class="hint">入力ミス防止のため、コピー＆ペーストせず再度ご入力ください</p>
+          <p class="field-err" id="err-email-confirm">メールアドレスが一致しません</p>
+        </div>
+      </div>
+
+      <!-- パス送付先 -->
+      <div class="form-section">
+        <p class="section-label">出展者パス送付先住所</p>
+        <p class="hint" style="margin-bottom:12px;font-size:12px">出展者パスを郵送するための住所です。</p>
+
+        <div class="form-row">
+          <label>郵便番号<span class="req">*</span></label>
+          <input type="text" id="f-zip" placeholder="例：1234567（ハイフンなし7桁）" autocomplete="postal-code" inputmode="numeric" maxlength="7">
+          <p class="field-err" id="err-zip">郵便番号をハイフンなし7桁で入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>住所（都道府県以下）<span class="req">*</span></label>
+          <input type="text" id="f-address" placeholder="例：東京都杉並区成田東3-13-11" autocomplete="street-address">
+          <p class="field-err" id="err-address">住所を入力してください</p>
+        </div>
+      </div>
+
+      <!-- 出展内容 -->
+      <div class="form-section">
+        <p class="section-label">出展内容</p>
+
+        <div class="form-row">
+          <label>出展内容<span class="req">*</span></label>
+          <textarea id="f-content" placeholder="展示する車両・製品・サービスの内容などをご記入ください"></textarea>
+          <p class="field-err" id="err-content">出展内容を入力してください</p>
+        </div>
+
+        <div class="form-row">
+          <label>出展ブース区画<span class="req">*</span></label>
+          <p class="hint" style="margin-bottom:8px;">1区画：間口9m × 奥行6m</p>
+          <div class="radio-group" id="rg-booth">
+            <label class="radio-label"><input type="radio" name="booth" value="あり"> <span>あり（ブース区画を使用する）</span></label>
+            <label class="radio-label"><input type="radio" name="booth" value="なし"> <span>なし（ブース区画は不要）</span></label>
+          </div>
+          <p class="field-err" id="err-booth">選択してください</p>
+        </div>
+
+        <div class="form-row">
+          <label>出展ブースに関するその他希望</label>
+          <input type="text" id="f-booth-note" placeholder="ご希望があればご記入ください（希望に添えない場合もあります）">
+        </div>
+
+        <div class="form-row">
+          <label>デモ走行<span class="req">*</span></label>
+          <div class="radio-group" id="rg-demo">
+            <label class="radio-label"><input type="radio" name="demo" value="あり(学生同乗あり)"> <span>あり（学生同乗あり）</span></label>
+            <label class="radio-label"><input type="radio" name="demo" value="あり(学生同乗なし)"> <span>あり（学生同乗なし）</span></label>
+            <label class="radio-label"><input type="radio" name="demo" value="なし"> <span>なし</span></label>
+          </div>
+          <p class="field-err" id="err-demo">選択してください</p>
+        </div>
+
+        <div class="form-row" id="row-demo-detail">
+          <label>デモ走行内容の詳細<span class="req">*</span></label>
+          <textarea id="f-demo-detail" placeholder="デモ走行の内容を具体的にご記入ください。同乗走行をされる場合、デモ走行をされる側で責任をもって保険はご加入ください。"></textarea>
+          <p class="field-err" id="err-demo-detail">デモ走行の詳細を入力してください</p>
+        </div>
+      </div>
+
+      <!-- 注意事項 -->
+      <div class="form-section">
+        <p class="section-label">注意事項</p>
+
+        <div class="terms-box">
+          <p>スペースの関係でテント裏に車両を留置きすることができない場合があります。その場合は展示車両以外のお車は指定の駐車場まで移動していただく可能性がございます。</p>
+          <p>出展内容は自由ですが、ふさわしくないと判断した場合はお断りする場合もあります。</p>
+          <p>飲食販売については不可。飲食以外の物販は実施可能です。</p>
+          <p>テントは風で飛ばされないよう、必ず120kg以上（20kg×6個）のウエイトで固定してください。</p>
+          <p>基本的に展示車両以外の車両は留置きできません。指定のスペースに移動してください。</p>
+          <p>地面はアスファルト舗装となります。</p>
+          <p>壁、仕切等の設備はありません。</p>
+          <p>電源が必要な場合は各自で発電機等をご用意ください（その際は消火器をご用意ください）。</p>
+          <p>搬入車両は会場内の指定の場所に駐車してください。</p>
+          <p>それぞれの区画に対して出展者パスが付きます。それ以上必要な場合は別途お申込みください。</p>
+          <p>展示品、車両等の盗難や破損、物品販売等に関してのトラブルには、事務局では一切の責任を負いません。</p>
+          <p>テント、テーブル、椅子、展示台等は各自でご用意ください。</p>
+        </div>
+
+        <div class="consent-box" id="consent-box">
+          <label>
+            <input type="checkbox" id="f-consent">
+            上記の注意事項をすべて確認し、内容に同意します。
+          </label>
+        </div>
+        <p class="field-err" id="err-consent">注意事項への同意が必要です</p>
+      </div>
+
+      <button class="submit-btn" id="btn-submit">申込を送信する</button>
+    </div>
+  </div>
+
+  <!-- 送信中 -->
+  <div class="card" id="state-submitting" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo"><img class="fg-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
+      <div class="fg-page-name">ブース出展申込</div>
+    </div>
+    <div class="card-body" style="text-align:center;padding:40px 24px;">
+      <div class="spinner"></div>
+      <p style="font-size:13px;color:var(--fg-muted);">送信中...</p>
+    </div>
+  </div>
+
+  <!-- 完了 -->
+  <div class="card" id="state-success" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo"><img class="fg-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
+      <div class="fg-page-name">ブース出展申込</div>
+    </div>
+    <div class="card-body" style="text-align:center;">
+      <div class="success-icon">✓</div>
+      <p class="state-title">申込を受け付けました</p>
+      <p class="state-msg" style="margin-bottom:20px;">ご申込いただきありがとうございます。<br>内容を確認後、事務局よりご連絡いたします。</p>
+      <div class="success-note" style="text-align:left;">
+        <p style="font-size:12px;color:var(--fg-muted);line-height:1.7;">
+          <strong>事務局</strong>　MSC株式会社<br>
+          東京都杉並区成田東3-13-11<br>
+          お問い合わせはメールにてお願いします。
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- エラー -->
+  <div class="card" id="state-error" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo"><img class="fg-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
+      <div class="fg-page-name">ブース出展申込</div>
+    </div>
+    <div class="card-body" style="text-align:center;">
+      <div class="state-icon">⚠</div>
+      <p class="state-title" id="err-title">エラー</p>
+      <p class="state-msg" id="err-msg"></p>
+    </div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/company-entry.js?v=20260626a"></script>
+</body>
+</html>
