@@ -1563,33 +1563,44 @@ async function loadCompanyEntries_() {
 }
 
 function renderEntries_(entries) {
-  const boothCount    = entries.filter(e => e['ブース区画'] === 'あり').length;
-  const demoCount     = entries.filter(e => e['デモ走行'] && e['デモ走行'] !== 'なし').length;
-  const demoRideCount = entries.filter(e => e['デモ走行'] === 'あり(学生同乗あり)').length;
+  const sumN = k => entries.reduce((s, e) => s + (Number(e[k]) || 0), 0);
+  const boothCount = entries.filter(e => e['ブース区画'] === 'あり').length;
+  const demoCount  = entries.filter(e => e['デモ走行'] === 'あり').length;
 
-  setText_('entry-count-total',     entries.length);
-  setText_('entry-count-booth',     boothCount);
-  setText_('entry-count-demo',      demoCount);
-  setText_('entry-count-demo-ride', demoRideCount);
+  setText_('es-total', entries.length);
+  setText_('es-booth', boothCount);
+  setText_('es-car',   sumN('展示車両数'));
+  setText_('es-demo',  demoCount);
+  setText_('es-ppass', sumN('人パス'));
+  setText_('es-cpass', sumN('車両パス'));
+  setText_('es-lsat',  sumN('昼食土'));
+  setText_('es-lsun',  sumN('昼食日'));
   id_('entry-summary').style.display = '';
   id_('entry-section').style.display = '';
   setText_('entry-list-count', entries.length + '件');
 
   const tbody = id_('entry-tbody');
   if (!entries.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-msg">出展申込はまだありません</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="empty-msg">出展申込はまだありません</td></tr>';
     return;
   }
 
+  const demoCell = v => v === 'あり' ? '<span style="color:var(--fg-success);font-weight:700">あり</span>'
+                      : v === '未定'  ? '<span style="color:var(--fg-warning);font-weight:700">未定</span>'
+                      : (v || '—');
+
   tbody.innerHTML = entries.map((e, i) => `
     <tr style="cursor:pointer" data-idx="${i}">
-      <td>${esc_(e['申込日時'])}</td>
-      <td><strong>${esc_(e['企業名'])}</strong></td>
-      <td>${esc_(e['担当者名'])}</td>
-      <td style="font-size:11px">${esc_(e['メールアドレス'])}</td>
-      <td>${esc_(e['ブース区画'] || '—')}</td>
-      <td style="font-size:11px">${esc_(e['デモ走行'] || '—')}</td>
-      <td><span style="font-size:11px;font-weight:600;color:var(--fg-success)">${esc_(e['状態'] || '—')}</span></td>
+      <td style="font-weight:700">${esc_(e['社名略称'] || e['企業名正式'])}</td>
+      <td style="font-size:10px;color:var(--gray)">${esc_(e['企業名正式'])}</td>
+      <td style="font-size:11px">${esc_(e['担当者名'])}</td>
+      <td style="text-align:center">${e['ブース区画'] === 'あり' ? '✓' : '—'}</td>
+      <td style="text-align:center">${e['展示車両数'] || 0}</td>
+      <td style="text-align:center">${demoCell(e['デモ走行'])}</td>
+      <td style="text-align:center">${e['人パス'] || 0}</td>
+      <td style="text-align:center">${e['車両パス'] || 0}</td>
+      <td style="text-align:center">${e['昼食土'] || 0}</td>
+      <td style="text-align:center">${e['昼食日'] || 0}</td>
     </tr>`).join('');
 
   tbody.querySelectorAll('tr').forEach(tr => {
@@ -1598,36 +1609,45 @@ function renderEntries_(entries) {
 }
 
 function showEntryDetail_(e) {
-  const fields = [
-    ['企業名',       e['企業名']],
-    ['代表者名',     e['代表者名']],
-    ['担当者名',     e['担当者名']],
-    ['電話番号',     e['電話番号']],
-    ['担当者電話',   e['担当者電話']],
-    ['メールアドレス', e['メールアドレス']],
-    ['郵便番号',     e['郵便番号']],
-    ['住所',         e['住所']],
-    ['出展内容',     e['出展内容']],
-    ['ブース区画',   e['ブース区画']],
-    ['ブースその他', e['ブースその他希望']],
-    ['デモ走行',     e['デモ走行']],
-    ['デモ走行詳細', e['デモ走行詳細']],
-    ['申込日時',     e['申込日時']],
-    ['状態',         e['状態']],
-  ];
+  const row = (k, v) => v !== undefined && v !== '' && v !== null
+    ? `<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:2px">${esc_(k)}</div><div style="font-size:13px;line-height:1.6">${esc_(String(v))}</div></div>`
+    : '';
 
-  id_('modal-entry-title').textContent = e['企業名'] || '詳細';
-  id_('modal-entry-body').innerHTML = fields.map(([k, v]) => v
-    ? `<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:2px">${esc_(k)}</div><div style="font-size:13px;line-height:1.6">${esc_(v)}</div></div>`
-    : '').join('');
+  id_('modal-entry-title').textContent = (e['社名略称'] || e['企業名正式']) + ' 申込詳細';
+  id_('modal-entry-body').innerHTML = [
+    row('企業名（正式）', e['企業名正式']),
+    row('社名略称',       e['社名略称']),
+    row('代表者名',       e['代表者名']),
+    row('担当者名',       e['担当者名']),
+    row('電話番号',       e['電話番号']),
+    row('担当者電話',     e['担当者電話']),
+    row('メールアドレス', e['メールアドレス']),
+    row('郵便番号',       e['郵便番号']),
+    row('住所',           (e['都道府県'] || '') + (e['住所'] || '')),
+    '<hr style="border:none;border-top:1px solid var(--fg-line);margin:12px 0">',
+    row('出展内容',       e['出展内容']),
+    row('ブース区画',     e['ブース区画']),
+    row('展示車両数',     e['展示車両数'] + '台'),
+    row('デモ走行',       e['デモ走行']),
+    row('デモ走行詳細',   e['デモ走行詳細']),
+    '<hr style="border:none;border-top:1px solid var(--fg-line);margin:12px 0">',
+    row('人パス',   e['人パス'] + '枚'),
+    row('車両パス', e['車両パス'] + '枚'),
+    row('昼食（土）', e['昼食土'] + '食'),
+    row('昼食（日）', e['昼食日'] + '食'),
+    row('備考',     e['備考']),
+    '<hr style="border:none;border-top:1px solid var(--fg-line);margin:12px 0">',
+    row('申込日時', e['申込日時']),
+    row('状態',     e['状態']),
+  ].join('');
   id_('modal-entry').style.display = '';
 }
 
 function downloadEntryCsv_() {
   if (!companyEntries_.length) { showToast_('申込データがありません'); return; }
-  const cols = ['申込日時','企業名','代表者名','担当者名','電話番号','担当者電話','メールアドレス','郵便番号','住所','出展内容','ブース区画','ブースその他希望','デモ走行','デモ走行詳細','状態'];
+  const cols = ['申込日時','社名略称','企業名正式','代表者名','担当者名','電話番号','担当者電話','メールアドレス','郵便番号','都道府県','住所','出展内容','ブース区画','展示車両数','デモ走行','デモ走行詳細','人パス','車両パス','昼食土','昼食日','備考','状態'];
   const header = cols.join(',');
-  const rows   = companyEntries_.map(e => cols.map(c => '"' + (e[c] || '').replace(/"/g, '""') + '"').join(','));
+  const rows   = companyEntries_.map(e => cols.map(c => '"' + String(e[c] ?? '').replace(/"/g, '""') + '"').join(','));
   const csv    = '﻿' + [header, ...rows].join('\r\n');
   const blob   = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const a      = document.createElement('a');

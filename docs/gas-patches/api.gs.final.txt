@@ -2251,8 +2251,8 @@ function actionAdminGenerateKeys_(p) {
 // ============================================================
 
 function actionSubmitCompanyEntry_(p) {
-  const required = ['companyName','director','contact','tel','contactTel','email','zip','address','content','booth','demo'];
-  for (const f of required) if (!p[f]) return err_('missing_params');
+  const required = ['companyName','companyShort','director','contact','tel','contactTel','email','zip','prefecture','address','content','booth','demo'];
+  for (const f of required) if (!p[f] && p[f] !== 0) return err_('missing_params');
 
   // イベント解決: パラメータ優先、なければ当日のアクティブイベント
   let eventId = p.event;
@@ -2281,22 +2281,24 @@ function actionSubmitCompanyEntry_(p) {
   if (!sheet) {
     sheet = ss.insertSheet(SHEET.COMPANY_ENTRIES);
     sheet.appendRow([
-      '申込日時','eventId','企業名','代表者名','担当者名',
-      '電話番号','担当者電話','メールアドレス',
-      '郵便番号','住所','出展内容',
-      'ブース区画','ブースその他希望',
-      'デモ走行','デモ走行詳細','状態',
+      '申込日時','eventId',
+      '企業名正式','社名略称','代表者名','担当者名','電話番号','担当者電話','メールアドレス',
+      '郵便番号','都道府県','住所',
+      '出展内容','ブース区画','展示車両数','デモ走行','デモ走行詳細',
+      '人パス','車両パス','昼食土','昼食日',
+      '備考','状態',
     ]);
     sheet.setFrozenRows(1);
   }
 
+  const toInt = v => { const n = parseInt(v, 10); return isNaN(n) ? 0 : n; };
   sheet.appendRow([
     new Date(), eventId,
-    p.companyName, p.director, p.contact, p.tel, p.contactTel, p.email,
-    p.zip, p.address, p.content,
-    p.booth, p.boothNote || '',
-    p.demo, p.demoDetail || '',
-    '受付済',
+    p.companyName, p.companyShort || '', p.director, p.contact, p.tel, p.contactTel, p.email,
+    p.zip, p.prefecture || '', p.address,
+    p.content, p.booth, toInt(p.carCount), p.demo, p.demoDetail || '',
+    toInt(p.personPass), toInt(p.carPass), toInt(p.lunchSat), toInt(p.lunchSun),
+    p.note || '', '受付済',
   ]);
 
   return ok_({ message: '受付しました' });
@@ -2316,7 +2318,8 @@ function actionAdminGetCompanyEntries_(p) {
 
   const data    = sheet.getDataRange().getValues();
   const headers = data[0].map(String);
-  const g = (row, name) => { const i = headers.indexOf(name); return i >= 0 ? String(row[i] || '') : ''; };
+  const g  = (row, name) => { const i = headers.indexOf(name); return i >= 0 ? String(row[i] || '') : ''; };
+  const gn = (row, name) => { const i = headers.indexOf(name); return i >= 0 ? (Number(row[i]) || 0) : 0; };
 
   const tz  = Session.getScriptTimeZone();
   const fmtDate = v => {
@@ -2326,19 +2329,26 @@ function actionAdminGetCompanyEntries_(p) {
 
   const entries = data.slice(1).map(row => ({
     申込日時:     fmtDate(row[headers.indexOf('申込日時')]),
-    企業名:       g(row, '企業名'),
+    企業名正式:   g(row, '企業名正式'),
+    社名略称:     g(row, '社名略称'),
     代表者名:     g(row, '代表者名'),
     担当者名:     g(row, '担当者名'),
     電話番号:     g(row, '電話番号'),
     担当者電話:   g(row, '担当者電話'),
     メールアドレス: g(row, 'メールアドレス'),
     郵便番号:     g(row, '郵便番号'),
+    都道府県:     g(row, '都道府県'),
     住所:         g(row, '住所'),
     出展内容:     g(row, '出展内容'),
     ブース区画:   g(row, 'ブース区画'),
-    ブースその他希望: g(row, 'ブースその他希望'),
+    展示車両数:   gn(row, '展示車両数'),
     デモ走行:     g(row, 'デモ走行'),
     デモ走行詳細: g(row, 'デモ走行詳細'),
+    人パス:       gn(row, '人パス'),
+    車両パス:     gn(row, '車両パス'),
+    昼食土:       gn(row, '昼食土'),
+    昼食日:       gn(row, '昼食日'),
+    備考:         g(row, '備考'),
     状態:         g(row, '状態'),
   }));
 

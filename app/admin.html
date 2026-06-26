@@ -763,28 +763,25 @@
       <div class="action-row" style="margin-bottom:10px">
         <button class="act-btn act-btn-ghost" id="btn-entry-reload">↻ 再読み込み</button>
         <button class="act-btn act-btn-ghost" id="btn-entry-csv">CSV ダウンロード</button>
-        <a class="act-btn act-btn-ghost" id="btn-entry-form-link" href="../app/company-entry.html" target="_blank">申込フォームを開く</a>
+        <a class="act-btn act-btn-ghost" id="btn-entry-form-link" href="../app/company-entry.html" target="_blank" style="text-decoration:none">申込フォームを開く</a>
       </div>
 
       <div id="entry-loading" class="loading-msg">読み込み中...</div>
 
-      <!-- サマリー -->
-      <div class="stat-grid" id="entry-summary" style="display:none">
-        <div class="stat-card">
-          <div class="stat-val" id="entry-count-total">—</div>
-          <div class="stat-lbl">申込総数</div>
+      <!-- サマリー集計 -->
+      <div id="entry-summary" style="display:none">
+        <div class="area-label" style="margin-top:0">集計</div>
+        <div class="stat-grid" style="grid-template-columns:repeat(2,1fr)">
+          <div class="stat-card"><div class="stat-val" id="es-total">—</div><div class="stat-lbl">申込件数</div></div>
+          <div class="stat-card"><div class="stat-val" id="es-booth">—</div><div class="stat-lbl">ブース区画あり</div></div>
+          <div class="stat-card"><div class="stat-val" id="es-car">—</div><div class="stat-lbl">展示車両合計（台）</div></div>
+          <div class="stat-card"><div class="stat-val" id="es-demo">—</div><div class="stat-lbl">デモ走行あり</div></div>
         </div>
-        <div class="stat-card">
-          <div class="stat-val" id="entry-count-booth">—</div>
-          <div class="stat-lbl">ブース希望</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-val" id="entry-count-demo">—</div>
-          <div class="stat-lbl">デモ走行あり</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-val" id="entry-count-demo-ride">—</div>
-          <div class="stat-lbl">学生同乗あり</div>
+        <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);margin-top:0">
+          <div class="stat-card"><div class="stat-val" id="es-ppass">—</div><div class="stat-lbl">人パス合計（枚）</div></div>
+          <div class="stat-card"><div class="stat-val" id="es-cpass">—</div><div class="stat-lbl">車両パス合計（枚）</div></div>
+          <div class="stat-card"><div class="stat-val" id="es-lsat">—</div><div class="stat-lbl">土曜昼食合計（食）</div></div>
+          <div class="stat-card"><div class="stat-val" id="es-lsun">—</div><div class="stat-lbl">日曜昼食合計（食）</div></div>
         </div>
       </div>
 
@@ -796,16 +793,19 @@
         </div>
         <div class="section-body open" id="body-entry-list">
           <div class="tbl-wrap">
-            <table class="data-tbl" id="entry-tbl">
+            <table class="data-tbl">
               <thead>
                 <tr>
-                  <th>申込日時</th>
-                  <th>企業名</th>
+                  <th>略称</th>
+                  <th>正式名称</th>
                   <th>担当者</th>
-                  <th>メール</th>
                   <th>ブース</th>
-                  <th>デモ走行</th>
-                  <th>状態</th>
+                  <th>展示</th>
+                  <th>デモ</th>
+                  <th>人P</th>
+                  <th>車P</th>
+                  <th>昼土</th>
+                  <th>昼日</th>
                 </tr>
               </thead>
               <tbody id="entry-tbody"></tbody>
@@ -926,6 +926,6 @@
 <div class="toast" id="toast"></div>
 <script src="../js/vendor/qrcode.min.js"></script>
 <script src="../js/config.js?v=20260623a"></script>
-<script src="../js/admin.js?v=20260626b"></script>
+<script src="../js/admin.js?v=20260626c"></script>
 </body>
 </html>
