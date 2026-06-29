@@ -7,9 +7,9 @@
 
 /* ── CSS変数 ────────────────────────────────────── */
 :root {
-  --fg-blue:         #004ECC;   /* 公式サイト寄せ（旧 #0057B8） */
-  --fg-blue-light:   #1361E0;
-  --fg-navy:         #0B2545;
+  --fg-blue:         #3520D0;   /* ロゴ GYMKHANA ボックス実測値 */
+  --fg-blue-light:   #4535D8;
+  --fg-navy:         #0F1040;   /* ロゴに合わせ青紫寄りに */
   --fg-black:        #141617;   /* 黒ヘッダー背景 */
   --fg-dark:         #212326;   /* 濃色テキスト */
   --fg-gray:         #434549;   /* 中間グレー */
@@ -20,8 +20,8 @@
   --fg-text:         #1A2733;
   --fg-muted:        #6B7280;
   --fg-line:         #DDE1E7;   /* 統一（旧 #E2E8F0） */
-  --fg-blue-soft:    #EEF7FF;
-  --fg-blue-border:  #D8EAFB;
+  --fg-blue-soft:    #EEEEFF;
+  --fg-blue-border:  #CCCAFB;
   --fg-success-bg:   #EAF8F0;
   --fg-success:      #1A6640;
   --fg-success-border:#CDEEDC;
@@ -196,7 +196,7 @@ body {
 }
 
 .btn-primary:active {
-  background: #0047A0;
+  background: #2210B0;
 }
 
 .btn-primary:disabled {
@@ -351,7 +351,7 @@ body {
 
 /* 達成（青グラデ・progress/stampの達成バナー） */
 .status-card.cleared {
-  background: linear-gradient(135deg, var(--fg-blue), #2E7DD1);
+  background: linear-gradient(135deg, var(--fg-blue), #5545E0);
   color: #fff;
 }
 
@@ -677,9 +677,9 @@ body {
   100% { opacity: 1; }
 }
 @keyframes milestone-pulse {
-  0%   { box-shadow: 0 0 0 0px rgba(30, 90, 200, 0.5), 0 0 0 2px var(--fg-blue); }
-  70%  { box-shadow: 0 0 0 7px rgba(30, 90, 200, 0),   0 0 0 2px var(--fg-blue); }
-  100% { box-shadow: 0 0 0 0px rgba(30, 90, 200, 0),   0 0 0 2px var(--fg-blue); }
+  0%   { box-shadow: 0 0 0 0px rgba(53, 32, 208, 0.5), 0 0 0 2px var(--fg-blue); }
+  70%  { box-shadow: 0 0 0 7px rgba(53, 32, 208, 0),   0 0 0 2px var(--fg-blue); }
+  100% { box-shadow: 0 0 0 0px rgba(53, 32, 208, 0),   0 0 0 2px var(--fg-blue); }
 }
 .milestone-track.complete .milestone-fill {
   animation: milestone-shimmer 2s ease-in-out infinite;
