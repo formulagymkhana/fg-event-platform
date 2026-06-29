@@ -48,20 +48,22 @@ function cardUrl(v) {
 }
 
 function visitorRow(v) {
-  const nameEl = v.cardToken
-    ? `<a class="v-name v-link" href="${cardUrl(v)}" target="_blank">${esc(v.name)}<span class="v-furigana">${esc(v.furigana)}</span></a>`
-    : `<div class="v-name">${esc(v.name)}<span class="v-furigana">${esc(v.furigana)}</span></div>`;
+  const url   = v.cardToken ? cardUrl(v) : null;
+  const outer = url
+    ? `<a class="visitor-row v-row-link" href="${esc(url)}" target="_blank" rel="noopener">`
+    : `<div class="visitor-row">`;
+  const close = url ? '</a>' : '</div>';
   const dept = v.department ? ` · ${esc(v.department)}` : '';
   const yr   = v.year ? ` · ${esc(v.year)}年` : '';
   return `
-    <div class="visitor-row">
+    ${outer}
       <div class="v-head">
-        ${nameEl}
+        <div class="v-name">${esc(v.name)}<span class="v-furigana">${esc(v.furigana)}</span>${url ? '<span class="v-arrow">›</span>' : ''}</div>
         <div class="v-time">${esc(v.time)}</div>
       </div>
       <div class="v-meta">${esc(v.school)}${yr}${dept}<span class="v-cat">${esc(v.category)}</span></div>
       ${v.email ? `<div class="v-email" data-email="${esc(v.email)}">${esc(v.email)}</div>` : ''}
-    </div>`;
+    ${close}`;
 }
 
 function renderQrList(visitors) {
@@ -72,7 +74,8 @@ function renderQrList(visitors) {
   }
   wrap.innerHTML = `<div class="visitor-list">${visitors.map(visitorRow).join('')}</div>`;
   wrap.querySelectorAll('.v-email[data-email]').forEach(el =>
-    el.addEventListener('click', () => {
+    el.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
       navigator.clipboard?.writeText(el.dataset.email).then(() => toast('メールアドレスをコピーしました'));
     }));
 }
@@ -85,7 +88,8 @@ function renderStampList(visitors) {
   }
   wrap.innerHTML = `<div class="visitor-list">${visitors.map(visitorRow).join('')}</div>`;
   wrap.querySelectorAll('.v-email[data-email]').forEach(el =>
-    el.addEventListener('click', () => {
+    el.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
       navigator.clipboard?.writeText(el.dataset.email).then(() => toast('メールアドレスをコピーしました'));
     }));
 }

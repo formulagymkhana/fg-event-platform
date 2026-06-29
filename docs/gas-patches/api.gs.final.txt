@@ -142,6 +142,10 @@ function actionGetStudent_(p) {
   if (!p.token) return err_('missing_token');
   if (!p.event) return err_('missing_event');
 
+  // 学生自身のMYPASS表示（source=mypass）はイベント期間中のみ許可する。
+  // 企業が学生カードを確認する場合はsourceなし → publicDeadlineまで許可。
+  if (p.source === 'mypass' && !isEventDay_(p.event)) return err_('event_ended');
+
   const cfg = getConfig_(p.event);
   if (isPastDeadline_(cfg)) return err_('expired');
 
@@ -353,6 +357,8 @@ function actionSaveStamp_(p) {
 function actionGetStampProgress_(p) {
   if (!p.token) return err_('missing_token');
   if (!p.event) return err_('missing_event');
+
+  if (!isEventDay_(p.event)) return err_('event_ended');
 
   const student = findStudentByStampToken_(p.token, p.event);
   if (!student) return err_('invalid_token');

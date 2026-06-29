@@ -94,9 +94,10 @@ const FG_API = (() => {
   // ── 企業向けAPI ───────────────────────────────
 
   /** cardTokenで学生情報を取得(企業がQR名刺を見るとき) */
-  function getStudent(cardToken, event) {
+  function getStudent(cardToken, event, source) {
     const p = { token: cardToken };
-    if (event) p.event = event;
+    if (event)  p.event  = event;
+    if (source) p.source = source;
     return call_('getStudent', p);
   }
 

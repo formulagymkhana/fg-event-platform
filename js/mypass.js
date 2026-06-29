@@ -26,9 +26,11 @@
     event = cur.ok && cur.data ? cur.data.eventId : null;
   }
 
-  const res = await FG_API.getStudent(token, event);
+  const res = await FG_API.getStudent(token, event, 'mypass');
   if (!res.ok) {
-    if (res.error === 'expired') {
+    if (res.error === 'event_ended') {
+      showError('このイベントは終了しました。', '');
+    } else if (res.error === 'expired') {
       showError('公開期限が終了しました。', 'MY PASSの公開期間が終了しています。');
     } else if (res.error === 'timeout' || res.error === 'network_error') {
       showError('接続に失敗しました。', '電波の良い場所でもう一度お試しください。');

@@ -31,7 +31,10 @@ async function loadProgress() {
 
   if (!res.ok) {
     showState('error');
-    if (res.error === 'timeout') {
+    if (res.error === 'event_ended') {
+      setText('error-title', 'このイベントは終了しました。');
+      setText('error-msg', '');
+    } else if (res.error === 'timeout') {
       setText('error-title', '接続がタイムアウトしました');
       setText('error-msg', 'ページを再読み込みして再試行してください。');
     } else {

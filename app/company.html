@@ -18,6 +18,9 @@
            padding: 0 0 48px; background: var(--fg-bg); }
 
     .page-wrap { width: 100%; max-width: 480px; }
+    @media (min-width: 768px) {
+      .page-wrap { max-width: 860px; }
+    }
 
     /* ヘッダー（白背景＋青下線の共通意匠に統一） */
     .co-header { background: #fff; padding: 18px 20px 14px; border-bottom: 3px solid var(--fg-blue); }
@@ -38,20 +41,35 @@
 
     /* 学生行 */
     .visitor-list { margin: 12px 12px 0; border: 1px solid var(--fg-line); border-radius: 10px; overflow: hidden; background: #fff; }
-    .visitor-row { padding: 11px 14px; border-bottom: 1px solid var(--fg-line); }
+    .visitor-row { display: block; padding: 11px 14px; border-bottom: 1px solid var(--fg-line); color: inherit; text-decoration: none; }
     .visitor-row:last-child { border-bottom: none; }
-    .visitor-row:active { background: var(--fg-blue-soft); }
+    .v-row-link { cursor: pointer; }
+    .v-row-link:hover { background: var(--fg-blue-soft); }
+    .v-row-link:active { background: var(--fg-blue-soft); }
     .v-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
     .v-name { font-size: 14px; font-weight: 600; color: var(--fg-navy); }
     .v-furigana { font-size: 10px; color: var(--fg-muted); margin-left: 4px; font-weight: 400; }
+    .v-arrow { font-size: 16px; color: var(--fg-blue); margin-left: 5px; font-weight: 400; vertical-align: middle; }
     .v-time { font-size: 11px; color: var(--fg-muted); flex-shrink: 0; }
     .v-meta { margin-top: 3px; font-size: 11px; color: var(--fg-muted); }
     .v-cat { display: inline-block; margin-left: 6px; font-size: 10px; font-weight: 600;
              background: var(--fg-bg); color: var(--fg-gray); border-radius: 4px; padding: 1px 6px; }
     .v-email { margin-top: 4px; font-size: 11px; color: var(--fg-blue); word-break: break-all;
                cursor: pointer; text-decoration: underline; text-decoration-color: var(--fg-blue-border); }
-    .v-link { color: var(--fg-navy); text-decoration: none; }
-    .v-link:active { color: var(--fg-blue); }
+
+    /* PC レイアウト */
+    @media (min-width: 768px) {
+      .visitor-list { margin: 16px 0 0; }
+      .visitor-row { display: grid; grid-template-columns: 1fr auto; align-items: center;
+                     padding: 10px 20px; column-gap: 16px; }
+      .v-head { grid-column: 1; }
+      .v-meta { grid-column: 1; margin-top: 2px; }
+      .v-email { grid-column: 1; }
+      .v-time { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 12px; white-space: nowrap; }
+      .tab-bar { margin-top: 4px; }
+      .reload-bar { padding: 16px 0 0; }
+      .reload-btn { border-radius: 8px; }
+    }
 
     /* 空・エラー */
     .empty-note { text-align: center; padding: 32px 20px; font-size: 13px; color: var(--fg-muted); line-height: 1.7; }
@@ -155,7 +173,7 @@
   <div id="toast"></div>
 
   <script src="../js/config.js?v=20260623a"></script>
-  <script src="../js/api.js?v=20260623a"></script>
-  <script src="../js/company.js?v=20260623c"></script>
+  <script src="../js/api.js?v=20260629b"></script>
+  <script src="../js/company.js?v=20260629a"></script>
 </body>
 </html>
