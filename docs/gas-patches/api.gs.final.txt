@@ -2161,25 +2161,69 @@ function actionAdminUploadCompanyLogo_(p) {
   if (e) return e;
   if (!p.event || !p.companyId || !p.base64) return err_('missing_params');
 
-  const root   = getOrCreateChildFolder_(DriveApp.getRootFolder(), 'FGロゴ');
-  const folder = getOrCreateChildFolder_(root, String(p.event));
+  // Step1: Drive フォルダ確保
+  let folder;
+  try {
+    const root = getOrCreateChildFolder_(DriveApp.getRootFolder(), 'FGロゴ');
+    folder     = getOrCreateChildFolder_(root, String(p.event));
+  } catch (er) {
+    console.error('logo_step1_folder:', er);
+    return err_('logo_step1_folder_failed');
+  }
 
-  // 同企業の既存ファイルを削除して置き換え
-  const existing = folder.getFilesByName(String(p.companyId));
-  while (existing.hasNext()) existing.next().setTrashed(true);
+  // Step2: 既存ファイル削除
+  try {
+    const existing = folder.getFilesByName(String(p.companyId));
+    while (existing.hasNext()) existing.next().setTrashed(true);
+  } catch (er) {
+    console.error('logo_step2_trash:', er);
+    // 削除失敗は致命的でないので続行
+  }
 
-  const mime  = p.mimeType || 'image/png';
-  const ext   = mime.split('/')[1] || 'png';
-  const bytes = Utilities.base64Decode(p.base64);
-  const blob  = Utilities.newBlob(bytes, mime, String(p.companyId) + '.' + ext);
-  const file  = folder.createFile(blob);
-  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  // Step3: ファイル作成
+  let file;
+  try {
+    const mime  = p.mimeType || 'image/png';
+    const ext   = mime.split('/')[1] || 'png';
+    const bytes = Utilities.base64Decode(p.base64);
+    const blob  = Utilities.newBlob(bytes, mime, String(p.companyId) + '.' + ext);
+    file = folder.createFile(blob);
+  } catch (er) {
+    console.error('logo_step3_create:', er);
+    return err_('logo_step3_create_failed');
+  }
+
+  // Step4: 公開設定
+  try {
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (er) {
+    console.error('logo_step4_sharing:', er);
+    return err_('logo_step4_sharing_failed');
+  }
 
   const fileId = file.getId();
   const url    = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=s200';
 
-  // シートの logoUrl も同時に更新
-  actionAdminUpdateCompany_(Object.assign({}, p, { logoUrl: url }));
+  // Step5: シートの logoUrl 更新
+  try {
+    const sheet   = eventSs_(p.event).getSheetByName(SHEET.COMPANIES);
+    const data    = sheet.getDataRange().getValues();
+    let   headers = data[0].map(String);
+    const idCol   = headers.indexOf('companyId');
+    const rowIdx  = data.slice(1).findIndex(r => String(r[idCol]) === String(p.companyId));
+    if (rowIdx >= 0) {
+      let col = headers.indexOf('logoUrl');
+      if (col < 0) {
+        sheet.getRange(1, headers.length + 1).setValue('logoUrl');
+        col = headers.length;
+      }
+      sheet.getRange(rowIdx + 2, col + 1).setValue(url);
+      CacheService.getScriptCache().remove('cfg_' + p.event);
+    }
+  } catch (er) {
+    console.error('logo_step5_sheet:', er);
+    return err_('logo_step5_sheet_failed');
+  }
 
   return ok_({ url, fileId });
 }
