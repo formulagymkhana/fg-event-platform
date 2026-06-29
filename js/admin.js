@@ -651,6 +651,9 @@ async function loadCompanies_(gen = null, ev = null) {
           data-logo-id="${esc_(c.companyId)}" value="${esc_(c.logoUrl || '')}">
         <div class="logo-preview">${c.logoUrl ? `<img src="${esc_(c.logoUrl)}" alt="">` : '?'}</div>
         <button class="copy-btn logo-save-btn" data-logo-save="${esc_(c.companyId)}">保存</button>
+        <input type="file" accept="image/*" class="logo-file-input" style="display:none"
+          data-logo-id="${esc_(c.companyId)}">
+        <button class="copy-btn logo-upload-btn" data-logo-upload="${esc_(c.companyId)}">↑ファイル</button>
       </div>
     </div>`;
   }).join('');
@@ -671,6 +674,11 @@ async function loadCompanies_(gen = null, ev = null) {
   container.querySelectorAll('.logo-preview img').forEach(attachLogoFallback_);
   container.querySelectorAll('.logo-save-btn[data-logo-save]').forEach(b =>
     b.addEventListener('click', () => handleSaveLogo_(b)));
+  container.querySelectorAll('.logo-upload-btn[data-logo-upload]').forEach(b =>
+    b.addEventListener('click', () =>
+      b.closest('.logo-row').querySelector('.logo-file-input')?.click()));
+  container.querySelectorAll('.logo-file-input').forEach(inp =>
+    inp.addEventListener('change', () => { if (inp.files[0]) handleUploadLogo_(inp); }));
   container.querySelectorAll('input[data-rally]').forEach(cb =>
     cb.addEventListener('change', () => handleToggleStampRally_(cb)));
   updateStepBadges_();
@@ -730,6 +738,43 @@ async function handleSaveLogo_(btn) {
   if (res.ok) showToast_('✓ ロゴURLを保存しました');
   else showToast_('⚠ 保存失敗: ' + (res.message || ''));
   setTimeout(() => { btn.textContent = orig; }, 1500);
+}
+
+async function handleUploadLogo_(fileInput) {
+  if (!curEvent_) return;
+  const companyId = fileInput.dataset.logoId;
+  const file      = fileInput.files[0];
+  const row       = fileInput.closest('.logo-row');
+  const btn       = row.querySelector('.logo-upload-btn');
+  const orig      = btn.textContent;
+  btn.disabled    = true; btn.textContent = '送信中...';
+
+  const base64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const res = await adminCall_('adminUploadCompanyLogo', {
+    event: curEvent_, companyId,
+    base64, mimeType: file.type || 'image/png',
+  });
+
+  btn.disabled = false;
+  if (res.ok) {
+    btn.textContent = '✓';
+    const urlInput = row.querySelector('.logo-url-input');
+    if (urlInput) urlInput.value = res.data.url;
+    const pv = row.querySelector('.logo-preview');
+    if (pv) { pv.textContent = ''; pv.appendChild(makeLogoImg_(res.data.url)); }
+    showToast_('✓ ロゴをアップロードしました');
+  } else {
+    btn.textContent = 'エラー';
+    showToast_('⚠ アップロード失敗: ' + (res.message || ''));
+  }
+  setTimeout(() => { btn.textContent = orig; }, 2000);
+  fileInput.value = '';
 }
 
 // ── 企業ダッシュボードサマリー ───────────────────

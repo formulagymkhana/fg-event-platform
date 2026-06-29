@@ -116,8 +116,9 @@ function dispatch_(e) {
       case 'adminClearCache':   return actionAdminClearCache_(p);
       case 'adminGetCompanies': return actionAdminGetCompanies_(p);
       case 'adminAddCompany':   return actionAdminAddCompany_(p);
-      case 'adminUpdateCompany':return actionAdminUpdateCompany_(p);
-      case 'adminDeleteCompany':return actionAdminDeleteCompany_(p);
+      case 'adminUpdateCompany':      return actionAdminUpdateCompany_(p);
+      case 'adminUploadCompanyLogo':  return actionAdminUploadCompanyLogo_(p);
+      case 'adminDeleteCompany':      return actionAdminDeleteCompany_(p);
       case 'adminGenerateKeys':    return actionAdminGenerateKeys_(p);
       case 'adminImportCompanies': return actionAdminImportCompanies_(p);
       case 'adminUpdateKey':    return actionAdminUpdateKey_(p);
@@ -2152,6 +2153,35 @@ function actionAdminUpdateCompany_(p) {
 
   CacheService.getScriptCache().remove('cfg_' + p.event);
   return ok_({ companyId: p.companyId, ...updates });
+}
+
+// 企業ロゴを Google Drive にアップロードして thumbnail URL を返す
+function actionAdminUploadCompanyLogo_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.event || !p.companyId || !p.base64) return err_('missing_params');
+
+  const root   = getOrCreateChildFolder_(DriveApp.getRootFolder(), 'FGロゴ');
+  const folder = getOrCreateChildFolder_(root, String(p.event));
+
+  // 同企業の既存ファイルを削除して置き換え
+  const existing = folder.getFilesByName(String(p.companyId));
+  while (existing.hasNext()) existing.next().setTrashed(true);
+
+  const mime  = p.mimeType || 'image/png';
+  const ext   = mime.split('/')[1] || 'png';
+  const bytes = Utilities.base64Decode(p.base64);
+  const blob  = Utilities.newBlob(bytes, mime, String(p.companyId) + '.' + ext);
+  const file  = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  const fileId = file.getId();
+  const url    = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=s200';
+
+  // シートの logoUrl も同時に更新
+  actionAdminUpdateCompany_(Object.assign({}, p, { logoUrl: url }));
+
+  return ok_({ url, fileId });
 }
 
 // 企業を削除
