@@ -53,7 +53,7 @@ FG Event Platform（Formula Gymkhana のイベント管理基盤）の改修。
 
 ---
 
-## 0.3 進捗ステータス（2026-06-08 時点）
+## 0.3 進捗ステータス（2026-06-29 時点）
 
 完了済み（git 履歴・CHANGELOG 参照）:
 - T2: findStudentByStampToken_() の検索条件強化 ✅
@@ -93,9 +93,23 @@ FG Event Platform（Formula Gymkhana のイベント管理基盤）の改修。
 - prizeCount を行数カウント→claimedCount集計に修正 ✅（2026-06-17。GAS再デプロイ必須）
 - PRIZE_LOG 列順バグ修正 ✅（2026-06-17。GAS再デプロイ済み）
 - registerWalkIn_ STAMP_PARTICIPANTS 自動作成 ✅（2026-06-17。GAS再デプロイ済み）
+- 企業ブース出展申込フォーム（company-entry.html）全面改修 ✅（2026-06-29）
+  - 5ステップ化・カードラジオ・ステッパー・admin カード一覧・詳細モーダル
+  - submitCompanyEntry バグ修正・event= URL パラメータ付与・出展内容を任意入力に
+  - **GAS 再デプロイ必須**（api.gs.final.txt 更新済み）
+- コードレビュー対応 ✅（2026-06-29）
+  - GAS: イベント状態チェック4関数 + LockService 追加（**GAS 再デプロイ必須**）
+  - admin.js: adminCall_ を POST JSON に変更（adminKey を URL に含めない）
+  - card.js: const $ TDZ クラッシュ修正
+- ブランドカラーをロゴ実測値（#3520D0）に合わせてインディゴ系に統一 ✅（2026-06-29）
+- postCall_ タイムアウトを Promise.race 方式に統一（iOS Safari 互換）✅（2026-06-29）
 - 既存イベントの QR閲覧ログ シートに `source` 列ヘッダーを手動追記（推奨・未着手）。
 - 将来構想: 脱Googleフォーム化（NOTES.md 参照。計画段階）。
 - 任意: eventId 比較の String() 統一（下記「任意（おまけ）」参照。NOTES.md にも記録）。
+
+**⚠ GAS 再デプロイ待ち（2026-06-29 時点）:**
+`docs/gas-patches/api.gs.final.txt` を GAS エディタに貼り付けて再デプロイすること。
+（イベント状態チェック4関数・LockService・submitCompanyEntry が反映される）
 
 **確定した運用方針（2026-06-09）**:
 - activateStamp の期間チェック: 不要（物理的に当日会場参加が前提）。

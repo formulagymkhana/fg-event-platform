@@ -69,23 +69,17 @@ const FG_API = (() => {
 
   // POST 送信（事前登録・将来のファイルアップロード用）。
   // Content-Type を付けない＝CORSプリフライト回避（GAS doPost が JSON を読む）。
+  // タイムアウトは Promise.race で実装（iOS Safari で AbortController の signal が
+  // GAS リダイレクト後に失われる既知バグを回避するため call_ と同方式）。
   async function postCall_(action, params = {}) {
     const body = JSON.stringify({ action, ...params });
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 120000); // ファイルUL考慮
-      const res = await fetch(FG_CONFIG.API_BASE_URL, {
-        method: 'POST',
-        body,
-        redirect: 'follow',
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
-      return await res.json();
+      const fetchPromise   = fetch(FG_CONFIG.API_BASE_URL, { method: 'POST', body, redirect: 'follow' }).then(r => r.json());
+      const timeoutPromise = new Promise(resolve =>
+        setTimeout(() => resolve({ ok: false, error: 'timeout', message: 'タイムアウトしました。再度お試しください。' }), 120000)
+      );
+      return await Promise.race([fetchPromise, timeoutPromise]);
     } catch (e) {
-      if (e.name === 'AbortError') {
-        return { ok: false, error: 'timeout', message: 'タイムアウトしました。再度お試しください。' };
-      }
       return { ok: false, error: 'network_error', message: '通信エラーが発生しました' };
     }
   }

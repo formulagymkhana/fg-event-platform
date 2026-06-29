@@ -16,6 +16,41 @@
 
 ---
 
+## 2026-06-29 fix: postCall_ タイムアウトを Promise.race 方式に統一
+- 変更ファイル: `js/api.js`
+- 変更内容: `postCall_` の AbortController → Promise.race（`call_` と同方式）
+- 理由/背景: iOS Safari で GAS リダイレクト後に AbortController の signal が失われる既知バグ。`call_` では既に対応済みだったが `postCall_` が取り残されていた
+- 申し送り/注意点: GAS 再デプロイ不要
+
+## 2026-06-29 style: ブランドカラーをロゴ実測値に合わせてインディゴ系に統一
+- 変更ファイル: `js/style.css`
+- 変更内容: `--fg-blue` #004ECC → #3520D0（ロゴ GYMKHANA ボックス Pillow 実測）、関連変数（light/soft/border/navy）・ハードコード3箇所も更新
+- 理由/背景: ロゴは青紫系インディゴ、UI は純青で色味が乖離していた
+- 申し送り/注意点: GAS 再デプロイ不要
+
+## 2026-06-29 fix: コードレビュー対応（GAS・admin.js・card.js）
+- 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `js/admin.js`, `js/card.js`
+- 変更内容:
+  - GAS: イベント状態チェック4関数追加（isEventInactive_ / isBeforeFormOpen_ / isPastCategoryDeadline_ / isEventDay_）+ 3アクションに組み込み
+  - GAS: 景品交換・参加者登録に LockService.getScriptLock() 追加
+  - admin.js: `adminCall_` を POST JSON 送信に変更（adminKey を URL に含めない）
+  - card.js: `const $` / `const pad` の宣言位置をファイル先頭に移動（TDZ クラッシュ修正）
+- 理由/背景: セキュリティ・競合抑止・iOS Safari 互換
+- 申し送り/注意点: **GAS 再デプロイ必須**（api.gs.final.txt を GAS エディタへ貼り付け）
+
+## 2026-06-29 feat: 企業ブース出展申込フォーム全面改修
+- 変更ファイル: `app/company-entry.html`, `js/company-entry.js`, `js/api.js`, `js/admin.js`, `app/admin.html`
+- 変更内容:
+  - フォームを5ステップ化（進捗ドット・ステップ別バリデーション・スムーズスクロール）
+  - ブース区画・デモ走行をカード型ラジオに変更、パス/昼食をステッパー入力に変更
+  - 注意事項を全展開箇条書きに変更（内部スクロール廃止）
+  - api.js: `submitCompanyEntry` を追加（旧 `FG_API.post` 未定義バグを修正）
+  - admin 出展一覧をカード型に変更、詳細モーダルをグループ化・コピーボタン付きに
+  - 管理画面フォームURLに `?event=` パラメータを付与（会期前でも使用可能に）
+  - 出展内容フィールドを任意入力に変更（出展なし企業に対応）
+  - 記入例のプレースホルダーをMSC株式会社に統一
+- 申し送り/注意点: GAS 再デプロイ不要（GAS 側は前セッションで対応済み）
+
 ## 2026-06-17 fix: iOS Safari フェッチハング対策・企業QRエラー表示改善
 - 変更ファイル: `js/api.js`, `js/card.js`
 - 変更内容:
