@@ -20,6 +20,7 @@ document.getElementById('btn-retry')?.addEventListener('click', () => {
   ['paste', 'drop'].forEach(ev => el.addEventListener(ev, e => e.preventDefault()));
 });
 
+
 // 成功画面のマイページリンク組み立て用に、解決済みイベントIDを保持
 let pageEvent_ = null;
 
@@ -56,8 +57,8 @@ async function handleSubmit() {
   showState('submitting');
 
   const params = {
-    name:       val_('f-name').trim(),
-    furigana:   val_('f-furigana').trim(),
+    name:       val_('f-name').trim().replace(/　/g, ' '),
+    furigana:   val_('f-furigana').trim().replace(/　/g, ' '),
     school:     val_('f-school').trim(),
     department: val_('f-department').trim(),
     year:       val_('f-year'),

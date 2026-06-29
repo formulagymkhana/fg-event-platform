@@ -39,6 +39,7 @@ const TOTAL_STEPS = 5;
     ['paste', 'drop'].forEach(ev => el.addEventListener(ev, e => e.preventDefault()));
   });
 
+
   // デモ走行 → 詳細欄の表示切り替え
   document.querySelectorAll('input[name="demo"]').forEach(r => {
     r.addEventListener('change', () => {
@@ -176,8 +177,8 @@ async function handleSubmit_() {
   const params = {
     companyName:  val_('f-company'),
     companyShort: val_('f-company-short'),
-    director:     val_('f-director'),
-    contact:      val_('f-contact'),
+    director:     val_('f-director').replace(/　/g, ' '),
+    contact:      val_('f-contact').replace(/　/g, ' '),
     tel:          val_('f-tel'),
     contactTel:   val_('f-contact-tel'),
     email:        val_('f-email'),

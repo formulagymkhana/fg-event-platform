@@ -97,6 +97,7 @@ $('btn-submit')?.addEventListener('click', submitForm);
   ['paste', 'drop'].forEach(ev => el.addEventListener(ev, e => e.preventDefault()));
 });
 
+
 // ── 参加区分による分岐表示 ──────────────────────
 const BRANCH_BY_CAT = {
   '出場選手(FGクラスドライバー)':       'sec-fg',
@@ -284,8 +285,8 @@ function validateBranch(cat, b) {
 function collect() {
   const cat = document.querySelector('input[name="category"]:checked');
   return {
-    name:       $('f-name').value.trim(),
-    furigana:   $('f-furigana').value.trim(),
+    name:       $('f-name').value.trim().replace(/　/g, ' '),
+    furigana:   $('f-furigana').value.trim().replace(/　/g, ' '),
     school:     $('f-school').value.trim(),
     department: $('f-department').value.trim(),
     year:       $('f-year').value,
