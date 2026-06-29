@@ -23,6 +23,8 @@ const CAT_COLORS = {
 };
 
 let _d = null;
+const $ = id => document.getElementById(id);
+const pad = n  => String(n).padStart(2, '0');
 
 // ── イベントリスナー(CSP対応: onclickは使わない) ──
 document.getElementById('email-row')?.addEventListener('click', copyEmail);
@@ -301,9 +303,6 @@ function setOverlayMsg_(text, kind) {
   el.textContent = text;
   el.className = 'overlay-msg' + (kind ? ' ' + kind : '');
 }
-
-const $ = id => document.getElementById(id);
-const pad = n  => String(n).padStart(2, '0');
 
 function clip(text) {
   if (navigator.clipboard) {

@@ -1286,17 +1286,19 @@ function toggleSection_(name) {
 }
 
 // ── Admin API ─────────────────────────────────────
+// adminKey をURLに含めないよう POST JSON で送信する。
+// GAS の doPost は postData.contents を JSON パースして parameter にマージする。
 async function adminCall_(action, params) {
-  const url = new URL(FG_CONFIG.API_BASE_URL);
-  url.searchParams.set('action', action);
-  url.searchParams.set('adminKey', adminKey_);
-  Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
-  });
+  const body = JSON.stringify({ action, adminKey: adminKey_, ...params });
   try {
     const ctrl  = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 20000);
-    const res   = await fetch(url.toString(), { redirect: 'follow', signal: ctrl.signal });
+    const res   = await fetch(FG_CONFIG.API_BASE_URL, {
+      method: 'POST',
+      body,
+      redirect: 'follow',
+      signal: ctrl.signal,
+    });
     clearTimeout(timer);
     return await res.json();
   } catch (e) {

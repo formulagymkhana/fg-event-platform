@@ -151,7 +151,6 @@ function v2_() {
 
 function v3_() {
   let ok = true;
-  if (!val_('f-content'))      { showErr_('err-content', 'f-content', '出展内容を入力してください'); ok = false; }
   if (!checkedRadio_('booth')) { showErr_('err-booth', null, 'ブース区画を選択してください'); ok = false; }
   if (!checkedRadio_('demo'))  { showErr_('err-demo',  null, 'デモ走行を選択してください'); ok = false; }
   return ok;

@@ -411,15 +411,23 @@ function actionExchangePrize_(p) {
   if (!isExchangeOpen_(cfg)) return err_('exchange_closed');
   const student = findStudentByStampToken_(p.token, p.event);
   if (!student) return err_('invalid_token');
-  const count  = countStamps_(p.event, student.studentId);
-  const result = buildStampResult_(p.event, student.studentId, count, {});
-  if (result.claimableNow <= 0) return err_('nothing_to_claim');
-  eventSs_(p.event).getSheetByName(SHEET.PRIZE_LOG).appendRow([
-    new Date(), p.event, student.studentId, student.name,
-    count, '学生確定', result.claimableNow,
-  ]);
-  // appendRow後に countExchanged_ が更新されるので再計算して返す
-  return ok_(buildStampResult_(p.event, student.studentId, count, {}));
+
+  // 同時リクエストによる二重交換を防ぐためロック内で再計算してから書き込む
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const count  = countStamps_(p.event, student.studentId);
+    const result = buildStampResult_(p.event, student.studentId, count, {});
+    if (result.claimableNow <= 0) return err_('nothing_to_claim');
+    eventSs_(p.event).getSheetByName(SHEET.PRIZE_LOG).appendRow([
+      new Date(), p.event, student.studentId, student.name,
+      count, '学生確定', result.claimableNow,
+    ]);
+    // appendRow後に countExchanged_ が更新されるので再計算して返す
+    return ok_(buildStampResult_(p.event, student.studentId, count, {}));
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================
@@ -797,6 +805,61 @@ function isExchangeOpen_(cfg) {
   return new Date() <= new Date(cfg.exchangeDeadline);
 }
 
+/** イベントが停止・完了状態なら true（EVENT_LIST で確認） */
+function isEventInactive_(eventId) {
+  const sheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+  if (!sheet || sheet.getLastRow() < 2) return true;
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const idCol   = headers.indexOf('eventId');
+  const statCol = headers.indexOf('状態');
+  const row     = data.slice(1).find(r => String(r[idCol]) === String(eventId));
+  if (!row) return true;
+  if (statCol >= 0) {
+    const st = String(row[statCol]);
+    if (st === '公開停止' || st === '完了') return true;
+  }
+  return false;
+}
+
+/** formOpenAt 前なら true（未設定なら false） */
+function isBeforeFormOpen_(cfg) {
+  if (!cfg.formOpenAt) return false;
+  return new Date() < new Date(cfg.formOpenAt);
+}
+
+/** 参加区分の締切を過ぎていたら true（未設定なら false） */
+function isPastCategoryDeadline_(cfg, attr) {
+  const dl = {
+    'Aドライバー':             cfg.deadlineDriver,
+    'Bドライバー':             cfg.deadlineDriver,
+    'Cドライバー':             cfg.deadlineDriver,
+    'ドライバー登録メカニック': cfg.deadlineDriver,
+    '女子クラスドライバー':     cfg.deadlineWomenDriver,
+    '補欠ドライバー':           cfg.deadlineReserve,
+    'メカニック':               cfg.deadlineMechanic,
+  }[attr];
+  if (!dl) return false;
+  return new Date() > new Date(dl);
+}
+
+/** eventId の開催期間内（当日）かを EVENT_LIST で確認 */
+function isEventDay_(eventId) {
+  const sheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+  if (!sheet || sheet.getLastRow() < 2) return false;
+  const data     = sheet.getDataRange().getValues();
+  const headers  = data[0].map(String);
+  const idCol    = headers.indexOf('eventId');
+  const startCol = headers.indexOf('開始日');
+  const endCol   = headers.indexOf('終了日');
+  const row = data.slice(1).find(r => String(r[idCol]) === String(eventId));
+  if (!row) return false;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const start = new Date(row[startCol]); start.setHours(0, 0, 0, 0);
+  const end   = new Date(row[endCol]);   end.setHours(23, 59, 59, 999);
+  return today >= start && today <= end;
+}
+
 // ============================================================
 // 学生検索
 // ============================================================
@@ -913,6 +976,10 @@ function err_(code) {
     invalid_code:          '登録コードが無効です',               // T6 追加
     already_registered:    'すでに本日のイベントに登録済みです', // T6 追加
     no_email:              'この参加者にはメールアドレスが登録されていません',
+    form_not_open:         '受付がまだ開始されていません',
+    registration_closed:   '受付期間が終了しました',
+    event_inactive:        'このイベントへの登録は受け付けていません',
+    not_event_day:         'イベント開催日ではありません',
     // T12 admin
     admin_key_not_configured: 'ADMIN_KEYがGASスクリプトプロパティに未設定です',
     invalid_admin_key:        '管理者キーが正しくありません',
@@ -985,120 +1052,139 @@ function actionRegisterWalkIn_(p) {
   if (!p.event) return err_('missing_event');
   if (!p.name || !p.school) return err_('missing_params');
 
-  const studentSheet = eventSs_(p.event).getSheetByName(SHEET.STUDENTS);
-  const sData        = studentSheet.getDataRange().getValues();
-  const sHeaders     = sData[0].map(String);
-  const nameCol      = sHeaders.indexOf('氏名');
-  const schoolCol    = sHeaders.indexOf('大学名');
-  const sidCol       = sHeaders.indexOf('studentId');
+  // サーバー側検証: イベント状態・開催日チェック
+  if (isEventInactive_(p.event)) return err_('event_inactive');
+  if (!isEventDay_(p.event))     return err_('not_event_day');
 
-  // 同日・同一学生の重複チェック(氏名+大学名)
-  // 空白の表記揺れ（半角/全角/前後）で別人扱いにならないよう正規化して照合する。
-  // （クッキー喪失→再登録での復帰の取りこぼしを防ぐ）
-  const norm_ = s => String(s == null ? '' : s).replace(/[\s　]/g, '');
-  const existing = sData.slice(1).find(r =>
-    norm_(r[nameCol])   === norm_(p.name) &&
-    norm_(r[schoolCol]) === norm_(p.school)
-  );
-  if (existing) {
-    const existStudentId = String(existing[sidCol]);
-    // 既存stampTokenを返す
-    let participantSheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_PARTICIPANTS);
-    if (!participantSheet) {
-      participantSheet = eventSs_(p.event).insertSheet(SHEET.STAMP_PARTICIPANTS);
-      participantSheet.appendRow(['時刻', 'eventId', 'studentId', 'stampToken', '開始日時', 'status']);
-    }
-    const pData    = participantSheet.getDataRange().getValues();
-    const pHeaders = pData[0].map(String);
-    const pSidCol  = pHeaders.indexOf('studentId');
-    const pStCol   = pHeaders.indexOf('stampToken');
-    const pRow     = pData.slice(1).find(r =>
-      String(r[pSidCol]) === existStudentId &&
-      String(r[pHeaders.indexOf('eventId')]) === String(p.event)
+  const studentSheet = eventSs_(p.event).getSheetByName(SHEET.STUDENTS);
+
+  // 重複チェック → 採番 → appendRow を同一ロック内で完結させ、同時登録での ID 重複を防ぐ
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  let outcome_; // ロック内で確定した結果を外へ持ち出す
+  try {
+    const sData   = studentSheet.getDataRange().getValues();
+    const sHeaders = sData[0].map(String);
+    const nameCol  = sHeaders.indexOf('氏名');
+    const schoolCol = sHeaders.indexOf('大学名');
+    const sidCol   = sHeaders.indexOf('studentId');
+
+    // 同日・同一学生の重複チェック(氏名+大学名)
+    // 空白の表記揺れ（半角/全角/前後）で別人扱いにならないよう正規化して照合する。
+    // （クッキー喪失→再登録での復帰の取りこぼしを防ぐ）
+    const norm_ = s => String(s == null ? '' : s).replace(/[\s　]/g, '');
+    const existing = sData.slice(1).find(r =>
+      norm_(r[nameCol])   === norm_(p.name) &&
+      norm_(r[schoolCol]) === norm_(p.school)
     );
-    // 既存学生だが参加者行が無い場合（例: 事前登録済みで未開始）は
-    // 新規トークンを発行し、必ずシートへ追記する。
-    // （追記しないと未保存トークンを返し、以後スタンプ不能になるため）
-    let stampToken;
-    if (pRow) {
-      stampToken = String(pRow[pStCol]);
+
+    if (existing) {
+      const existStudentId = String(existing[sidCol]);
+      let participantSheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_PARTICIPANTS);
+      if (!participantSheet) {
+        participantSheet = eventSs_(p.event).insertSheet(SHEET.STAMP_PARTICIPANTS);
+        participantSheet.appendRow(['時刻', 'eventId', 'studentId', 'stampToken', '開始日時', 'status']);
+      }
+      const pData    = participantSheet.getDataRange().getValues();
+      const pHeaders = pData[0].map(String);
+      const pSidCol  = pHeaders.indexOf('studentId');
+      const pStCol   = pHeaders.indexOf('stampToken');
+      const pRow     = pData.slice(1).find(r =>
+        String(r[pSidCol]) === existStudentId &&
+        String(r[pHeaders.indexOf('eventId')]) === String(p.event)
+      );
+      // 既存学生だが参加者行が無い場合（例: 事前登録済みで未開始）は
+      // 新規トークンを発行し、必ずシートへ追記する。
+      // （追記しないと未保存トークンを返し、以後スタンプ不能になるため）
+      let stampToken;
+      if (pRow) {
+        stampToken = String(pRow[pStCol]);
+      } else {
+        stampToken = Utilities.getUuid();
+        participantSheet.appendRow([
+          new Date(), p.event, existStudentId, stampToken, new Date(), 'active',
+        ]);
+      }
+      const existCardToken = String(existing[sHeaders.indexOf('cardToken')] || '');
+      const count = countStamps_(p.event, existStudentId);
+      const result = buildStampResult_(p.event, existStudentId, count, { stampToken, cardToken: existCardToken });
+      outcome_ = { type: 'existing', existStudentId, existCardToken, stampResult: result };
     } else {
-      stampToken = Utilities.getUuid();
-      participantSheet.appendRow([
-        new Date(), p.event, existStudentId, stampToken, new Date(), 'active',
+      // 新規: studentId 採番・両シートへの appendRow をロック内で完結
+      const yearMatch  = String(p.event).match(/(\d{4})/);
+      const yearSuffix = yearMatch ? yearMatch[1].slice(-1) : String(new Date().getFullYear()).slice(-1);
+      const { uniMap, maxAutoCode } = loadUniversityMaster_();
+      const schoolName = String(p.school).trim();
+      let uniCode = uniMap.get(schoolName);
+      if (!uniCode) {
+        uniCode = String(maxAutoCode + 1).padStart(4, '0');
+        saveNewUniversities_([[schoolName, uniCode, '自動割当(要確認)']]);
+      }
+      // 連番は「西暦+大学コード+区分文字(=V)」で始まる既存IDの最大連番+1（＝同一大学・同一区分のみ）。
+      // 全件通算ではなく大学・区分単位で 01 から採番。max+1 なので既存IDの歯抜けとも衝突しない。
+      const idPrefix  = yearSuffix + uniCode + 'V';
+      const studentId = idPrefix + String(nextStudentSeq_(sData, sidCol, idPrefix)).padStart(2, '0');
+      const token     = Utilities.getUuid();
+
+      // 学生マスターに追加
+      const newRow = sHeaders.map(h => {
+        const map = {
+          'studentId': studentId, 'cardToken': token,  // T11: token → cardToken
+          '氏名': String(p.name).trim(), 'ふりがな': String(p.furigana || '').trim(),
+          '大学名': String(p.school).trim(), '学部学科': p.department || '',
+          '学年': p.year || '', '属性': '一般参加学生',
+          '自動車部在籍年数': p.clubYears || '',
+          '住所(都道府県)': p.prefecture || '',
+          '性別': p.gender || '',                       // フォーム準拠で追加
+          '生年月日': p.birthday || '', 'メールアドレス': p.email || '',
+          '電話番号': p.phone || '',
+          '所属校出場': p.competing || '',              // 所属校が出場するか
+          '規則誓約同意': p.rulesConsent  === 'true' ? 'true' : 'false', // 同意記録(大会規則書・誓約書)
+          'SNS同意':     p.snsConsent     === 'true' ? 'true' : 'false', // 同意記録
+          '個人情報同意': p.privacyConsent === 'true' ? 'true' : 'false', // 同意記録
+          '登録種別': '当日',
+        };
+        return map[h] !== undefined ? map[h] : '';
+      });
+      studentSheet.appendRow(newRow);
+
+      // スタンプ参加者シートに追加（シート未存在時は自動作成）
+      const stampToken = Utilities.getUuid();
+      let stampParticipantSheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_PARTICIPANTS);
+      if (!stampParticipantSheet) {
+        stampParticipantSheet = eventSs_(p.event).insertSheet(SHEET.STAMP_PARTICIPANTS);
+        stampParticipantSheet.appendRow(['時刻', 'eventId', 'studentId', 'stampToken', '開始日時', 'status']);
+      }
+      stampParticipantSheet.appendRow([
+        new Date(), p.event, studentId, stampToken, new Date(), 'active',
       ]);
+      outcome_ = { type: 'new', studentId, token, stampToken };
     }
-    const existCardToken = String(existing[sHeaders.indexOf('cardToken')] || '');
-    const count = countStamps_(p.event, existStudentId);
-    const result = buildStampResult_(p.event, existStudentId, count, { stampToken, cardToken: existCardToken });
+  } finally {
+    lock.releaseLock();
+  }
+
+  // ロック解放後にメール送信（IO待ちでロックを保持しない）
+  if (outcome_.type === 'existing') {
+    const { existStudentId, existCardToken, stampResult } = outcome_;
     // 再登録は実質「復帰」操作。個人ページ(氏名+QR)のリンクを再送（失敗しても登録判定は維持）
     try {
       sendWalkInPassMail_(p.email, p.name, p.event, buildPassUrl_(p.appBase, existCardToken, p.event));
     } catch (err) {
       console.error('sendWalkInPassMail_ (already_registered) failed:', err);
     }
-    return { ok: false, error: 'already_registered', data: result,
+    return { ok: false, error: 'already_registered', data: stampResult,
              message: 'すでに本日のイベントに登録済みです' };
+  } else {
+    const { studentId, token, stampToken } = outcome_;
+    // 個人ページ(氏名+QR)のリンクをメール送信（失敗しても登録は成立させる）
+    try {
+      sendWalkInPassMail_(p.email, p.name, p.event, buildPassUrl_(p.appBase, token, p.event));
+    } catch (err) {
+      console.error('sendWalkInPassMail_ failed:', err);
+    }
+    return ok_(buildStampResult_(p.event, studentId, 0, { stampToken, isNew: true, cardToken: token }));
   }
-
-  // studentId 生成(Vクラス)
-  const yearMatch  = String(p.event).match(/(\d{4})/);
-  const yearSuffix = yearMatch ? yearMatch[1].slice(-1) : String(new Date().getFullYear()).slice(-1);
-  const { uniMap, maxAutoCode } = loadUniversityMaster_();
-  const schoolName = String(p.school).trim();
-  let uniCode = uniMap.get(schoolName);
-  if (!uniCode) {
-    uniCode = String(maxAutoCode + 1).padStart(4, '0');
-    saveNewUniversities_([[schoolName, uniCode, '自動割当(要確認)']]);
-  }
-  // 連番は「西暦+大学コード+区分文字(=V)」で始まる既存IDの最大連番+1（＝同一大学・同一区分のみ）。
-  // 全件通算ではなく大学・区分単位で 01 から採番。max+1 なので既存IDの歯抜けとも衝突しない。
-  // （sidCol は上で宣言済み）
-  const idPrefix  = yearSuffix + uniCode + 'V';
-  const studentId = idPrefix + String(nextStudentSeq_(sData, sidCol, idPrefix)).padStart(2, '0');
-  const token     = Utilities.getUuid();
-
-  // 学生マスターに追加
-  const newRow = sHeaders.map(h => {
-    const map = {
-      'studentId': studentId, 'cardToken': token,  // T11: token → cardToken
-      '氏名': String(p.name).trim(), 'ふりがな': String(p.furigana || '').trim(),
-      '大学名': String(p.school).trim(), '学部学科': p.department || '',
-      '学年': p.year || '', '属性': '一般参加学生',
-      '自動車部在籍年数': p.clubYears || '',
-      '住所(都道府県)': p.prefecture || '',
-      '性別': p.gender || '',                       // フォーム準拠で追加
-      '生年月日': p.birthday || '', 'メールアドレス': p.email || '',
-      '電話番号': p.phone || '',
-      '所属校出場': p.competing || '',              // 所属校が出場するか
-      '規則誓約同意': p.rulesConsent  === 'true' ? 'true' : 'false', // 同意記録(大会規則書・誓約書)
-      'SNS同意':     p.snsConsent     === 'true' ? 'true' : 'false', // 同意記録
-      '個人情報同意': p.privacyConsent === 'true' ? 'true' : 'false', // 同意記録
-      '登録種別': '当日',
-    };
-    return map[h] !== undefined ? map[h] : '';
-  });
-  studentSheet.appendRow(newRow);
-
-  // スタンプ参加者シートに追加（シート未存在時は自動作成）
-  const stampToken = Utilities.getUuid();
-  let stampParticipantSheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_PARTICIPANTS);
-  if (!stampParticipantSheet) {
-    stampParticipantSheet = eventSs_(p.event).insertSheet(SHEET.STAMP_PARTICIPANTS);
-    stampParticipantSheet.appendRow(['時刻', 'eventId', 'studentId', 'stampToken', '開始日時', 'status']);
-  }
-  stampParticipantSheet.appendRow([
-    new Date(), p.event, studentId, stampToken, new Date(), 'active',
-  ]);
-
-  // 個人ページ(氏名+QR)のリンクをメール送信（失敗しても登録は成立させる）
-  try {
-    sendWalkInPassMail_(p.email, p.name, p.event, buildPassUrl_(p.appBase, token, p.event));
-  } catch (err) {
-    console.error('sendWalkInPassMail_ failed:', err);
-  }
-
-  return ok_(buildStampResult_(p.event, studentId, 0, { stampToken, isNew: true, cardToken: token }));
 }
 
 // ============================================================
@@ -1114,63 +1200,79 @@ function actionRegisterPreStudent_(p) {
   if (!p.event) return err_('missing_event');
   if (!p.name || !p.school || !p.email) return err_('missing_params');
 
+  // サーバー側検証: イベント状態・受付期間・区分別締切
+  if (isEventInactive_(p.event))  return err_('event_inactive');
+  const cfg  = getConfig_(p.event);
+  if (isBeforeFormOpen_(cfg))     return err_('form_not_open');
+  // 参加区分を先行確定して締切チェックに使う（後段でも同じ値を流用）
+  const attr = preAttr_(p.category, p.driverClass, p.serviceClass);
+  if (isPastCategoryDeadline_(cfg, attr)) return err_('registration_closed');
+
   const ss           = eventSs_(p.event);
   const studentSheet = ss.getSheetByName(SHEET.STUDENTS);
-  const sData        = studentSheet.getDataRange().getValues();
-  const sHeaders     = sData[0].map(String);
-  const idx          = n => sHeaders.indexOf(n);
 
-  // 重複（氏名+大学名+登録種別=事前）→ 既存 cardToken を返す
-  const existing = sData.slice(1).find(r =>
-    String(r[idx('氏名')])     === String(p.name).trim() &&
-    String(r[idx('大学名')])   === String(p.school).trim() &&
-    String(r[idx('登録種別')]) === '事前'
-  );
-  if (existing) {
-    return { ok: false, error: 'already_registered',
-      data: { studentId: String(existing[idx('studentId')]), cardToken: String(existing[idx('cardToken')]) },
-      message: 'すでに事前登録済みです' };
+  // 重複チェック → 採番 → STUDENTS appendRow を同一ロック内で完結させ、同時登録での ID 重複を防ぐ
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  let studentId, cardToken;
+  try {
+    const sData   = studentSheet.getDataRange().getValues();
+    const sHeaders = sData[0].map(String);
+    const idx     = n => sHeaders.indexOf(n);
+
+    // 重複（氏名+大学名+登録種別=事前）→ 既存 cardToken を返す
+    const existing = sData.slice(1).find(r =>
+      String(r[idx('氏名')])     === String(p.name).trim() &&
+      String(r[idx('大学名')])   === String(p.school).trim() &&
+      String(r[idx('登録種別')]) === '事前'
+    );
+    if (existing) {
+      return { ok: false, error: 'already_registered',
+        data: { studentId: String(existing[idx('studentId')]), cardToken: String(existing[idx('cardToken')]) },
+        message: 'すでに事前登録済みです' };
+    }
+
+    // 参加区分 → クラスコード（attr は上で採番前に確定済み）
+    const classCode = PRE_CLASS_CODES[attr] || 'V';
+
+    // studentId 生成
+    const yearMatch  = String(p.event).match(/(\d{4})/);
+    const yearSuffix = yearMatch ? yearMatch[1].slice(-1) : String(new Date().getFullYear()).slice(-1);
+    const { uniMap, maxAutoCode } = loadUniversityMaster_();
+    const schoolName = String(p.school).trim();
+    let uniCode = uniMap.get(schoolName);
+    if (!uniCode) {
+      uniCode = String(maxAutoCode + 1).padStart(4, '0');
+      saveNewUniversities_([[schoolName, uniCode, '自動割当(要確認)']]);
+    }
+    // 連番は「西暦+大学コード+区分文字」で始まる既存IDの最大連番+1。
+    // 属性ではなく studentId 接頭辞で数えるため、同一文字に集約される区分
+    // （補欠/メカニック/応援＝S）どうしの衝突も防げる。max+1 で歯抜けとも衝突しない。
+    const idPrefix = yearSuffix + uniCode + classCode;
+    studentId      = idPrefix + String(nextStudentSeq_(sData, idx('studentId'), idPrefix)).padStart(2, '0');
+    cardToken      = Utilities.getUuid();
+
+    // STUDENTS upsert（本人確認サブセット）
+    const newRow = sHeaders.map(h => {
+      const map = {
+        'studentId': studentId, 'cardToken': cardToken,
+        '氏名': String(p.name).trim(), 'ふりがな': String(p.furigana || '').trim(),
+        '大学名': String(p.school).trim(), '学部学科': p.department || '',
+        '学年': p.year || '', '属性': attr, '自動車部在籍年数': p.clubYears || '',
+        '住所(都道府県)': p.prefecture || '', '生年月日': p.birthday || '',
+        '性別': p.gender || '', 'メールアドレス': p.email || '', '電話番号': p.phone || '',
+        '所属校出場': p.competing || '',
+        '規則誓約同意': p.rulesConsent   === 'true' ? 'true' : 'false',
+        'SNS同意':     p.mediaConsent    === 'true' ? 'true' : 'false',
+        '個人情報同意': p.privacyConsent  === 'true' ? 'true' : 'false',
+        '登録種別': '事前',
+      };
+      return map[h] !== undefined ? map[h] : '';
+    });
+    studentSheet.appendRow(newRow);
+  } finally {
+    lock.releaseLock();
   }
-
-  // 参加区分 → 属性（serviceClass でメカニック/応援学生を区別）
-  const attr      = preAttr_(p.category, p.driverClass, p.serviceClass);
-  const classCode = PRE_CLASS_CODES[attr] || 'V';
-
-  // studentId 生成
-  const yearMatch  = String(p.event).match(/(\d{4})/);
-  const yearSuffix = yearMatch ? yearMatch[1].slice(-1) : String(new Date().getFullYear()).slice(-1);
-  const { uniMap, maxAutoCode } = loadUniversityMaster_();
-  const schoolName = String(p.school).trim();
-  let uniCode = uniMap.get(schoolName);
-  if (!uniCode) {
-    uniCode = String(maxAutoCode + 1).padStart(4, '0');
-    saveNewUniversities_([[schoolName, uniCode, '自動割当(要確認)']]);
-  }
-  // 連番は「西暦+大学コード+区分文字」で始まる既存IDの最大連番+1。
-  // 属性ではなく studentId 接頭辞で数えるため、同一文字に集約される区分
-  // （補欠/メカニック/応援＝S）どうしの衝突も防げる。max+1 で歯抜けとも衝突しない。
-  const idPrefix    = yearSuffix + uniCode + classCode;
-  const studentId   = idPrefix + String(nextStudentSeq_(sData, idx('studentId'), idPrefix)).padStart(2, '0');
-  const cardToken   = Utilities.getUuid();
-
-  // STUDENTS upsert（本人確認サブセット）
-  const newRow = sHeaders.map(h => {
-    const map = {
-      'studentId': studentId, 'cardToken': cardToken,
-      '氏名': String(p.name).trim(), 'ふりがな': String(p.furigana || '').trim(),
-      '大学名': String(p.school).trim(), '学部学科': p.department || '',
-      '学年': p.year || '', '属性': attr, '自動車部在籍年数': p.clubYears || '',
-      '住所(都道府県)': p.prefecture || '', '生年月日': p.birthday || '',
-      '性別': p.gender || '', 'メールアドレス': p.email || '', '電話番号': p.phone || '',
-      '所属校出場': p.competing || '',
-      '規則誓約同意': p.rulesConsent   === 'true' ? 'true' : 'false',
-      'SNS同意':     p.mediaConsent    === 'true' ? 'true' : 'false',
-      '個人情報同意': p.privacyConsent  === 'true' ? 'true' : 'false',
-      '登録種別': '事前',
-    };
-    return map[h] !== undefined ? map[h] : '';
-  });
-  studentSheet.appendRow(newRow);
 
   // ファイル（Drive保存・非公開）→ URLを p に設定
   // 権限未承認/一時障害でも登録自体は成立させる（サーバーエラーにしない）
@@ -2256,7 +2358,10 @@ function actionSubmitCompanyEntry_(p) {
 
   // イベント解決: パラメータ優先、なければ当日のアクティブイベント
   let eventId = p.event;
-  if (!eventId) {
+  if (eventId) {
+    // 明示指定の場合も状態チェックを必ず行う（直接POSTによるバイパス対策）
+    if (isEventInactive_(eventId)) return err_('event_inactive');
+  } else {
     const evSheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
     if (!evSheet || evSheet.getLastRow() < 2) return err_('no_active_event');
     const evData    = evSheet.getDataRange().getValues();
