@@ -2193,7 +2193,7 @@ function actionAdminUploadCompanyLogo_(p) {
     folder     = getOrCreateChildFolder_(root, String(p.event));
   } catch (er) {
     console.error('logo_step1_folder:', er);
-    return err_('logo_step1_folder_failed');
+    return { ok: false, error: 'logo_step1_folder_failed', message: 'Step1(Driveフォルダ): ' + (er && er.message ? er.message : String(er)) };
   }
 
   // Step2: 既存ファイル削除
@@ -2215,7 +2215,7 @@ function actionAdminUploadCompanyLogo_(p) {
     file = folder.createFile(blob);
   } catch (er) {
     console.error('logo_step3_create:', er);
-    return err_('logo_step3_create_failed');
+    return { ok: false, error: 'logo_step3_create_failed', message: 'Step3(ファイル作成): ' + (er && er.message ? er.message : String(er)) };
   }
 
   // Step4: 公開設定
@@ -2223,7 +2223,7 @@ function actionAdminUploadCompanyLogo_(p) {
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   } catch (er) {
     console.error('logo_step4_sharing:', er);
-    return err_('logo_step4_sharing_failed');
+    return { ok: false, error: 'logo_step4_sharing_failed', message: 'Step4(公開設定): ' + (er && er.message ? er.message : String(er)) };
   }
 
   const fileId = file.getId();
@@ -2247,7 +2247,7 @@ function actionAdminUploadCompanyLogo_(p) {
     }
   } catch (er) {
     console.error('logo_step5_sheet:', er);
-    return err_('logo_step5_sheet_failed');
+    return { ok: false, error: 'logo_step5_sheet_failed', message: 'Step5(シート更新): ' + (er && er.message ? er.message : String(er)) };
   }
 
   return ok_({ url, fileId });
