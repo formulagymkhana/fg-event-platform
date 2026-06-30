@@ -403,6 +403,8 @@ function actionGetStampProgress_(p) {
   return ok_(buildStampResult_(p.event, student.studentId, myStamps.length, {
     stamps: myStamps,
     companies: getCompaniesForEvent_(p.event),  // スタンプ帳の全ブース（ロゴ含む）
+    name:      student.name,        // 本人確認用（共有端末での取り違え防止）
+    studentId: student.studentId,   // 同上・補助識別
   }));
 }
 

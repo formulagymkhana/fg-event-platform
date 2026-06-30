@@ -52,6 +52,14 @@ async function loadProgress() {
 }
 
 function renderProgress(d) {
+  // 本人確認表示（共有端末でのスタンプ取り違え防止）。名前を主・学生IDを補助に。
+  if (d.name) {
+    const idPart = d.studentId ? `（${d.studentId}）` : '';
+    setText('pg-student', `${d.name} さん${idPart}`);
+  } else {
+    setText('pg-student', '');
+  }
+
   const count          = d.stampCount     || 0;
   const prizeUnitSize  = d.prizeUnitSize  || d.prizeThreshold || 5;
   const maxPrizes      = d.maxPrizes      || d.prizeCount     || 3;
