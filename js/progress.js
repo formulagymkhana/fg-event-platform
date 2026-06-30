@@ -19,8 +19,10 @@ document.getElementById('btn-exchange-confirm')?.addEventListener('click', doExc
 loadProgress();
 
 async function loadProgress() {
-  const token = FG_API.getParam('st') || FG_API.getStampToken();
-  const pk = FG_API.getParam('pk');  // cardToken fallback: MYPASSから来た場合に学生を特定
+  const pk = FG_API.getParam('pk');  // cardToken: MYPASS由来。これがあれば学生が一意に定まる
+  // pk がある＝MYPASS から来た場合は cookie を信用しない（前の人のtokenが残っている可能性）。
+  // pk が無い直アクセスのみ cookie にフォールバックする。
+  const token = FG_API.getParam('st') || (pk ? null : FG_API.getStampToken());
   const eventOverride = FG_API.getParam('event') || null;  // テスト/会期外用の明示指定
   if (!token && !pk) {
     showState('no-token');
@@ -277,15 +279,17 @@ function buildMilestones_(unitSize, maxPrizes) {
 // ── 景品交換(学生側確定) ──
 
 async function doExchange() {
-  const token = FG_API.getParam('st') || FG_API.getStampToken();
-  if (!token) return;
+  const pk = FG_API.getParam('pk');
+  // pk(MYPASS由来)があれば cookie を信用しない。直アクセス時のみ cookie フォールバック。
+  const token = FG_API.getParam('st') || (pk ? null : FG_API.getStampToken());
+  if (!token && !pk) return;
   const eventOverride = FG_API.getParam('event') || null;
 
   const btn = document.getElementById('btn-exchange-confirm');
   btn.disabled = true;
   btn.textContent = '記録中...';
 
-  const res = await FG_API.exchangePrize(token, eventOverride);
+  const res = await FG_API.exchangePrize(token, eventOverride, pk);
 
   btn.disabled = false;
   btn.textContent = 'はい、受け取りました';

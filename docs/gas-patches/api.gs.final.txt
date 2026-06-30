@@ -433,11 +433,13 @@ function getCompaniesForEvent_(eventId) {
 // ============================================================
 
 function actionExchangePrize_(p) {
-  if (!p.token) return err_('missing_token');
+  if (!p.token && !p.pk) return err_('missing_token');
   if (!p.event) return err_('missing_event');
   const cfg = getConfig_(p.event);
   if (!isExchangeOpen_(cfg)) return err_('exchange_closed');
-  const student = findStudentByStampToken_(p.token, p.event);
+  // stampToken で学生特定。未登録なら cardToken(pk)で fallback（学生確定→studentIdで記録）
+  let student = p.token ? findStudentByStampToken_(p.token, p.event) : null;
+  if (!student && p.pk) student = findStudentByCardToken_(p.pk, p.event);
   if (!student) return err_('invalid_token');
 
   // 同時リクエストによる二重交換を防ぐためロック内で再計算してから書き込む

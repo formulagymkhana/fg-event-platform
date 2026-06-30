@@ -150,9 +150,10 @@ const FG_API = (() => {
   }
 
   /** 学生が自分で景品交換を確定する(スタッフ指示に従って操作) */
-  function exchangePrize(stampToken, event) {
+  function exchangePrize(stampToken, event, pk) {
     const p = { token: stampToken };
     if (event) p.event = event;
+    if (pk) p.pk = pk;
     return call_('exchangePrize', p);
   }
 
