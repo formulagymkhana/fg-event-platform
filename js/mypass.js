@@ -55,7 +55,7 @@ function renderPass_(d, token, event) {
   const school = [d.school, d.department].filter(Boolean).join(' ');
   setText('school', school);
 
-  // 進捗リンク: event + stampToken を付与してデバイス間で同一学生データを参照
+  // 進捗リンク: pk(cardToken)を常に付与。stampTokenがなくてもサーバ側で学生を特定できる。
   const prog = document.getElementById('btn-progress');
   if (prog && event) {
     const params = new URLSearchParams({ event });
@@ -63,6 +63,7 @@ function renderPass_(d, token, event) {
       params.set('st', d.stampToken);
       FG_API.saveStampToken(d.stampToken);
     }
+    params.set('pk', token);
     prog.href = `progress.html?${params}`;
   }
 
@@ -101,6 +102,7 @@ async function restoreStampCookie_(token, event) {
       const prog = document.getElementById('btn-progress');
       if (prog && event && !prog.href.includes('st=')) {
         const params = new URLSearchParams({ event, st });
+        params.set('pk', token);
         prog.href = `progress.html?${params}`;
       }
     }

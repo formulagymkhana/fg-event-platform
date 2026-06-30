@@ -142,9 +142,10 @@ const FG_API = (() => {
 
   /** stampTokenでスタンプ取得状況を取得(個人情報を含まない)
    *  event 省略時は当日の自動判定。テスト/会期外は event 明示で対象イベントを指定可。 */
-  function getStampProgress(stampToken, event) {
+  function getStampProgress(stampToken, event, pk) {
     const p = { token: stampToken };
     if (event) p.event = event;
+    if (pk) p.pk = pk;
     return call_('getStampProgress', p);
   }
 

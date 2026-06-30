@@ -20,14 +20,15 @@ loadProgress();
 
 async function loadProgress() {
   const token = FG_API.getParam('st') || FG_API.getStampToken();
+  const pk = FG_API.getParam('pk');  // cardToken fallback: MYPASSから来た場合に学生を特定
   const eventOverride = FG_API.getParam('event') || null;  // テスト/会期外用の明示指定
-  if (!token) {
+  if (!token && !pk) {
     showState('no-token');
     return;
   }
 
   showState('loading');
-  const res = await FG_API.getStampProgress(token, eventOverride);
+  const res = await FG_API.getStampProgress(token, eventOverride, pk);
 
   if (!res.ok) {
     showState('error');

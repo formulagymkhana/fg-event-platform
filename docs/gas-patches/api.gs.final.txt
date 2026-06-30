@@ -375,12 +375,14 @@ function actionSaveStamp_(p) {
 // ============================================================
 
 function actionGetStampProgress_(p) {
-  if (!p.token) return err_('missing_token');
+  if (!p.token && !p.pk) return err_('missing_token');
   if (!p.event) return err_('missing_event');
 
   if (!isEventDay_(p.event)) return err_('event_ended');
 
-  const student = findStudentByStampToken_(p.token, p.event);
+  // stampToken で学生を特定。未登録(STAMP_PARTICIPANTS未作成)の場合は cardToken(pk)で fallback。
+  let student = p.token ? findStudentByStampToken_(p.token, p.event) : null;
+  if (!student && p.pk) student = findStudentByCardToken_(p.pk, p.event);
   if (!student) return err_('invalid_token');
 
   const sheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_LOG);
