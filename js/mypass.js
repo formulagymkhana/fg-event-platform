@@ -55,9 +55,16 @@ function renderPass_(d, token, event) {
   const school = [d.school, d.department].filter(Boolean).join(' ');
   setText('school', school);
 
-  // 進捗リンクに event を引き継ぐ（会期外・複数イベントでの取り違え防止）
+  // 進捗リンク: event + stampToken を付与してデバイス間で同一学生データを参照
   const prog = document.getElementById('btn-progress');
-  if (prog && event) prog.href = `progress.html?event=${encodeURIComponent(event)}`;
+  if (prog && event) {
+    const params = new URLSearchParams({ event });
+    if (d.stampToken) {
+      params.set('st', d.stampToken);
+      FG_API.saveStampToken(d.stampToken);
+    }
+    prog.href = `progress.html?${params}`;
+  }
 
   // QRは企業閲覧用URL（card.html）を符号化する
   const cardUrl = buildCardUrl_(token, event);
@@ -88,7 +95,14 @@ async function restoreStampCookie_(token, event) {
   try {
     const res = await FG_API.activateStamp(token, event);
     if (res.ok && res.data && res.data.stampToken) {
-      FG_API.saveStampToken(res.data.stampToken);
+      const st = res.data.stampToken;
+      FG_API.saveStampToken(st);
+      // スタンプ初回起動後に進捗リンクへ st を付与（getStudent 時点では未登録の場合）
+      const prog = document.getElementById('btn-progress');
+      if (prog && event && !prog.href.includes('st=')) {
+        const params = new URLSearchParams({ event, st });
+        prog.href = `progress.html?${params}`;
+      }
     }
   } catch (e) { /* 失敗しても表示は維持 */ }
 }

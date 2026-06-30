@@ -153,6 +153,24 @@ function actionGetStudent_(p) {
   const student = findStudentByCardToken_(p.token, p.event);
   if (!student) return err_('invalid_token');
 
+  // MYPASS からのリクエストはスタンプトークンも返す（進捗リンクに ?st= を付与するため）
+  let stampToken = null;
+  if (p.source === 'mypass') {
+    const ps = eventSs_(p.event).getSheetByName(SHEET.STAMP_PARTICIPANTS);
+    if (ps && ps.getLastRow() > 1) {
+      const pd  = ps.getDataRange().getValues();
+      const ph  = pd[0].map(String);
+      const pEv = ph.indexOf('eventId');
+      const pSi = ph.indexOf('studentId');
+      const pSt = ph.indexOf('stampToken');
+      const row = pd.slice(1).find(r =>
+        String(r[pEv]) === String(p.event) &&
+        String(r[pSi]) === String(student.studentId)
+      );
+      if (row && pSt >= 0) stampToken = String(row[pSt]);
+    }
+  }
+
   return ok_({
     studentId:  student.studentId,
     name:       student.name,
@@ -167,6 +185,7 @@ function actionGetStudent_(p) {
     email:      student.email,
     eventName:  cfg.eventName,
     deadline:   cfg.publicDeadline,
+    stampToken: stampToken,
   });
 }
 
