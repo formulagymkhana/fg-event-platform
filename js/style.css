@@ -620,7 +620,7 @@ body {
 
 /* ── マイルストーンバー ───────────────────────────── */
 .milestone-bar-section {
-  padding: 0 20px 10px;
+  padding: 0 20px 6px;
 }
 .milestone-title {
   font-size: 11px;
