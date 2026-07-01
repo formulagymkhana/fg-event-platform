@@ -204,7 +204,7 @@ function renderMilestoneBar(count, visited, prizeMilestones, totalCompanies) {
   // マーカーは閾値の実数値ではなく等間隔に配置（i番目→(i+1)/n%、末尾＝100%）。
   // これで景品マーカーが前半に密集せず、最後の「→全制覇」区間だけ実距離が長くなる。
   const n = markers.length;
-  markers.forEach((m, i) => { m.pos = Math.round(((i + 1) / n) * 100); });
+  markers.forEach((m, i) => { m.pos = Math.round(((i + 1) / n) * 96); });
 
   // 進捗フィルは区分線形でマーカー位置へマッピング（区切り間の実スタンプ数で按分）。
   const pct         = milestoneFill_(count, markers);
