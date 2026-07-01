@@ -14,7 +14,7 @@
   <title>FORMULA GYMKHANA — スタンプ進捗</title>
   <link rel="preconnect" href="https://script.google.com">
   <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
-  <link rel="stylesheet" href="../js/style.css?v=20260629c">
+  <link rel="stylesheet" href="../js/style.css?v=20260701a">
   <style>
     html, body { height: 100%; overflow: hidden; }
     body { margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; background: var(--fg-bg); }
@@ -30,18 +30,18 @@
     .pg-scroll .section-label { margin-bottom: 16px; }
     .pg-scroll .section-en { font-size: 22px; letter-spacing: 0.1em; }
     .stampbook-head { padding: 20px 20px 0; }
-    .pg-bottom { flex-shrink: 0; padding: 14px 0 12px; border-top: 1px solid var(--fg-line); background: #fff; }
+    .pg-bottom { flex-shrink: 0; padding: 8px 0 8px; border-top: 1px solid var(--fg-line); background: #fff; }
     .pg-bottom .reload-btn { width: auto; margin: 4px 20px 0; padding: 8px 16px; }
     .pg-note { margin: 8px 20px 0; padding: 10px 12px; border-radius: 10px; background: var(--fg-blue-soft); color: var(--fg-muted); font-size: 11px; line-height: 1.6; }
-    .status-card { margin: 18px 24px 0; }
+    .status-card { margin: 10px 20px 0; padding: 10px 14px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* 景品引換 */
-    .exchange-action { padding: 14px 24px 0; }
-    .exchange-btn { width: 100%; padding: 15px; border: none; border-radius: var(--radius-ui); font-size: 15px; font-weight: 700; cursor: pointer; background: var(--fg-success); color: #fff; }
+    .exchange-action { padding: 8px 20px 0; }
+    .exchange-btn { width: 100%; padding: 12px; border: none; border-radius: var(--radius-ui); font-size: 14px; font-weight: 700; cursor: pointer; background: var(--fg-success); color: #fff; }
     .exchange-btn:active { background: #248052; }
     .exchange-btn.confirm { background: #C0392B; }
-    .exchange-note { font-size: 11px; color: #9A2A2A; text-align: center; margin-top: 8px; line-height: 1.6; }
-    .confirm-text { font-size: 14px; color: var(--fg-text); text-align: center; margin-bottom: 12px; font-weight: 600; line-height: 1.6; }
+    .exchange-note { font-size: 10px; color: #9A2A2A; text-align: center; margin-top: 4px; line-height: 1.4; white-space: nowrap; }
+    .confirm-text { font-size: 13px; color: var(--fg-text); text-align: center; margin-bottom: 8px; font-weight: 600; line-height: 1.5; }
     .cancel-link  { display: block; width: 100%; padding: 10px; margin-top: 8px; background: none; border: none; color: var(--fg-muted); font-size: 13px; cursor: pointer; text-decoration: underline; }
 
     .list-heading { padding: 0 20px; margin-bottom: 10px; }
@@ -136,7 +136,7 @@
       <div class="exchange-action" id="exchange-action" style="display:none">
         <div id="exchange-start">
           <button class="exchange-btn" id="btn-exchange-start">景品を受け取る</button>
-          <p class="exchange-note">※交換所でスタッフの指示があってから<br>押してください</p>
+          <p class="exchange-note">※交換所でスタッフの指示があってから押してください</p>
         </div>
         <div id="exchange-confirm" style="display:none">
           <p class="confirm-text">景品を受け取りましたか?<br>確定すると取り消せません。</p>

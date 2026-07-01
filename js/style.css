@@ -357,10 +357,11 @@ body {
 
 .status-card .status-sub,
 .status-card .sub {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 400;
-  margin-top: 4px;
+  margin-top: 2px;
   opacity: 0.9;
+  white-space: nowrap;
 }
 
 /* ── 企業ブースカード / 完了カード（stamp.html用） ── */
@@ -619,7 +620,7 @@ body {
 
 /* ── マイルストーンバー ───────────────────────────── */
 .milestone-bar-section {
-  padding: 0 20px 20px;
+  padding: 0 20px 10px;
 }
 .milestone-title {
   font-size: 11px;

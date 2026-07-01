@@ -2112,7 +2112,7 @@ function actionAdminGetCompanies_(p) {
     viewKey:     g(row, 'viewKey'),
     hasNfc:      g(row, 'hasNfc'),
     logoUrl:     String(g(row, 'logoUrl') || ''),
-    stampRally:  String(g(row, 'stampRally') || '').toUpperCase() !== 'FALSE',
+    stampRally:  String(g(row, 'stampRally')).toUpperCase() !== 'FALSE',
   }));
   return ok_({ companies });
 }
