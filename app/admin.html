@@ -276,6 +276,14 @@
     .entry-chip.booth-yes{background:#EBF2FF;color:var(--navy)}
     .entry-chip.demo-yes{background:var(--fg-success-bg,#EAF8F0);color:var(--fg-success,#1A6640)}
     .entry-chip.demo-maybe{background:var(--fg-warning-bg);color:var(--fg-warning)}
+    /* ── 企業管理タブ ── */
+    .co-tab-bar{display:flex;background:#fff;border-bottom:2px solid var(--border)}
+    .co-tab-btn{flex:1;padding:12px 8px;font-size:13px;font-weight:600;color:var(--gray);
+      background:none;border:none;border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;transition:color .15s,border-color .15s}
+    .co-tab-btn.active{color:var(--fg-blue);border-bottom-color:var(--fg-blue)}
+    .co-tab-count{font-size:11px;font-weight:400;margin-left:4px}
+    .co-tab-content{display:none}
+    .co-tab-content.active{display:block}
     /* ── 詳細モーダル グループ ── */
     .detail-group{margin-bottom:14px}
     .detail-group:last-child{margin-bottom:0}
@@ -520,6 +528,11 @@
       <a class="page-back" id="back-dash-co" href="#">← ダッシュボード</a>
       <span class="page-title">企業管理</span>
     </header>
+    <div class="co-tab-bar">
+      <button class="co-tab-btn active" data-co-tab="register">企業登録</button>
+      <button class="co-tab-btn" data-co-tab="entries">出展申込<span class="co-tab-count" id="co-tab-entry-count"></span></button>
+    </div>
+    <div class="co-tab-content active" id="co-tab-register">
     <div class="app-body">
       <p class="step-desc" style="margin-top:4px">参加企業を登録し、スタンプキー・閲覧キーを発行します。</p>
 
@@ -558,6 +571,65 @@
       </div>
       <div id="company-list"></div>
     </div>
+    </div><!-- /co-tab-register -->
+
+    <div class="co-tab-content" id="co-tab-entries">
+      <div class="app-body">
+
+        <div class="action-row" style="margin-bottom:10px">
+          <button class="act-btn act-btn-ghost" id="btn-entry-reload">↻ 再読み込み</button>
+          <button class="act-btn act-btn-ghost" id="btn-entry-csv">CSV ダウンロード</button>
+        </div>
+        <div class="cfg-row" style="margin-bottom:14px">
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">申込フォームURL</label>
+          <div class="url-box">
+            <div class="url-val" id="entry-form-url">—</div>
+            <button class="sm-btn" id="btn-copy-entry-url">URLをコピー</button>
+          </div>
+        </div>
+
+        <div id="entry-loading" class="loading-msg">読み込み中...</div>
+
+        <div id="entry-summary" style="display:none">
+          <div class="area-label" style="margin-top:0">集計</div>
+          <div class="stat-grid" style="grid-template-columns:repeat(2,1fr)">
+            <div class="stat-card"><div class="stat-val" id="es-total">—</div><div class="stat-lbl">申込件数</div></div>
+            <div class="stat-card"><div class="stat-val" id="es-booth">—</div><div class="stat-lbl">ブース区画あり</div></div>
+            <div class="stat-card"><div class="stat-val" id="es-car">—</div><div class="stat-lbl">展示車両合計（台）</div></div>
+            <div class="stat-card"><div class="stat-val" id="es-demo">—</div><div class="stat-lbl">デモ走行あり</div></div>
+          </div>
+          <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);margin-top:0">
+            <div class="stat-card"><div class="stat-val" id="es-ppass">—</div><div class="stat-lbl">人パス合計（枚）</div></div>
+            <div class="stat-card"><div class="stat-val" id="es-cpass">—</div><div class="stat-lbl">車両パス合計（枚）</div></div>
+            <div class="stat-card"><div class="stat-val" id="es-lsat">—</div><div class="stat-lbl">土曜昼食合計（食）</div></div>
+            <div class="stat-card"><div class="stat-val" id="es-lsun">—</div><div class="stat-lbl">日曜昼食合計（食）</div></div>
+          </div>
+        </div>
+
+        <div class="section" id="entry-section" style="display:none">
+          <div class="section-hd" data-section="entry-list">
+            <span class="section-title">📋 申込一覧 <span class="section-count" id="entry-list-count"></span></span>
+            <span class="section-toggle" id="toggle-entry-list">▼</span>
+          </div>
+          <div class="section-body open" id="body-entry-list">
+            <div id="entry-card-list"></div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /co-tab-entries -->
+
+    <!-- 出展申込詳細モーダル -->
+    <div class="modal-ov" id="modal-entry" style="display:none">
+      <div class="modal-card">
+        <div class="modal-hd">
+          <span class="modal-title" id="modal-entry-title">申込詳細</span>
+          <button class="modal-close" id="modal-entry-close">✕</button>
+        </div>
+        <div class="modal-bd" id="modal-entry-body" style="overflow-y:auto;max-height:70vh;"></div>
+      </div>
+    </div>
+
   </div><!-- /page-companies -->
 
   <!-- ─────────────────────────────────────
@@ -771,71 +843,6 @@
     </div>
   </div><!-- /page-universities -->
 
-  <!-- ─────────────────────────────────────
-       PAGE: 出展申込
-  ───────────────────────────────────── -->
-  <div id="page-entries" style="display:none">
-    <header class="page-hd">
-      <a class="page-back" id="back-dash-entry" href="#">← ダッシュボード</a>
-      <span class="page-title">出展申込</span>
-    </header>
-    <div class="app-body">
-
-      <div class="action-row" style="margin-bottom:10px">
-        <button class="act-btn act-btn-ghost" id="btn-entry-reload">↻ 再読み込み</button>
-        <button class="act-btn act-btn-ghost" id="btn-entry-csv">CSV ダウンロード</button>
-      </div>
-      <div class="cfg-row" style="margin-bottom:14px">
-        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">申込フォームURL</label>
-        <div class="url-box">
-          <div class="url-val" id="entry-form-url">—</div>
-          <button class="sm-btn" id="btn-copy-entry-url">URLをコピー</button>
-        </div>
-      </div>
-
-      <div id="entry-loading" class="loading-msg">読み込み中...</div>
-
-      <!-- サマリー集計 -->
-      <div id="entry-summary" style="display:none">
-        <div class="area-label" style="margin-top:0">集計</div>
-        <div class="stat-grid" style="grid-template-columns:repeat(2,1fr)">
-          <div class="stat-card"><div class="stat-val" id="es-total">—</div><div class="stat-lbl">申込件数</div></div>
-          <div class="stat-card"><div class="stat-val" id="es-booth">—</div><div class="stat-lbl">ブース区画あり</div></div>
-          <div class="stat-card"><div class="stat-val" id="es-car">—</div><div class="stat-lbl">展示車両合計（台）</div></div>
-          <div class="stat-card"><div class="stat-val" id="es-demo">—</div><div class="stat-lbl">デモ走行あり</div></div>
-        </div>
-        <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);margin-top:0">
-          <div class="stat-card"><div class="stat-val" id="es-ppass">—</div><div class="stat-lbl">人パス合計（枚）</div></div>
-          <div class="stat-card"><div class="stat-val" id="es-cpass">—</div><div class="stat-lbl">車両パス合計（枚）</div></div>
-          <div class="stat-card"><div class="stat-val" id="es-lsat">—</div><div class="stat-lbl">土曜昼食合計（食）</div></div>
-          <div class="stat-card"><div class="stat-val" id="es-lsun">—</div><div class="stat-lbl">日曜昼食合計（食）</div></div>
-        </div>
-      </div>
-
-      <!-- 申込カード一覧 -->
-      <div class="section" id="entry-section" style="display:none">
-        <div class="section-hd" data-section="entry-list">
-          <span class="section-title">📋 申込一覧 <span class="section-count" id="entry-list-count"></span></span>
-          <span class="section-toggle" id="toggle-entry-list">▼</span>
-        </div>
-        <div class="section-body open" id="body-entry-list">
-          <div id="entry-card-list"></div>
-        </div>
-      </div>
-
-      <!-- 詳細モーダル -->
-      <div class="modal-ov" id="modal-entry" style="display:none">
-        <div class="modal-card">
-          <div class="modal-hd">
-            <span class="modal-title" id="modal-entry-title">申込詳細</span>
-            <button class="modal-close" id="modal-entry-close">✕</button>
-          </div>
-          <div class="modal-bd" id="modal-entry-body" style="overflow-y:auto;max-height:70vh;"></div>
-        </div>
-      </div>
-
-    </div>
-  </div><!-- /page-entries -->
 
   <!-- ─────────────────────────────────────
        PAGE: 全体設定
@@ -935,6 +942,6 @@
 <div class="toast" id="toast"></div>
 <script src="../js/vendor/qrcode.min.js"></script>
 <script src="../js/config.js?v=20260623a"></script>
-<script src="../js/admin.js?v=20260629a"></script>
+<script src="../js/admin.js?v=20260701a"></script>
 </body>
 </html>

@@ -86,6 +86,21 @@ window.addEventListener('DOMContentLoaded', () => {
     if (txt && !txt.startsWith('（') && txt !== '—') copyText_(txt);
   });
 
+  // 企業管理タブ切り替え
+  document.querySelectorAll('.co-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.coTab;
+      activateCoTab_(tab);
+      if (tab === 'register') {
+        populateImportSelect_();
+        loadCompanies_();
+      } else if (tab === 'entries') {
+        updateEntryFormUrl_();
+        loadCompanyEntries_();
+      }
+    });
+  });
+
   // 準備中ボタン: トースト案内
   document.addEventListener('click', e => {
     if (e.target.hasAttribute('data-wip')) {
@@ -164,6 +179,7 @@ function route_() {
 
   if (section === 'companies') {
     showPage_('companies');
+    activateCoTab_('register');
     populateImportSelect_();
     loadCompanies_();
   } else if (section === 'students') {
@@ -182,7 +198,8 @@ function route_() {
     showPage_('universities');
     loadUniversities_();
   } else if (section === 'entries') {
-    showPage_('entries');
+    showPage_('companies');
+    activateCoTab_('entries');
     updateEntryFormUrl_();
     loadCompanyEntries_();
   } else {
@@ -196,10 +213,19 @@ function route_() {
 }
 
 function showPage_(name) {
-  ['events', 'dashboard', 'companies', 'students', 'forms', 'universities', 'entries', 'settings'].forEach(p => {
+  ['events', 'dashboard', 'companies', 'students', 'forms', 'universities', 'settings'].forEach(p => {
     const el = id_('page-' + p);
     if (el) el.style.display = p === name ? '' : 'none';
   });
+}
+
+function activateCoTab_(tab) {
+  document.querySelectorAll('.co-tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.coTab === tab);
+  });
+  document.querySelectorAll('.co-tab-content').forEach(c => c.classList.remove('active'));
+  const target = id_('co-tab-' + tab);
+  if (target) target.classList.add('active');
 }
 
 /** イベント一覧をカード形式でレンダリング */
@@ -1625,6 +1651,9 @@ async function loadCompanyEntries_() {
     badge.textContent = n + '件';
     badge.className   = 'nav-card-count ' + (n > 0 ? 'todo' : 'init');
   }
+  // タブカウント更新
+  const tabCount = id_('co-tab-entry-count');
+  if (tabCount) tabCount.textContent = companyEntries_.length ? ' (' + companyEntries_.length + ')' : '';
 }
 
 function renderEntries_(entries) {
