@@ -620,7 +620,7 @@ body {
 
 /* ── マイルストーンバー ───────────────────────────── */
 .milestone-bar-section {
-  padding: 0 20px 2px;
+  padding: 0 28px 2px 20px;
 }
 .milestone-title {
   font-size: 11px;
@@ -635,7 +635,7 @@ body {
   height: 8px;
   background: var(--fg-line);
   border-radius: 100px;
-  margin: 16px 0 40px;
+  margin: 16px 0 28px;
 }
 .milestone-fill {
   height: 100%;
@@ -698,7 +698,7 @@ body {
   font-weight: 700;
   color: var(--fg-blue);
   letter-spacing: 0.05em;
-  padding-top: 40px;
+  padding-top: 0;
   padding-bottom: 4px;
 }
 
