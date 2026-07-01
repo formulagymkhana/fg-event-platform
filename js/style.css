@@ -635,7 +635,7 @@ body {
   height: 8px;
   background: var(--fg-line);
   border-radius: 100px;
-  margin: 16px 0 28px;
+  margin: 16px 0 22px;
 }
 .milestone-fill {
   height: 100%;
@@ -664,7 +664,7 @@ body {
   text-align: center;
   transform: translateX(-50%);
   position: absolute;
-  top: 18px;
+  top: 14px;
   white-space: nowrap;
 }
 .milestone-label .m-count {
