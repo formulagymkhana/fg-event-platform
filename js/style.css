@@ -698,8 +698,8 @@ body {
   font-weight: 700;
   color: var(--fg-blue);
   letter-spacing: 0.05em;
-  padding-top: 0;
-  padding-bottom: 4px;
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 
 /* ── fg-list（進捗リスト・公式サイト日程表スタイル） ── */
