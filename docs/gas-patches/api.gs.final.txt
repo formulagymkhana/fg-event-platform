@@ -1934,8 +1934,8 @@ function actionAdminGetStats_(p) {
     const llCol = sHeaders.indexOf('弁当_日');
     if (lsCol >= 0 || llCol >= 0) {
       sData.slice(1).forEach(r => {
-        if (lsCol >= 0) stuLunchSat += Number(r[lsCol]) || 0;
-        if (llCol >= 0) stuLunchSun += Number(r[llCol]) || 0;
+        if (lsCol >= 0) { var vs = String(r[lsCol]); stuLunchSat += vs === 'はい' ? 1 : (Number(vs) || 0); }
+        if (llCol >= 0) { var vl = String(r[llCol]); stuLunchSun += vl === 'はい' ? 1 : (Number(vl) || 0); }
       });
     }
   }

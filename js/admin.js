@@ -416,6 +416,8 @@ async function loadStats_(gen, ev) {
   setText_('lunch-total-sun', (co.sun || 0) + (st.sun || 0) || '—');
   setText_('lunch-stu-sat2',  st.sat  ?? '—');
   setText_('lunch-stu-sun2',  st.sun  ?? '—');
+  setText_('lunch-co-sat2',   co.sat  ?? '—');
+  setText_('lunch-co-sun2',   co.sun  ?? '—');
   updateStepBadges_();
 }
 
