@@ -1921,6 +1921,7 @@ function actionAdminGetStats_(p) {
 
   const studentSheet = ss.getSheetByName(SHEET.STUDENTS);
   let studentCount = 0, walkInCount = 0;
+  let stuLunchSat = 0, stuLunchSun = 0;
   if (studentSheet && studentSheet.getLastRow() > 1) {
     const sData    = studentSheet.getDataRange().getValues();
     const sHeaders = sData[0].map(String);
@@ -1929,6 +1930,30 @@ function actionAdminGetStats_(p) {
     walkInCount  = regCol >= 0
       ? sData.slice(1).filter(r => String(r[regCol]) === '当日').length
       : 0;
+    const lsCol = sHeaders.indexOf('弁当_土');
+    const llCol = sHeaders.indexOf('弁当_日');
+    if (lsCol >= 0 || llCol >= 0) {
+      sData.slice(1).forEach(r => {
+        if (lsCol >= 0) stuLunchSat += Number(r[lsCol]) || 0;
+        if (llCol >= 0) stuLunchSun += Number(r[llCol]) || 0;
+      });
+    }
+  }
+
+  // 企業側の食券（出展申込シート）
+  const entrySheet = ss.getSheetByName(SHEET.COMPANY_ENTRIES);
+  let coLunchSat = 0, coLunchSun = 0;
+  if (entrySheet && entrySheet.getLastRow() > 1) {
+    const eData    = entrySheet.getDataRange().getValues();
+    const eHeaders = eData[0].map(String);
+    const elsCol   = eHeaders.indexOf('昼食土');
+    const ellCol   = eHeaders.indexOf('昼食日');
+    if (elsCol >= 0 || ellCol >= 0) {
+      eData.slice(1).forEach(r => {
+        if (elsCol >= 0) coLunchSat += Number(r[elsCol]) || 0;
+        if (ellCol >= 0) coLunchSun += Number(r[ellCol]) || 0;
+      });
+    }
   }
 
   const stampSheet       = ss.getSheetByName(SHEET.STAMP_LOG);
@@ -1963,6 +1988,10 @@ function actionAdminGetStats_(p) {
     stampCount:       stampSheet       ? Math.max(0, stampSheet.getLastRow()       - 1) : 0,
     participantCount: participantSheet ? Math.max(0, participantSheet.getLastRow() - 1) : 0,
     prizeCount,
+    lunch: {
+      student: { sat: stuLunchSat, sun: stuLunchSun },
+      company: { sat: coLunchSat,  sun: coLunchSun },
+    },
   });
 }
 

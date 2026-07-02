@@ -12,7 +12,7 @@
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src 'self' https://fonts.gstatic.com;">
   <title>FG 管理パネル</title>
-  <link rel="stylesheet" href="../js/style.css?v=20260629c">
+  <link rel="stylesheet" href="../js/style.css?v=20260702a">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     :root{
@@ -405,11 +405,17 @@
           <span class="nav-card-label">大学管理</span>
           <span class="nav-card-count init" id="badge-uni">確認中</span>
         </a>
-        <a class="nav-card" id="nav-entry-card" href="#" style="grid-column:1/-1">
-          <span class="nav-card-icon">🏁</span>
-          <span class="nav-card-label">出展申込</span>
-          <span class="nav-card-count init" id="badge-entry">確認中</span>
-        </a>
+      </div>
+
+      <!-- 食券集計 -->
+      <div class="area-label">食券（弁当）必要枚数</div>
+      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stat-card"><div class="stat-val" id="lunch-co-sat">—</div><div class="stat-lbl">企業 土曜</div></div>
+        <div class="stat-card"><div class="stat-val" id="lunch-stu-sat">—</div><div class="stat-lbl">学生 土曜</div></div>
+        <div class="stat-card"><div class="stat-val" id="lunch-total-sat">—</div><div class="stat-lbl">合計 土曜</div></div>
+        <div class="stat-card"><div class="stat-val" id="lunch-co-sun">—</div><div class="stat-lbl">企業 日曜</div></div>
+        <div class="stat-card"><div class="stat-val" id="lunch-stu-sun">—</div><div class="stat-lbl">学生 日曜</div></div>
+        <div class="stat-card"><div class="stat-val" id="lunch-total-sun">—</div><div class="stat-lbl">合計 日曜</div></div>
       </div>
 
       <!-- 当日運用 -->
@@ -648,6 +654,10 @@
         <div class="stat-card"><div class="stat-val" id="student-prereg-step3">—</div><div class="stat-lbl">事前登録</div></div>
         <div class="stat-card"><div class="stat-val" id="student-walkin-step3">—</div><div class="stat-lbl">当日参加</div></div>
         <div class="stat-card"><div class="stat-val" id="student-stamp-step3">—</div><div class="stat-lbl">スタンプ参加</div></div>
+      </div>
+      <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);margin-top:0">
+        <div class="stat-card"><div class="stat-val" id="lunch-stu-sat2">—</div><div class="stat-lbl">食券 土曜（枚）</div></div>
+        <div class="stat-card"><div class="stat-val" id="lunch-stu-sun2">—</div><div class="stat-lbl">食券 日曜（枚）</div></div>
       </div>
 
       <!-- 事前登録 -->
@@ -942,6 +952,6 @@
 <div class="toast" id="toast"></div>
 <script src="../js/vendor/qrcode.min.js"></script>
 <script src="../js/config.js?v=20260623a"></script>
-<script src="../js/admin.js?v=20260701a"></script>
+<script src="../js/admin.js?v=20260702a"></script>
 </body>
 </html>

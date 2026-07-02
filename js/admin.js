@@ -405,6 +405,17 @@ async function loadStats_(gen, ev) {
   setText_('student-prereg-step3', d.preRegisteredCount ?? '—');
   setText_('student-walkin-step3', d.walkInCount        ?? '—');
   setText_('student-stamp-step3',  d.stampParticipants  ?? '—');
+  // 食券集計
+  const L = d.lunch || {};
+  const co = L.company || {}, st = L.student || {};
+  setText_('lunch-co-sat',    co.sat  ?? '—');
+  setText_('lunch-co-sun',    co.sun  ?? '—');
+  setText_('lunch-stu-sat',   st.sat  ?? '—');
+  setText_('lunch-stu-sun',   st.sun  ?? '—');
+  setText_('lunch-total-sat', (co.sat || 0) + (st.sat || 0) || '—');
+  setText_('lunch-total-sun', (co.sun || 0) + (st.sun || 0) || '—');
+  setText_('lunch-stu-sat2',  st.sat  ?? '—');
+  setText_('lunch-stu-sun2',  st.sun  ?? '—');
   updateStepBadges_();
 }
 
@@ -1702,7 +1713,7 @@ function renderEntries_(entries) {
           <span class="${boothClass}">ブース: ${e['ブース区画'] || '—'}</span>
           <span class="entry-chip">展示 ${Number(e['展示車両数']) || 0}台</span>
           <span class="entry-chip">人P:${Number(e['人パス']) || 0} 車P:${Number(e['車両パス']) || 0}</span>
-          <span class="entry-chip">昼食 ${lunchTotal}食</span>
+          <span class="entry-chip">昼食 土${Number(e['昼食土']) || 0} 日${Number(e['昼食日']) || 0}</span>
         </div>
       </div>`;
   }).join('');
