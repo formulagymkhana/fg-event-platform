@@ -276,6 +276,15 @@
     .entry-chip.booth-yes{background:#EBF2FF;color:var(--navy)}
     .entry-chip.demo-yes{background:var(--fg-success-bg,#EAF8F0);color:var(--fg-success,#1A6640)}
     .entry-chip.demo-maybe{background:var(--fg-warning-bg);color:var(--fg-warning)}
+    .entry-chip.demo-no{background:var(--gray-light);color:var(--gray)}
+    .entry-chip.car-yes{background:#EBF2FF;color:var(--navy)}
+    .entry-chip.car-no{background:var(--gray-light);color:var(--gray)}
+    .entry-chip.lunch-sat{background:#E8F0FE;color:#1A56DB}
+    .entry-chip.lunch-sun{background:#FEF0F0;color:#C0392B}
+    .entry-card-actions{display:flex;justify-content:flex-end;margin-top:8px}
+    .entry-edit-btn{font-size:11px;padding:4px 12px;border:1px solid var(--border);border-radius:6px;
+      background:#fff;color:var(--navy);cursor:pointer;font-weight:600}
+    .entry-edit-btn:hover{background:var(--gray-light);border-color:var(--navy)}
     /* ── 企業管理タブ ── */
     .co-tab-bar{display:flex;background:#fff;border-bottom:2px solid var(--border)}
     .co-tab-btn{flex:1;padding:12px 8px;font-size:13px;font-weight:600;color:var(--gray);
@@ -640,6 +649,28 @@
       </div>
     </div>
 
+    <!-- 出展申込 編集モーダル -->
+    <div class="modal-ov" id="modal-entry-edit" style="display:none">
+      <div class="modal-card">
+        <div class="modal-hd">
+          <span class="modal-title" id="modal-entry-edit-title">申込編集</span>
+          <button class="modal-close" id="modal-entry-edit-close">✕</button>
+        </div>
+        <div class="modal-bd" style="padding:16px 20px">
+          <div class="cfg-row"><label>展示車両数</label><input type="number" class="cfg-input" id="edit-entry-cars" min="0"></div>
+          <div class="cfg-row"><label>人パス</label><input type="number" class="cfg-input" id="edit-entry-ppass" min="0"></div>
+          <div class="cfg-row"><label>車両パス</label><input type="number" class="cfg-input" id="edit-entry-cpass" min="0"></div>
+          <div class="cfg-row"><label>昼食 土曜</label><input type="number" class="cfg-input" id="edit-entry-lsat" min="0"></div>
+          <div class="cfg-row"><label>昼食 日曜</label><input type="number" class="cfg-input" id="edit-entry-lsun" min="0"></div>
+          <div class="cfg-row"><label>デモ走行</label>
+            <select class="cfg-input" id="edit-entry-demo"><option value="なし">なし</option><option value="未定">未定</option><option value="あり">あり</option></select>
+          </div>
+          <button class="save-btn" id="btn-save-entry-edit" style="margin-top:12px">保存</button>
+          <span class="save-fb" id="save-entry-edit-fb"></span>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /page-companies -->
 
   <!-- ─────────────────────────────────────
@@ -956,6 +987,6 @@
 <div class="toast" id="toast"></div>
 <script src="../js/vendor/qrcode.min.js"></script>
 <script src="../js/config.js?v=20260623a"></script>
-<script src="../js/admin.js?v=20260702a"></script>
+<script src="../js/admin.js?v=20260702b"></script>
 </body>
 </html>

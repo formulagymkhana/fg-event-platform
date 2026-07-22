@@ -127,6 +127,7 @@ function dispatch_(e) {
       case 'adminConfirmUniversity':      return actionAdminConfirmUniversity_(p);
       case 'adminUpdateStudent':          return actionAdminUpdateStudent_(p);
       case 'adminGetCompanyEntries':      return actionAdminGetCompanyEntries_(p);
+      case 'adminUpdateEntry':             return actionAdminUpdateEntry_(p);
       default:                        return err_('unknown_action');
     }
   } catch (e) {
@@ -2592,4 +2593,41 @@ function actionAdminGetCompanyEntries_(p) {
   }));
 
   return ok_({ entries });
+}
+
+// ============================================================
+// アクション: adminUpdateEntry（出展申込の部分更新）
+// ============================================================
+function actionAdminUpdateEntry_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.event)   return err_('missing_event');
+  if (!p.company) return err_('missing_params');
+  if (!p.updates || typeof p.updates !== 'object') return err_('missing_params');
+
+  const sheet = eventSs_(p.event).getSheetByName(SHEET.COMPANY_ENTRIES);
+  if (!sheet || sheet.getLastRow() < 2) return err_('not_found');
+
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+
+  var rowIdx = -1;
+  var nameCol = headers.indexOf('企業名正式');
+  var abbCol  = headers.indexOf('社名略称');
+  for (var r = 1; r < data.length; r++) {
+    if (String(data[r][nameCol]) === p.company || String(data[r][abbCol]) === p.company) {
+      rowIdx = r;
+      break;
+    }
+  }
+  if (rowIdx < 0) return err_('not_found');
+
+  var allowed = ['展示車両数','人パス','車両パス','昼食土','昼食日','デモ走行'];
+  for (var key in p.updates) {
+    if (allowed.indexOf(key) < 0) continue;
+    var col = headers.indexOf(key);
+    if (col < 0) continue;
+    sheet.getRange(rowIdx + 1, col + 1).setValue(p.updates[key]);
+  }
+  return ok_({ updated: true });
 }

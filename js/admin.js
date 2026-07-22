@@ -77,6 +77,8 @@ window.addEventListener('DOMContentLoaded', () => {
   id_('btn-entry-reload')?.addEventListener('click', loadCompanyEntries_);
   id_('btn-entry-csv')?.addEventListener('click', downloadEntryCsv_);
   id_('modal-entry-close')?.addEventListener('click', () => { id_('modal-entry').style.display = 'none'; });
+  id_('modal-entry-edit-close')?.addEventListener('click', () => { id_('modal-entry-edit').style.display = 'none'; });
+  id_('btn-save-entry-edit')?.addEventListener('click', saveEntryEdit_);
   id_('modal-entry-body')?.addEventListener('click', e => {
     const btn = e.target.closest('[data-copy]');
     if (btn) copyText_(btn.dataset.copy);
@@ -1696,26 +1698,41 @@ function renderEntries_(entries) {
   }
 
   const demoChip = v => {
-    if (v === 'あり') return '<span class="entry-chip demo-yes">デモ: あり</span>';
-    if (v === '未定') return '<span class="entry-chip demo-maybe">デモ: 未定</span>';
-    return '<span class="entry-chip">デモ: なし</span>';
+    if (v === 'あり') return '<span class="entry-chip demo-yes">デモあり</span>';
+    if (v === '未定') return '<span class="entry-chip demo-maybe">デモ未定</span>';
+    return '<span class="entry-chip demo-no">デモなし</span>';
+  };
+
+  const carChip = (n) => {
+    const v = Number(n) || 0;
+    return v > 0
+      ? `<span class="entry-chip car-yes">展示 ${v}台</span>`
+      : '<span class="entry-chip car-no">展示なし</span>';
   };
 
   list.innerHTML = entries.map((e, i) => {
-    const lunchTotal = (Number(e['昼食土']) || 0) + (Number(e['昼食日']) || 0);
     const boothClass = e['ブース区画'] === 'あり' ? 'entry-chip booth-yes' : 'entry-chip';
+    const pp = Number(e['人パス']) || 0;
+    const cp = Number(e['車両パス']) || 0;
+    const ls = Number(e['昼食土']) || 0;
+    const ll = Number(e['昼食日']) || 0;
     return `
       <div class="entry-card" data-idx="${i}">
         <div class="entry-card-top">
           <span class="entry-card-name">${esc_(e['社名略称'] || e['企業名正式'] || '—')}</span>
-          ${demoChip(e['デモ走行'])}
         </div>
         <div class="entry-card-contact">${esc_(e['担当者名'] || '—')} / ${esc_(e['電話番号'] || '—')}</div>
         <div class="entry-card-chips">
           <span class="${boothClass}">ブース: ${e['ブース区画'] || '—'}</span>
-          <span class="entry-chip">展示 ${Number(e['展示車両数']) || 0}台</span>
-          <span class="entry-chip">人P:${Number(e['人パス']) || 0} 車P:${Number(e['車両パス']) || 0}</span>
-          <span class="entry-chip">昼食 土${Number(e['昼食土']) || 0} 日${Number(e['昼食日']) || 0}</span>
+          ${carChip(e['展示車両数'])}
+          ${demoChip(e['デモ走行'])}
+          <span class="entry-chip${pp ? ' booth-yes' : ''}">人P:${pp}</span>
+          <span class="entry-chip${cp ? ' booth-yes' : ''}">車P:${cp}</span>
+          <span class="entry-chip lunch-sat">土食:${ls}</span>
+          <span class="entry-chip lunch-sun">日食:${ll}</span>
+        </div>
+        <div class="entry-card-actions">
+          <button class="entry-edit-btn" data-edit-idx="${i}" onclick="event.stopPropagation()">✏ 編集</button>
         </div>
       </div>`;
   }).join('');
@@ -1723,6 +1740,51 @@ function renderEntries_(entries) {
   list.querySelectorAll('.entry-card').forEach(card => {
     card.addEventListener('click', () => showEntryDetail_(companyEntries_[+card.dataset.idx]));
   });
+  list.querySelectorAll('.entry-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => openEntryEdit_(+btn.dataset.editIdx));
+  });
+}
+
+let editEntryIdx_ = -1;
+function openEntryEdit_(idx) {
+  const e = companyEntries_[idx];
+  if (!e) return;
+  editEntryIdx_ = idx;
+  id_('modal-entry-edit-title').textContent = (e['社名略称'] || e['企業名正式'] || '') + ' 編集';
+  id_('edit-entry-cars').value  = Number(e['展示車両数']) || 0;
+  id_('edit-entry-ppass').value = Number(e['人パス']) || 0;
+  id_('edit-entry-cpass').value = Number(e['車両パス']) || 0;
+  id_('edit-entry-lsat').value  = Number(e['昼食土']) || 0;
+  id_('edit-entry-lsun').value  = Number(e['昼食日']) || 0;
+  id_('edit-entry-demo').value  = e['デモ走行'] || 'なし';
+  id_('save-entry-edit-fb').textContent = '';
+  id_('modal-entry-edit').style.display = 'flex';
+}
+
+async function saveEntryEdit_() {
+  if (editEntryIdx_ < 0) return;
+  const e = companyEntries_[editEntryIdx_];
+  const fb = id_('save-entry-edit-fb');
+  fb.textContent = '保存中…';
+  const res = await adminCall_('adminUpdateEntry', {
+    event: curEvent_,
+    company: e['企業名正式'] || e['社名略称'],
+    updates: {
+      展示車両数: Number(id_('edit-entry-cars').value) || 0,
+      人パス:     Number(id_('edit-entry-ppass').value) || 0,
+      車両パス:   Number(id_('edit-entry-cpass').value) || 0,
+      昼食土:     Number(id_('edit-entry-lsat').value) || 0,
+      昼食日:     Number(id_('edit-entry-lsun').value) || 0,
+      デモ走行:   id_('edit-entry-demo').value,
+    },
+  });
+  if (res.ok) {
+    fb.textContent = '✓ 保存しました';
+    id_('modal-entry-edit').style.display = 'none';
+    loadCompanyEntries_();
+  } else {
+    fb.textContent = '✗ ' + (res.error || '保存失敗');
+  }
 }
 
 function showEntryDetail_(e) {
