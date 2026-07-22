@@ -1830,6 +1830,7 @@ function showEntryDetail_(e) {
       drow('申込日時', e['申込日時']),
       drow('状態', e['状態']),
     ].join('')),
+    e['変更履歴'] ? grp('変更履歴', `<div style="font-size:12px;color:var(--gray);white-space:pre-line;line-height:1.8">${esc_(e['変更履歴'])}</div>`) : '',
   ].join('');
   id_('modal-entry').style.display = '';
 }

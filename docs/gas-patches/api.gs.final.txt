@@ -2590,6 +2590,7 @@ function actionAdminGetCompanyEntries_(p) {
     昼食日:       gn(row, '昼食日'),
     備考:         g(row, '備考'),
     状態:         g(row, '状態'),
+    変更履歴:     g(row, '変更履歴'),
   }));
 
   return ok_({ entries });
@@ -2623,11 +2624,30 @@ function actionAdminUpdateEntry_(p) {
   if (rowIdx < 0) return err_('not_found');
 
   var allowed = ['展示車両数','人パス','車両パス','昼食土','昼食日','デモ走行'];
+  var changes = [];
   for (var key in p.updates) {
     if (allowed.indexOf(key) < 0) continue;
     var col = headers.indexOf(key);
     if (col < 0) continue;
-    sheet.getRange(rowIdx + 1, col + 1).setValue(p.updates[key]);
+    var oldVal = data[rowIdx][col];
+    var newVal = p.updates[key];
+    if (String(oldVal) !== String(newVal)) {
+      changes.push(key + ': ' + oldVal + ' → ' + newVal);
+      sheet.getRange(rowIdx + 1, col + 1).setValue(newVal);
+    }
+  }
+
+  if (changes.length) {
+    var logCol = headers.indexOf('変更履歴');
+    if (logCol < 0) {
+      logCol = headers.length;
+      sheet.getRange(1, logCol + 1).setValue('変更履歴');
+    }
+    var tz = Session.getScriptTimeZone();
+    var ts = Utilities.formatDate(new Date(), tz, 'MM/dd HH:mm');
+    var prev = String(sheet.getRange(rowIdx + 1, logCol + 1).getValue() || '');
+    var entry = '[' + ts + '] ' + changes.join(', ');
+    sheet.getRange(rowIdx + 1, logCol + 1).setValue(prev ? prev + '\n' + entry : entry);
   }
   return ok_({ updated: true });
 }
