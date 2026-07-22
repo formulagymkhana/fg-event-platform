@@ -11,7 +11,7 @@
 
 const FG_CONFIG = {
   // GASデプロイURL(変更時はここだけ書き換える)
-  API_BASE_URL: 'https://script.google.com/macros/s/AKfycbwdXCvSIcv9n9LtwqqDHSTV1bYY_JqscGzZu1bjBkoPD2b8gHkEVt54flboJuJYpSVNrg/exec',
+  API_BASE_URL: 'https://script.google.com/macros/s/AKfycbx-fpfyNTyX3dJP7LcNFDg2s6Qp9JsbZdS2KiDnC5_vkQqIEeFfe_Qp9Cdgy3L34Lil/exec',
 
   // フォールバック用イベントID(GAS側でイベントが見つからない場合のみ使用)
   EVENT_ID: null,
