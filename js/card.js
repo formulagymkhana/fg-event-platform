@@ -82,8 +82,9 @@ document.getElementById('btn-scan-cancel')?.addEventListener('click', closeCompa
 function autoViewLog_(token, pageEvent) {
   const vk = FG_API.getCompanyViewKey();
   if (vk) {
-    FG_API.saveViewLogAuto(token, vk, pageEvent);  // fire-and-forget(失敗しても表示は維持)
-    showCompanyRegistered_();
+    FG_API.saveViewLogAuto(token, vk, pageEvent)
+      .then(r => { if (r && r.ok) showCompanyRegistered_(); })
+      .catch(() => {});
   } else {
     $('company-section').style.display = 'block';
   }

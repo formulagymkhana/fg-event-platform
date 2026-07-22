@@ -1732,7 +1732,7 @@ function renderEntries_(entries) {
           <span class="entry-chip lunch-sun">日食:${ll}</span>
         </div>
         <div class="entry-card-actions">
-          <button class="entry-edit-btn" data-edit-idx="${i}" onclick="event.stopPropagation()">✏ 編集</button>
+          <button class="entry-edit-btn" data-edit-idx="${i}">✏ 編集</button>
         </div>
       </div>`;
   }).join('');
@@ -1741,7 +1741,7 @@ function renderEntries_(entries) {
     card.addEventListener('click', () => showEntryDetail_(companyEntries_[+card.dataset.idx]));
   });
   list.querySelectorAll('.entry-edit-btn').forEach(btn => {
-    btn.addEventListener('click', () => openEntryEdit_(+btn.dataset.editIdx));
+    btn.addEventListener('click', e => { e.stopPropagation(); openEntryEdit_(+btn.dataset.editIdx); });
   });
 }
 

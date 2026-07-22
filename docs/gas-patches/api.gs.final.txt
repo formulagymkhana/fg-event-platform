@@ -265,6 +265,7 @@ function actionResolveViewKey_(p) {
 function actionActivateStamp_(p) {
   if (!p.token) return err_('missing_token');
   if (!p.event) return err_('missing_event');
+  if (isEventInactive_(p.event)) return err_('event_inactive');
 
   const cfg = getConfig_(p.event);
   if (!isStampOpen_(cfg)) return err_('stamp_closed');
@@ -272,40 +273,45 @@ function actionActivateStamp_(p) {
   const student = findStudentByCardToken_(p.token, p.event);
   if (!student) return err_('invalid_token');
 
-  const ss_ = eventSs_(p.event);
-  let participantSheet = ss_.getSheetByName(SHEET.STAMP_PARTICIPANTS);
-  if (!participantSheet) {
-    participantSheet = ss_.insertSheet(SHEET.STAMP_PARTICIPANTS);
-    participantSheet.appendRow(['時刻', 'eventId', 'studentId', 'stampToken', '開始日時', 'status']);
-  }
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(6000); } catch (e) { return err_('lock_timeout'); }
+  try {
+    const ss_ = eventSs_(p.event);
+    let participantSheet = ss_.getSheetByName(SHEET.STAMP_PARTICIPANTS);
+    if (!participantSheet) {
+      participantSheet = ss_.insertSheet(SHEET.STAMP_PARTICIPANTS);
+      participantSheet.appendRow(['時刻', 'eventId', 'studentId', 'stampToken', '開始日時', 'status']);
+    }
 
-  let stampToken = null;
-  if (participantSheet.getLastRow() > 1) {
-    const data    = participantSheet.getDataRange().getValues();
-    const headers = data[0].map(String);
-    const evCol   = headers.indexOf('eventId');
-    const sidCol  = headers.indexOf('studentId');
-    const stCol   = headers.indexOf('stampToken');
-    const existing = data.slice(1).find(r =>
-      String(r[evCol]) === String(p.event) &&
-      String(r[sidCol]) === String(student.studentId)
-    );
-    if (existing) stampToken = String(existing[stCol]);
-  }
+    let stampToken = null;
+    if (participantSheet.getLastRow() > 1) {
+      const data    = participantSheet.getDataRange().getValues();
+      const headers = data[0].map(String);
+      const evCol   = headers.indexOf('eventId');
+      const sidCol  = headers.indexOf('studentId');
+      const stCol   = headers.indexOf('stampToken');
+      const existing = data.slice(1).find(r =>
+        String(r[evCol]) === String(p.event) &&
+        String(r[sidCol]) === String(student.studentId)
+      );
+      if (existing) stampToken = String(existing[stCol]);
+    }
 
-  // 参加者行が無ければ新規発行（＝今回が初回起動）。isNew で初回/復帰を区別する。
-  let isNew = false;
-  if (!stampToken) {
-    stampToken = Utilities.getUuid();
-    isNew = true;
-    participantSheet.appendRow([
-      new Date(), p.event, student.studentId,
-      stampToken, new Date(), 'active',
-    ]);
-  }
+    let isNew = false;
+    if (!stampToken) {
+      stampToken = Utilities.getUuid();
+      isNew = true;
+      participantSheet.appendRow([
+        new Date(), p.event, student.studentId,
+        stampToken, new Date(), 'active',
+      ]);
+    }
 
-  const count = countStamps_(p.event, student.studentId);
-  return ok_(buildStampResult_(p.event, student.studentId, count, { stampToken, isNew }));
+    const count = countStamps_(p.event, student.studentId);
+    return ok_(buildStampResult_(p.event, student.studentId, count, { stampToken, isNew }));
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================
@@ -315,8 +321,9 @@ function actionActivateStamp_(p) {
 function actionSaveStamp_(p) {
   if (!p.st || !p.ct) return err_('missing_params');
   if (!p.event) return err_('missing_event');
-  const cfg = getConfig_(p.event);                       // T3-c: 冒頭に移動
-  if (!isStampOpen_(cfg)) return err_('stamp_closed');   // T3-c: 期間チェック追加
+  if (isEventInactive_(p.event)) return err_('event_inactive');
+  const cfg = getConfig_(p.event);
+  if (!isStampOpen_(cfg)) return err_('stamp_closed');
 
   const student = findStudentByStampToken_(p.st, p.event);
   if (!student) return err_('invalid_student_token');
@@ -438,6 +445,7 @@ function getCompaniesForEvent_(eventId) {
 function actionExchangePrize_(p) {
   if (!p.token && !p.pk) return err_('missing_token');
   if (!p.event) return err_('missing_event');
+  if (isEventInactive_(p.event)) return err_('event_inactive');
   const cfg = getConfig_(p.event);
   if (!isExchangeOpen_(cfg)) return err_('exchange_closed');
   // stampToken で学生特定。未登録なら cardToken(pk)で fallback（学生確定→studentIdで記録）
