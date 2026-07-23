@@ -206,6 +206,7 @@ function route_() {
     showPage_('forms');
     loadConfig_(++loadGen_, curEvent_);
     updateWalkInUrl_(); // 当日参加登録URLをフォーム管理ページに表示
+    bindListPageEvents_();
   } else if (section === 'universities') {
     showPage_('universities');
     loadUniversities_();
@@ -2063,7 +2064,7 @@ function bindListPageEvents_() {
   // 一度だけバインド
   if (bindListPageEvents_._done) return;
   bindListPageEvents_._done = true;
-  document.querySelectorAll('#page-entry-list .tab-bar, #page-reception .tab-bar').forEach(bar => {
+  document.querySelectorAll('#page-entry-list .tab-bar, #page-reception .tab-bar, #page-forms .tab-bar').forEach(bar => {
     const btns = [...bar.querySelectorAll('.tab-btn')];
     bar.style.setProperty('--tab-count', btns.length);
     const activeIdx = Math.max(0, btns.findIndex(b => b.classList.contains('active')));
