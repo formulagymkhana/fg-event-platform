@@ -12,7 +12,7 @@
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src 'self' https://fonts.gstatic.com;">
   <title>FG 管理パネル</title>
-  <link rel="stylesheet" href="../js/style.css?v=20260723c">
+  <link rel="stylesheet" href="../js/style.css?v=20260723f">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     :root{
@@ -266,11 +266,7 @@
       transition:color .18s ease;position:relative;z-index:1}
     .tab-btn.active{color:#fff}
     .tab-content{display:none}
-    .tab-content.active{display:block;animation:tabFadeIn .28s cubic-bezier(.25,.8,.25,1)}
-    @keyframes tabFadeIn{
-      from{opacity:0;transform:translateY(6px)}
-      to{opacity:1;transform:translateY(0)}
-    }
+    .tab-content.active{display:block}
 
     /* ── 出走大学リスト ── */
     .school-order-list{background:#fff;border-radius:var(--radius-ui);padding:6px;
@@ -369,7 +365,7 @@
     .co-tab-btn.active{color:#fff}
     .co-tab-count{font-size:11px;font-weight:400;margin-left:4px}
     .co-tab-content{display:none}
-    .co-tab-content.active{display:block;animation:tabFadeIn .28s cubic-bezier(.25,.8,.25,1)}
+    .co-tab-content.active{display:block;}
     /* ── 詳細モーダル グループ ── */
     .detail-group{margin-bottom:14px}
     .detail-group:last-child{margin-bottom:0}
@@ -1240,6 +1236,6 @@
 <div class="toast" id="toast"></div>
 <script src="../js/vendor/qrcode.min.js"></script>
 <script src="../js/config.js?v=20260723d"></script>
-<script src="../js/admin.js?v=20260723e"></script>
+<script src="../js/admin.js?v=20260723f"></script>
 </body>
 </html>
