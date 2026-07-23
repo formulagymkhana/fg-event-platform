@@ -2112,11 +2112,12 @@ function classOf_(r) {
 }
 
 function computeMenSchools_(all) {
-  // Aドライバーが登録されている大学のリスト（重複除去、大学マスター順を近似的に維持）
+  // ドライバーが1人でも登録されている大学のリスト（A/B/C/女子問わず。重複除去、登録順を維持）
   const seen = new Set();
   const out = [];
   all.forEach(r => {
-    if (classOf_(r) === 'A') {
+    const cls = classOf_(r);
+    if (['A', 'B', 'C', 'W'].includes(cls)) {
       const s = String(r['大学名'] || r.school || '').trim();
       if (s && !seen.has(s)) { seen.add(s); out.push(s); }
     }
@@ -2523,7 +2524,7 @@ function downloadReceptionCsv_() {
   const headers = ['大学名', 'ヒート', '選手名', 'よみがな',
     '受付(土曜日)', '受付(日曜日)', '紹介カード', 'リストバンド', '必要書類', 'ID'];
   const data = rows.map(r => [r.school, r.cls, r.name, r.furigana, '', '', '', '', '', r.studentId]);
-  downloadCsv_(`受付リスト_${curEvent_}.csv`, toCsv_(headers, data));
+  downloadCsv_(`選手受付リスト_${curEvent_}.csv`, toCsv_(headers, data));
 }
 
 function downloadSupportCsv_() {
@@ -2543,5 +2544,5 @@ function downloadOrderCsv_() {
     .sort((a, b) => a.order - b.order);
   const headers = ['学校名', '出走順', 'ヒート', '氏名', 'ふりがな', '入部何年', 'studentId'];
   const data = rows.map(r => [r.school, r.order, r.cls, r.name, r.furigana, r.clubYears, r.studentId]);
-  downloadCsv_(`出走順リスト_${curEvent_}.csv`, toCsv_(headers, data));
+  downloadCsv_(`出走リスト_${curEvent_}.csv`, toCsv_(headers, data));
 }
