@@ -12,7 +12,7 @@
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src 'self' https://fonts.gstatic.com;">
   <title>FG 管理パネル</title>
-  <link rel="stylesheet" href="../js/style.css?v=20260723a">
+  <link rel="stylesheet" href="../js/style.css?v=20260723c">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     :root{
@@ -251,6 +251,62 @@
     .sm-btn{padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;
       font-weight:600;color:var(--navy);background:#fff;cursor:pointer}
 
+    /* ── タブ（エントリー/受付リスト用） ── */
+    .tab-bar{display:flex;gap:2px;background:#fff;border-radius:var(--radius-ui);
+      padding:4px;margin-bottom:12px;box-shadow:var(--shadow-sm)}
+    .tab-btn{flex:1;padding:9px 6px;border:none;background:transparent;font-size:12px;
+      font-weight:700;color:var(--gray);border-radius:6px;cursor:pointer;transition:.15s}
+    .tab-btn.active{background:var(--fg-blue);color:#fff}
+    .tab-content{display:none}
+    .tab-content.active{display:block}
+
+    /* ── 出走大学リスト ── */
+    .school-order-list{background:#fff;border-radius:var(--radius-ui);padding:6px;
+      box-shadow:var(--shadow-sm);margin-bottom:12px}
+    .school-order-item{display:flex;align-items:center;gap:8px;padding:8px 10px;
+      border-bottom:1px solid var(--border);font-size:13px}
+    .school-order-item:last-child{border-bottom:none}
+    .school-order-idx{font-family:monospace;font-weight:700;color:var(--navy);width:22px;text-align:right}
+    .school-order-name{flex:1;font-weight:600;color:var(--navy)}
+    .school-order-btn{padding:4px 8px;background:#fff;border:1px solid var(--border);border-radius:5px;
+      font-size:12px;cursor:pointer;color:var(--navy)}
+    .school-order-btn:hover{background:var(--gray-light)}
+    .school-order-btn:disabled{opacity:.3;cursor:not-allowed}
+    .school-count-badge{font-size:10px;color:var(--gray);background:var(--gray-light);
+      padding:1px 6px;border-radius:100px;margin-left:6px}
+
+    /* ── 女子ペアリング ── */
+    .women-pairs{background:#fff;border-radius:var(--radius-ui);padding:12px;
+      box-shadow:var(--shadow-sm);margin-bottom:12px}
+    .women-pair-row{display:grid;grid-template-columns:60px 1fr 1fr 24px;gap:8px;
+      margin-bottom:8px;align-items:center}
+    .women-pair-row.header{font-size:10px;font-weight:700;color:var(--gray);letter-spacing:.05em}
+    .women-pair-label{font-size:12px;font-weight:700;color:var(--navy)}
+    .women-pair-slot{display:flex;gap:4px;align-items:center}
+    .women-pair-slot select{flex:1;font-size:12px;padding:6px 4px;border:1px solid var(--border);
+      border-radius:6px;background:#fff;min-width:0}
+    .women-pair-slot .heat-lbl{font-size:11px;font-weight:700;color:var(--fg-blue);width:16px}
+    .women-add-btn{padding:6px 12px;background:#fff;border:1px dashed var(--border);border-radius:6px;
+      font-size:12px;color:var(--navy);cursor:pointer;width:100%;margin-top:4px}
+    .women-pair-del{background:none;border:none;color:var(--fg-error);cursor:pointer;font-size:14px;padding:2px 4px}
+
+    /* ── データテーブル（エントリーリスト・受付リスト用） ── */
+    .list-tbl{width:100%;background:#fff;border-radius:8px;overflow:hidden;
+      box-shadow:var(--shadow-sm);border-collapse:collapse;font-size:11px}
+    .list-tbl th,.list-tbl td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left}
+    .list-tbl thead th{background:var(--fg-bg);font-weight:700;color:var(--navy);font-size:10px}
+    .list-tbl td.num{text-align:right;font-family:monospace}
+    .list-tbl td.center{text-align:center}
+    .list-tbl .cls-A{color:#0057b7;font-weight:700}
+    .list-tbl .cls-B{color:#c86a00;font-weight:700}
+    .list-tbl .cls-C{color:#00795a;font-weight:700}
+    .list-tbl .cls-W{color:#b91c5c;font-weight:700}
+    .list-tbl .cls-S{color:#666;font-weight:700}
+    .list-scroll{overflow-x:auto;margin-bottom:12px}
+    .list-section-title{font-size:12px;font-weight:700;color:var(--navy);
+      margin:16px 0 6px;padding-bottom:4px;border-bottom:2px solid var(--fg-blue)}
+    .list-action-row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+
     /* ── Modal ── */
     .modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;
       display:flex;align-items:center;justify-content:center;padding:16px}
@@ -413,6 +469,16 @@
           <span class="nav-card-icon">🎓</span>
           <span class="nav-card-label">大学管理</span>
           <span class="nav-card-count init" id="badge-uni">確認中</span>
+        </a>
+        <a class="nav-card" id="nav-entry-list-card" href="#">
+          <span class="nav-card-icon">📋</span>
+          <span class="nav-card-label">エントリーリスト</span>
+          <span class="nav-card-count init" id="badge-entry-list">—</span>
+        </a>
+        <a class="nav-card" id="nav-reception-card" href="#">
+          <span class="nav-card-icon">🎫</span>
+          <span class="nav-card-label">受付リスト</span>
+          <span class="nav-card-count init" id="badge-reception">—</span>
         </a>
       </div>
 
@@ -942,6 +1008,105 @@
 
 
   <!-- ─────────────────────────────────────
+       PAGE: エントリーリスト
+  ───────────────────────────────────── -->
+  <div id="page-entry-list" style="display:none">
+    <header class="page-hd">
+      <a class="page-back" id="back-dash-entry" href="#">← ダッシュボード</a>
+      <span class="page-title">エントリーリスト</span>
+    </header>
+    <div class="app-body">
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="el-order">出走大学リスト</button>
+        <button class="tab-btn" data-tab="el-list">エントリーリスト</button>
+      </div>
+
+      <!-- 出走大学リスト -->
+      <div class="tab-content active" id="tab-el-order">
+        <p class="step-desc" style="margin-top:0">出場校エントリーが提出された大学の並び順と、女子クラスのペアリングを設定します。並び順はエントリーリスト・受付リスト・走行順に反映されます。</p>
+
+        <div class="area-label">大学の並び順</div>
+        <p class="step-note" style="margin:0 0 8px">▲▼ボタンで並べ替え。上から順に走行順が割り当てられます。</p>
+        <div class="school-order-list" id="school-order-wrap">
+          <p style="font-size:12px;color:var(--gray);text-align:center;padding:20px 0">読み込み中...</p>
+        </div>
+
+        <div class="area-label">女子クラス ペアリング</div>
+        <p class="step-note" style="margin:0 0 8px">各ペアの A/B ヒート担当を選択してください。ここで指定された順番で女子クラスの走行順が割り当てられます。</p>
+        <div class="women-pairs" id="women-pairs-wrap">
+          <p style="font-size:12px;color:var(--gray);text-align:center;padding:8px 0">読み込み中...</p>
+        </div>
+        <button class="women-add-btn" id="btn-add-women-pair">+ ペアを追加</button>
+
+        <div class="cfg-group" style="margin-top:16px">
+          <button class="save-btn" id="btn-save-order">保存</button>
+          <span class="save-fb" id="save-order-fb"></span>
+        </div>
+      </div>
+
+      <!-- エントリーリスト表示 -->
+      <div class="tab-content" id="tab-el-list">
+        <div class="list-action-row">
+          <button class="sm-btn" id="btn-entry-list-csv">CSVダウンロード</button>
+          <button class="sm-btn" id="btn-entry-list-print">印刷/PDF</button>
+        </div>
+        <div id="entry-list-wrap">
+          <p style="font-size:12px;color:var(--gray);text-align:center;padding:20px 0">読み込み中...</p>
+        </div>
+      </div>
+    </div>
+  </div><!-- /page-entry-list -->
+
+
+  <!-- ─────────────────────────────────────
+       PAGE: 受付リスト
+  ───────────────────────────────────── -->
+  <div id="page-reception" style="display:none">
+    <header class="page-hd">
+      <a class="page-back" id="back-dash-reception" href="#">← ダッシュボード</a>
+      <span class="page-title">受付リスト</span>
+    </header>
+    <div class="app-body">
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="rl-reception">受付リスト</button>
+        <button class="tab-btn" data-tab="rl-support">応援学生</button>
+        <button class="tab-btn" data-tab="rl-order">出走順</button>
+      </div>
+
+      <div class="tab-content active" id="tab-rl-reception">
+        <div class="list-action-row">
+          <button class="sm-btn" id="btn-reception-csv">CSVダウンロード</button>
+          <button class="sm-btn" id="btn-reception-print">印刷/PDF</button>
+        </div>
+        <div id="reception-list-wrap">
+          <p style="font-size:12px;color:var(--gray);text-align:center;padding:20px 0">読み込み中...</p>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tab-rl-support">
+        <div class="list-action-row">
+          <button class="sm-btn" id="btn-support-csv">CSVダウンロード</button>
+          <button class="sm-btn" id="btn-support-print">印刷/PDF</button>
+        </div>
+        <div id="support-list-wrap">
+          <p style="font-size:12px;color:var(--gray);text-align:center;padding:20px 0">読み込み中...</p>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tab-rl-order">
+        <div class="list-action-row">
+          <button class="sm-btn" id="btn-order-csv">CSVダウンロード</button>
+          <button class="sm-btn" id="btn-order-print">印刷/PDF</button>
+        </div>
+        <div id="order-list-wrap">
+          <p style="font-size:12px;color:var(--gray);text-align:center;padding:20px 0">読み込み中...</p>
+        </div>
+      </div>
+    </div>
+  </div><!-- /page-reception -->
+
+
+  <!-- ─────────────────────────────────────
        PAGE: 全体設定
   ───────────────────────────────────── -->
   <div id="page-settings" style="display:none">
@@ -1039,6 +1204,6 @@
 <div class="toast" id="toast"></div>
 <script src="../js/vendor/qrcode.min.js"></script>
 <script src="../js/config.js?v=20260722a"></script>
-<script src="../js/admin.js?v=20260723a"></script>
+<script src="../js/admin.js?v=20260723c"></script>
 </body>
 </html>

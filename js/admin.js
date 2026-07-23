@@ -214,6 +214,12 @@ function route_() {
     activateCoTab_('entries');
     updateEntryFormUrl_();
     loadCompanyEntries_();
+  } else if (section === 'entry-list') {
+    showPage_('entry-list');
+    loadEntryList_();
+  } else if (section === 'reception') {
+    showPage_('reception');
+    loadReceptionList_();
   } else {
     showPage_('dashboard');
     const ev = allEvents_.find(e => e.eventId === curEvent_);
@@ -225,7 +231,7 @@ function route_() {
 }
 
 function showPage_(name) {
-  ['events', 'dashboard', 'companies', 'students', 'forms', 'universities', 'settings'].forEach(p => {
+  ['events', 'dashboard', 'companies', 'students', 'forms', 'universities', 'entry-list', 'reception', 'settings'].forEach(p => {
     const el = id_('page-' + p);
     if (el) el.style.display = p === name ? '' : 'none';
   });
@@ -271,21 +277,29 @@ function updateNavLinks_() {
   const fm = id_('nav-form-card');
   const un = id_('nav-uni-card');
   const en = id_('nav-entry-card');
-  const backCo    = id_('back-dash-co');
-  const backSt    = id_('back-dash-st');
-  const backFm    = id_('back-dash-form');
-  const backUn    = id_('back-dash-uni');
-  const backEntry = id_('back-dash-entry');
+  const el = id_('nav-entry-list-card');
+  const rc = id_('nav-reception-card');
+  const backCo        = id_('back-dash-co');
+  const backSt        = id_('back-dash-st');
+  const backFm        = id_('back-dash-form');
+  const backUn        = id_('back-dash-uni');
+  const backEntry     = id_('back-dash-entry');
+  const backEntryList = id_('back-dash-entry-list');
+  const backReception = id_('back-dash-reception');
   if (co) co.href = '#' + curEvent_ + '/companies';
   if (st) st.href = '#' + curEvent_ + '/students';
   if (fm) fm.href = '#' + curEvent_ + '/forms';
   if (un) un.href = '#' + curEvent_ + '/universities';
   if (en) en.href = '#' + curEvent_ + '/entries';
-  if (backCo)    backCo.href    = '#' + curEvent_;
-  if (backSt)    backSt.href    = '#' + curEvent_;
-  if (backFm)    backFm.href    = '#' + curEvent_;
-  if (backUn)    backUn.href    = '#' + curEvent_;
-  if (backEntry) backEntry.href = '#' + curEvent_;
+  if (el) el.href = '#' + curEvent_ + '/entry-list';
+  if (rc) rc.href = '#' + curEvent_ + '/reception';
+  if (backCo)        backCo.href        = '#' + curEvent_;
+  if (backSt)        backSt.href        = '#' + curEvent_;
+  if (backFm)        backFm.href        = '#' + curEvent_;
+  if (backUn)        backUn.href        = '#' + curEvent_;
+  if (backEntry)     backEntry.href     = '#' + curEvent_;
+  if (backEntryList) backEntryList.href = '#' + curEvent_;
+  if (backReception) backReception.href = '#' + curEvent_;
 }
 
 // ── Load all data ─────────────────────────────────
@@ -1952,4 +1966,582 @@ function downloadEntryCsv_() {
   a.download   = '出展申込_' + curEvent_ + '.csv';
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+// ============================================================
+// エントリーリスト / 受付リスト / 応援学生 / 出走順リスト
+// ============================================================
+
+// 属性 → クラスコード（PRE_CLASS_CODES と同じ）
+const CATEGORY_TO_CLASS_ = {
+  'Aドライバー': 'A', 'Bドライバー': 'B', 'Cドライバー': 'C',
+  'ドライバー登録メカニック': 'A', // FGクラス扱い
+  '女子クラスドライバー': 'W',
+  '補欠ドライバー': 'S', 'メカニック': 'S', '応援学生': 'S',
+  '一般参加学生': 'V',
+};
+
+let preRegAll_        = [];   // 事前登録全件
+let schoolOrder_      = [];   // 大学の並び順（大学名の配列）
+let womenPairings_    = [];   // 女子ペアリング [{ a: studentId, b: studentId }]
+let entryListLoading_ = false;
+
+async function loadEntryList_() {
+  if (entryListLoading_) return;
+  entryListLoading_ = true;
+  const gen = ++loadGen_;
+  bindListPageEvents_();
+
+  const [preRes, cfgRes] = await Promise.all([
+    adminCall_('adminGetPreRegistrations', { event: curEvent_ }),
+    adminCall_('adminGetConfig',           { event: curEvent_ }),
+  ]);
+  entryListLoading_ = false;
+  if (gen !== loadGen_) return;
+  if (!preRes.ok) { showListErr_('entry-list-wrap', preRes); return; }
+
+  preRegAll_ = preRegRowsToObjects_(preRes.data);
+  const cfg  = (cfgRes.ok && cfgRes.data && cfgRes.data.config) ? cfgRes.data.config : {};
+
+  schoolOrder_   = parseJsonOr_(cfg.schoolRunningOrder, []);
+  womenPairings_ = parseJsonOr_(cfg.womenPairings, []);
+
+  // 現存する大学（Aドライバーがいる大学）を抽出、保存済み順序＋新規大学を後ろに
+  const menSchools = computeMenSchools_(preRegAll_);
+  schoolOrder_ = [
+    ...schoolOrder_.filter(s => menSchools.includes(s)),
+    ...menSchools.filter(s => !schoolOrder_.includes(s)),
+  ];
+
+  // 女子ペアリング: 保存済みが女子ドライバーの範囲外なら削除
+  const womenIds = new Set(preRegAll_
+    .filter(r => classOf_(r) === 'W')
+    .map(r => r.studentId));
+  womenPairings_ = womenPairings_.map(p => ({
+    a: womenIds.has(p.a) ? p.a : '',
+    b: womenIds.has(p.b) ? p.b : '',
+  }));
+
+  renderSchoolOrder_();
+  renderWomenPairs_();
+  renderEntryList_();
+}
+
+async function loadReceptionList_() {
+  const gen = ++loadGen_;
+  bindListPageEvents_();
+
+  const [preRes, cfgRes] = await Promise.all([
+    adminCall_('adminGetPreRegistrations', { event: curEvent_ }),
+    adminCall_('adminGetConfig',           { event: curEvent_ }),
+  ]);
+  if (gen !== loadGen_) return;
+  if (!preRes.ok) { showListErr_('reception-list-wrap', preRes); return; }
+
+  preRegAll_ = preRegRowsToObjects_(preRes.data);
+  const cfg  = (cfgRes.ok && cfgRes.data && cfgRes.data.config) ? cfgRes.data.config : {};
+  schoolOrder_   = parseJsonOr_(cfg.schoolRunningOrder, []);
+  womenPairings_ = parseJsonOr_(cfg.womenPairings, []);
+  const menSchools = computeMenSchools_(preRegAll_);
+  schoolOrder_ = [
+    ...schoolOrder_.filter(s => menSchools.includes(s)),
+    ...menSchools.filter(s => !schoolOrder_.includes(s)),
+  ];
+
+  renderReceptionList_();
+  renderSupportList_();
+  renderOrderList_();
+}
+
+function bindListPageEvents_() {
+  // 一度だけバインド
+  if (bindListPageEvents_._done) return;
+  bindListPageEvents_._done = true;
+  document.querySelectorAll('#page-entry-list .tab-btn, #page-reception .tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const page = btn.closest('[id^="page-"]');
+      page.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+      page.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      const t = id_('tab-' + btn.dataset.tab);
+      if (t) t.classList.add('active');
+    });
+  });
+  id_('btn-save-order')?.addEventListener('click', saveSchoolOrder_);
+  id_('btn-add-women-pair')?.addEventListener('click', () => {
+    womenPairings_.push({ a: '', b: '' });
+    renderWomenPairs_();
+  });
+  id_('btn-entry-list-csv')?.addEventListener('click', () => downloadEntryListCsv_());
+  id_('btn-entry-list-print')?.addEventListener('click', () => window.print());
+  id_('btn-reception-csv')?.addEventListener('click', () => downloadReceptionCsv_());
+  id_('btn-reception-print')?.addEventListener('click', () => window.print());
+  id_('btn-support-csv')?.addEventListener('click', () => downloadSupportCsv_());
+  id_('btn-support-print')?.addEventListener('click', () => window.print());
+  id_('btn-order-csv')?.addEventListener('click', () => downloadOrderCsv_());
+  id_('btn-order-print')?.addEventListener('click', () => window.print());
+}
+
+function parseJsonOr_(s, def) {
+  try { const v = JSON.parse(s || ''); return v || def; } catch (e) { return def; }
+}
+
+// adminGetPreRegistrations は {headers, rows} で返る。オブジェクトに変換。
+function preRegRowsToObjects_(d) {
+  if (!d) return [];
+  const H = d.headers || [];
+  const R = d.rows || [];
+  return R.map(row => {
+    const o = { studentId: '', school: '', category: '' };
+    H.forEach((h, i) => { o[h] = row[i]; });
+    o.studentId = String(o.studentId || '');
+    o.school    = String(o['大学名'] || '');
+    o.category  = String(o['属性'] || o['参加区分'] || '');
+    return o;
+  }).filter(r => r.studentId);
+}
+
+function classOf_(r) {
+  // studentId の 6文字目（0-indexed:5）に区分コードが埋め込まれている
+  // (year1桁 + 大学コード4桁 + 区分1文字 + 連番2桁)
+  const sid = String(r.studentId || '');
+  if (sid.length >= 6) {
+    const c = sid.charAt(5);
+    if ('ABCWSV'.indexOf(c) >= 0) return c;
+  }
+  return 'V';
+}
+
+function computeMenSchools_(all) {
+  // Aドライバーが登録されている大学のリスト（重複除去、大学マスター順を近似的に維持）
+  const seen = new Set();
+  const out = [];
+  all.forEach(r => {
+    if (classOf_(r) === 'A') {
+      const s = String(r['大学名'] || r.school || '').trim();
+      if (s && !seen.has(s)) { seen.add(s); out.push(s); }
+    }
+  });
+  return out;
+}
+
+function showListErr_(wrapId, res) {
+  const el = id_(wrapId);
+  if (el) el.innerHTML = `<p style="color:var(--fg-error);font-size:12px;text-align:center;padding:16px 0">読み込みに失敗しました: ${esc_(res.error || res.message || 'unknown')}</p>`;
+}
+
+// ── 出走大学リスト（並び順編集） ────────────
+function renderSchoolOrder_() {
+  const wrap = id_('school-order-wrap');
+  if (!wrap) return;
+  if (!schoolOrder_.length) {
+    wrap.innerHTML = '<p style="font-size:12px;color:var(--gray);text-align:center;padding:16px 0">Aドライバーの事前登録がまだありません</p>';
+    return;
+  }
+  const total = schoolOrder_.length;
+  wrap.innerHTML = schoolOrder_.map((s, i) => {
+    const men = preRegAll_.filter(r =>
+      String(r['大学名'] || '').trim() === s &&
+      ['A', 'B', 'C'].includes(classOf_(r))).length;
+    return `
+      <div class="school-order-item">
+        <span class="school-order-idx">${i + 1}</span>
+        <span class="school-order-name">${esc_(s)}<span class="school-count-badge">${men}名</span></span>
+        <button class="school-order-btn" data-move="up" data-i="${i}" ${i === 0 ? 'disabled' : ''}>▲</button>
+        <button class="school-order-btn" data-move="down" data-i="${i}" ${i === total - 1 ? 'disabled' : ''}>▼</button>
+      </div>`;
+  }).join('');
+  wrap.querySelectorAll('.school-order-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = +btn.dataset.i;
+      const j = btn.dataset.move === 'up' ? i - 1 : i + 1;
+      if (j < 0 || j >= schoolOrder_.length) return;
+      [schoolOrder_[i], schoolOrder_[j]] = [schoolOrder_[j], schoolOrder_[i]];
+      renderSchoolOrder_();
+    });
+  });
+}
+
+// ── 女子ペアリング編集 ────────────
+function renderWomenPairs_() {
+  const wrap = id_('women-pairs-wrap');
+  if (!wrap) return;
+  const womenDrivers = preRegAll_
+    .filter(r => classOf_(r) === 'W')
+    .sort((a, b) => String(a['大学名'] || '').localeCompare(String(b['大学名'] || ''), 'ja'));
+
+  if (!womenDrivers.length) {
+    wrap.innerHTML = '<p style="font-size:12px;color:var(--gray);text-align:center;padding:8px 0">女子クラスドライバーの事前登録がまだありません</p>';
+    return;
+  }
+
+  // ペアが空なら女子ドライバー数から自動生成（2名でペア）
+  if (!womenPairings_.length) {
+    for (let i = 0; i < womenDrivers.length; i += 2) {
+      womenPairings_.push({
+        a: womenDrivers[i] ? womenDrivers[i].studentId : '',
+        b: womenDrivers[i + 1] ? womenDrivers[i + 1].studentId : '',
+      });
+    }
+  }
+
+  const opt = (sel) => {
+    let html = '<option value="">選択</option>';
+    womenDrivers.forEach(w => {
+      const label = `${w['大学名'] || ''} / ${w['氏名'] || ''}`;
+      const s = w.studentId === sel ? ' selected' : '';
+      html += `<option value="${esc_(w.studentId)}"${s}>${esc_(label)}</option>`;
+    });
+    return html;
+  };
+
+  wrap.innerHTML =
+    `<div class="women-pair-row header"><span></span><span>Aヒート</span><span>Bヒート</span><span></span></div>` +
+    womenPairings_.map((p, i) => `
+      <div class="women-pair-row">
+        <span class="women-pair-label">ペア${i + 1}</span>
+        <div class="women-pair-slot"><span class="heat-lbl">A</span><select data-pair="${i}" data-heat="a">${opt(p.a)}</select></div>
+        <div class="women-pair-slot"><span class="heat-lbl">B</span><select data-pair="${i}" data-heat="b">${opt(p.b)}</select></div>
+        <button class="women-pair-del" data-del="${i}" title="ペアを削除">×</button>
+      </div>`).join('');
+
+  wrap.querySelectorAll('select').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const i = +sel.dataset.pair;
+      womenPairings_[i][sel.dataset.heat] = sel.value;
+    });
+  });
+  wrap.querySelectorAll('[data-del]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      womenPairings_.splice(+btn.dataset.del, 1);
+      renderWomenPairs_();
+    });
+  });
+}
+
+async function saveSchoolOrder_() {
+  const btn = id_('btn-save-order');
+  const fb  = id_('save-order-fb');
+  btn.disabled = true; fb.className = 'save-fb'; fb.textContent = '';
+
+  const r1 = await adminCall_('adminUpdateConfig', {
+    event: curEvent_, key: 'schoolRunningOrder', value: JSON.stringify(schoolOrder_),
+  });
+  const r2 = await adminCall_('adminUpdateConfig', {
+    event: curEvent_, key: 'womenPairings', value: JSON.stringify(womenPairings_),
+  });
+
+  btn.disabled = false;
+  if (r1.ok && r2.ok) {
+    fb.textContent = '✓ 保存しました';
+    fb.className = 'save-fb ok';
+    renderEntryList_(); // 表示側も更新
+  } else {
+    fb.textContent = '保存に失敗しました';
+    fb.className = 'save-fb err';
+  }
+}
+
+// ── 走行順の計算 ────────────
+// 男子A: 1..N / 女子A: N+1..N+M / 男子B: N+M+1..2N+M / 女子B: 2N+M+1..2N+2M / 男子C: 2N+2M+1..3N+2M
+function computeRunningOrder_() {
+  const N = schoolOrder_.length;
+  const M = womenPairings_.length;
+  const byId = {};  // studentId → 走行順
+  const menBySchoolAndClass = new Map();
+
+  preRegAll_.forEach(r => {
+    const cls = classOf_(r);
+    const school = String(r['大学名'] || '').trim();
+    if (['A', 'B', 'C'].includes(cls)) {
+      const key = school + '|' + cls;
+      if (!menBySchoolAndClass.has(key)) menBySchoolAndClass.set(key, r);
+    }
+  });
+
+  schoolOrder_.forEach((school, i) => {
+    ['A', 'B', 'C'].forEach((cls, cIdx) => {
+      const r = menBySchoolAndClass.get(school + '|' + cls);
+      if (!r) return;
+      let order = 0;
+      if (cls === 'A') order = i + 1;
+      else if (cls === 'B') order = N + M + i + 1;
+      else order = 2 * N + 2 * M + i + 1;
+      byId[r.studentId] = order;
+    });
+  });
+
+  womenPairings_.forEach((p, i) => {
+    if (p.a) byId[p.a] = N + i + 1;
+    if (p.b) byId[p.b] = 2 * N + M + i + 1;
+  });
+
+  return byId;
+}
+
+// ── エントリーリスト表示 ────────────
+function renderEntryList_() {
+  const wrap = id_('entry-list-wrap');
+  if (!wrap) return;
+  const orders = computeRunningOrder_();
+  const rows = buildEntryListRows_(orders);
+
+  const men   = rows.filter(r => r.section === 'men');
+  const women = rows.filter(r => r.section === 'women');
+
+  const heat = cls => `<span class="cls-${cls}">${cls}</span>`;
+  const row = r => `<tr>
+    <td>${esc_(r.school)}</td>
+    <td class="num">${r.order || ''}</td>
+    <td class="center">${heat(r.cls)}</td>
+    <td>${esc_(r.name)}</td>
+    <td>${esc_(r.furigana)}</td>
+    <td>${esc_(r.clubYears)}</td>
+  </tr>`;
+
+  const header = `<thead><tr>
+    <th>大学名</th><th>走行順</th><th>ヒート</th>
+    <th>選手名</th><th>よみがな</th><th>入部何年</th>
+  </tr></thead>`;
+
+  wrap.innerHTML = `
+    <div class="list-section-title">Formula Gymkhana クラス</div>
+    <div class="list-scroll"><table class="list-tbl">${header}<tbody>${men.map(row).join('')}</tbody></table></div>
+    ${women.length ? `<div class="list-section-title">Formula Gymkhana 女子クラス</div>
+      <div class="list-scroll"><table class="list-tbl">${header}<tbody>${women.map(row).join('')}</tbody></table></div>` : ''}
+  `;
+}
+
+function buildEntryListRows_(orders) {
+  const menBy = new Map();  // school → { A, B, C }
+  const rows  = [];
+
+  preRegAll_.forEach(r => {
+    const cls = classOf_(r);
+    const school = String(r['大学名'] || '').trim();
+    if (['A', 'B', 'C'].includes(cls)) {
+      if (!menBy.has(school)) menBy.set(school, {});
+      menBy.get(school)[cls] = r;
+    }
+  });
+
+  schoolOrder_.forEach(school => {
+    const set = menBy.get(school) || {};
+    ['A', 'B', 'C'].forEach(cls => {
+      const r = set[cls];
+      if (!r) return;
+      rows.push({
+        section: 'men',
+        school, cls,
+        order:     orders[r.studentId] || '',
+        studentId: r.studentId,
+        name:      r['氏名'] || '',
+        furigana:  r['ふりがな'] || '',
+        clubYears: r['自動車部在籍年数'] || '',
+      });
+    });
+  });
+
+  // 女子ペア
+  womenPairings_.forEach(p => {
+    ['a', 'b'].forEach(k => {
+      if (!p[k]) return;
+      const r = preRegAll_.find(x => x.studentId === p[k]);
+      if (!r) return;
+      rows.push({
+        section: 'women',
+        school:    String(r['大学名'] || '').trim(),
+        cls:       k === 'a' ? 'A' : 'B',
+        order:     orders[r.studentId] || '',
+        studentId: r.studentId,
+        name:      r['氏名'] || '',
+        furigana:  r['ふりがな'] || '',
+        clubYears: r['自動車部在籍年数'] || '',
+      });
+    });
+  });
+
+  return rows;
+}
+
+// ── 受付リスト表示 ────────────
+function renderReceptionList_() {
+  const wrap = id_('reception-list-wrap');
+  if (!wrap) return;
+  const orders = computeRunningOrder_();
+  const rows = buildEntryListRows_(orders);
+
+  const trs = rows.map(r => `<tr>
+    <td>${esc_(r.school)}</td>
+    <td class="center cls-${r.cls}">${r.cls}</td>
+    <td>${esc_(r.name)}</td>
+    <td>${esc_(r.furigana)}</td>
+    <td class="center"></td><td class="center"></td>
+    <td class="center"></td><td class="center"></td>
+    <td></td>
+    <td class="num">${esc_(r.studentId)}</td>
+  </tr>`).join('');
+
+  wrap.innerHTML = `
+    <div class="list-scroll"><table class="list-tbl">
+      <thead><tr>
+        <th>大学名</th><th>ヒート</th><th>選手名</th><th>よみがな</th>
+        <th>受付(土)</th><th>受付(日)</th><th>紹介カード</th><th>リストバンド</th>
+        <th>必要書類</th><th>ID</th>
+      </tr></thead>
+      <tbody>${trs}</tbody>
+    </table></div>`;
+}
+
+// ── 応援学生受付リスト表示 ────────────
+function buildSupportRows_() {
+  const rows = preRegAll_.filter(r => classOf_(r) === 'S');
+  // 大学順にソート（schoolOrder_ に無い大学は末尾）
+  const orderMap = new Map(schoolOrder_.map((s, i) => [s, i]));
+  rows.sort((a, b) => {
+    const sa = String(a['大学名'] || '').trim();
+    const sb = String(b['大学名'] || '').trim();
+    const ia = orderMap.has(sa) ? orderMap.get(sa) : 9999;
+    const ib = orderMap.has(sb) ? orderMap.get(sb) : 9999;
+    if (ia !== ib) return ia - ib;
+    return String(a.studentId).localeCompare(String(b.studentId));
+  });
+  return rows.map(r => {
+    const attr    = String(r['属性'] || '');
+    const svcCls  = String(r['サービス作業クラス'] || '');
+    const backup  = attr === '補欠ドライバー' ? svcCls : '';
+    const mech    = attr === '応援学生' && svcCls && !svcCls.includes('実施しない') ? svcCls : '';
+    const needDoc = attr === '応援学生' && svcCls && svcCls !== '' && !r['保険証明URL'] ? '※保険確認' : '';
+    return {
+      school:    String(r['大学名'] || '').trim(),
+      name:      r['氏名'] || '',
+      furigana:  r['ふりがな'] || '',
+      studentId: r.studentId,
+      backup, mech,
+      lunchSat: r['弁当_土'] || '',
+      lunchSun: r['弁当_日'] || '',
+      needDoc,
+    };
+  });
+}
+
+function renderSupportList_() {
+  const wrap = id_('support-list-wrap');
+  if (!wrap) return;
+  const rows = buildSupportRows_();
+  if (!rows.length) {
+    wrap.innerHTML = '<p style="font-size:12px;color:var(--gray);text-align:center;padding:16px 0">応援学生の事前登録がありません</p>';
+    return;
+  }
+  const trs = rows.map(r => `<tr>
+    <td>${esc_(r.school)}</td>
+    <td>${esc_(r.name)}</td>
+    <td>${esc_(r.furigana)}</td>
+    <td class="center"></td>
+    <td class="center">${esc_(r.backup)}</td>
+    <td class="center">${esc_(r.mech)}</td>
+    <td class="center">${esc_(r.lunchSat)}</td>
+    <td class="center">${esc_(r.lunchSun)}</td>
+    <td>${esc_(r.needDoc)}</td>
+    <td class="num">${esc_(r.studentId)}</td>
+  </tr>`).join('');
+  wrap.innerHTML = `
+    <div class="list-scroll"><table class="list-tbl">
+      <thead><tr>
+        <th>大学名</th><th>氏名</th><th>よみがな</th>
+        <th>受付</th><th>補欠選手登録</th><th>メカニック登録</th>
+        <th>土曜昼食</th><th>日曜昼食</th><th>必要書類</th><th>ID</th>
+      </tr></thead>
+      <tbody>${trs}</tbody>
+    </table></div>`;
+}
+
+// ── 出走順リスト表示 ────────────
+function renderOrderList_() {
+  const wrap = id_('order-list-wrap');
+  if (!wrap) return;
+  const orders = computeRunningOrder_();
+  const rows = buildEntryListRows_(orders)
+    .filter(r => r.order)
+    .sort((a, b) => a.order - b.order);
+
+  const N = schoolOrder_.length;
+  const M = womenPairings_.length;
+  const heatA = rows.filter(r => r.order <= N + M);
+  const heatB = rows.filter(r => r.order > N + M && r.order <= 2 * N + 2 * M);
+  const heatC = rows.filter(r => r.order > 2 * N + 2 * M);
+
+  const row = r => `<tr>
+    <td>${esc_(r.school)}</td>
+    <td class="num">${r.order}</td>
+    <td class="center cls-${r.cls}">${r.cls}</td>
+    <td>${esc_(r.name)}</td>
+    <td>${esc_(r.furigana)}</td>
+    <td>${esc_(r.clubYears)}</td>
+  </tr>`;
+  const header = `<thead><tr>
+    <th>学校名</th><th>出走順</th><th>ヒート</th>
+    <th>氏名</th><th>ふりがな</th><th>入部何年</th>
+  </tr></thead>`;
+
+  const tbl = (label, xs) => xs.length ? `
+    <div class="list-section-title">${label}</div>
+    <div class="list-scroll"><table class="list-tbl">${header}<tbody>${xs.map(row).join('')}</tbody></table></div>` : '';
+
+  wrap.innerHTML = tbl('第1ヒート', heatA) + tbl('第2ヒート', heatB) + tbl('第3ヒート', heatC);
+}
+
+// ── CSV出力 ────────────
+function toCsv_(headers, rows) {
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const lines = [headers.map(q).join(',')];
+  rows.forEach(r => lines.push(r.map(q).join(',')));
+  return '﻿' + lines.join('\r\n');
+}
+function downloadCsv_(filename, csv) {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function downloadEntryListCsv_() {
+  const orders = computeRunningOrder_();
+  const rows   = buildEntryListRows_(orders);
+  const headers = ['大学名', '走行順', 'ヒート', '選手名', 'よみがな', '入部何年', 'クラス', 'studentId'];
+  const data = rows.map(r => [
+    r.school, r.order, r.cls, r.name, r.furigana, r.clubYears,
+    r.section === 'men' ? 'Formula Gymkhana' : 'Formula Gymkhana 女子', r.studentId,
+  ]);
+  downloadCsv_(`エントリーリスト_${curEvent_}.csv`, toCsv_(headers, data));
+}
+
+function downloadReceptionCsv_() {
+  const orders = computeRunningOrder_();
+  const rows   = buildEntryListRows_(orders);
+  const headers = ['大学名', 'ヒート', '選手名', 'よみがな',
+    '受付(土曜日)', '受付(日曜日)', '紹介カード', 'リストバンド', '必要書類', 'ID'];
+  const data = rows.map(r => [r.school, r.cls, r.name, r.furigana, '', '', '', '', '', r.studentId]);
+  downloadCsv_(`受付リスト_${curEvent_}.csv`, toCsv_(headers, data));
+}
+
+function downloadSupportCsv_() {
+  const rows = buildSupportRows_();
+  const headers = ['大学名', '氏名', 'よみがな', '受付', '補欠選手登録', 'メカニック登録',
+    '土曜昼食', '日曜昼食', '必要書類', 'ID'];
+  const data = rows.map(r => [
+    r.school, r.name, r.furigana, '', r.backup, r.mech, r.lunchSat, r.lunchSun, r.needDoc, r.studentId,
+  ]);
+  downloadCsv_(`応援学生受付リスト_${curEvent_}.csv`, toCsv_(headers, data));
+}
+
+function downloadOrderCsv_() {
+  const orders = computeRunningOrder_();
+  const rows = buildEntryListRows_(orders)
+    .filter(r => r.order)
+    .sort((a, b) => a.order - b.order);
+  const headers = ['学校名', '出走順', 'ヒート', '氏名', 'ふりがな', '入部何年', 'studentId'];
+  const data = rows.map(r => [r.school, r.order, r.cls, r.name, r.furigana, r.clubYears, r.studentId]);
+  downloadCsv_(`出走順リスト_${curEvent_}.csv`, toCsv_(headers, data));
 }
