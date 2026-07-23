@@ -2487,7 +2487,7 @@ function renderOrderList_() {
     <div class="list-section-title">${label}</div>
     <div class="list-scroll"><table class="list-tbl">${header}<tbody>${xs.length ? xs.map(row).join('') : emptyBody}</tbody></table></div>`;
 
-  wrap.innerHTML = tbl('第1ヒート', heatA) + tbl('第2ヒート', heatB) + tbl('第3ヒート', heatC);
+  wrap.innerHTML = tbl('Aドライバー', heatA) + tbl('Bドライバー', heatB) + tbl('Cドライバー', heatC);
 }
 
 // ── CSV出力 ────────────
