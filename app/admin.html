@@ -251,17 +251,6 @@
     .sm-btn{padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;
       font-weight:600;color:var(--navy);background:#fff;cursor:pointer}
 
-    /* ── Mail modal ── */
-    .mail-field{margin-bottom:10px}
-    .mail-field-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
-    .mail-field-label{font-size:11px;font-weight:700;color:var(--navy)}
-    .mail-copy-btn{font-size:10px;padding:3px 8px;border:1px solid var(--border);border-radius:4px;
-      background:#fff;color:var(--navy);cursor:pointer;font-weight:600}
-    .mail-copy-btn.copied{background:var(--fg-blue);color:#fff;border-color:var(--fg-blue)}
-    .mail-field-val{font-size:12px;background:var(--gray-light);border-radius:6px;padding:8px 10px;
-      word-break:break-all;color:#333;font-family:inherit;line-height:1.6}
-    .mail-field-val.body{white-space:pre-wrap;max-height:40vh;overflow-y:auto;font-size:11px}
-
     /* ── Modal ── */
     .modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;
       display:flex;align-items:center;justify-content:center;padding:16px}
@@ -292,10 +281,10 @@
     .entry-chip.car-no{background:var(--gray-light);color:var(--gray)}
     .entry-chip.lunch-sat{background:#E8F0FE;color:#1A56DB}
     .entry-chip.lunch-sun{background:#FEF0F0;color:#C0392B}
-    .entry-card-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:8px}
-    .entry-mail-btn,.entry-edit-btn{font-size:11px;padding:4px 12px;border:1px solid var(--border);border-radius:6px;
+    .entry-card-actions{display:flex;justify-content:flex-end;margin-top:8px}
+    .entry-edit-btn{font-size:11px;padding:4px 12px;border:1px solid var(--border);border-radius:6px;
       background:#fff;color:var(--navy);cursor:pointer;font-weight:600}
-    .entry-mail-btn:hover,.entry-edit-btn:hover{background:var(--gray-light);border-color:var(--navy)}
+    .entry-edit-btn:hover{background:var(--gray-light);border-color:var(--navy)}
     /* ── 企業管理タブ ── */
     .co-tab-bar{display:flex;background:#fff;border-bottom:2px solid var(--border)}
     .co-tab-btn{flex:1;padding:12px 8px;font-size:13px;font-weight:600;color:var(--gray);
@@ -660,26 +649,6 @@
       </div>
     </div>
 
-    <!-- 受付確認メール モーダル -->
-    <div class="modal-ov" id="modal-entry-mail" style="display:none">
-      <div class="modal-card" style="max-width:480px">
-        <div class="modal-hd">
-          <span class="modal-title" id="modal-entry-mail-title">受付確認メール</span>
-          <button class="modal-close" id="modal-entry-mail-close">✕</button>
-        </div>
-        <div class="modal-bd" style="padding:14px 18px;overflow-y:auto;max-height:70vh">
-          <div class="mail-field">
-            <div class="mail-field-hd"><span class="mail-field-label">宛先</span><button class="mail-copy-btn" data-copy="mail-to">コピー</button></div>
-            <div class="mail-field-val" id="mail-to"></div>
-          </div>
-          <div class="mail-field">
-            <div class="mail-field-hd"><span class="mail-field-label">本文</span><button class="mail-copy-btn" data-copy="mail-body">コピー</button></div>
-            <div class="mail-field-val body" id="mail-body"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- 出展申込 編集モーダル -->
     <div class="modal-ov" id="modal-entry-edit" style="display:none">
       <div class="modal-card">
@@ -1018,6 +987,6 @@
 <div class="toast" id="toast"></div>
 <script src="../js/vendor/qrcode.min.js"></script>
 <script src="../js/config.js?v=20260722a"></script>
-<script src="../js/admin.js?v=20260723a"></script>
+<script src="../js/admin.js?v=20260722a"></script>
 </body>
 </html>
