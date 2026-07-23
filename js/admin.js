@@ -238,8 +238,14 @@ function showPage_(name) {
 }
 
 function activateCoTab_(tab) {
-  document.querySelectorAll('.co-tab-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.coTab === tab);
+  document.querySelectorAll('.co-tab-bar').forEach(bar => {
+    const btns = [...bar.querySelectorAll('.co-tab-btn')];
+    bar.style.setProperty('--tab-count', btns.length);
+    btns.forEach((b, i) => {
+      const on = b.dataset.coTab === tab;
+      b.classList.toggle('active', on);
+      if (on) bar.style.setProperty('--tab-idx', i);
+    });
   });
   document.querySelectorAll('.co-tab-content').forEach(c => c.classList.remove('active'));
   const target = id_('co-tab-' + tab);
