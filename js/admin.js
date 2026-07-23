@@ -2057,13 +2057,20 @@ function bindListPageEvents_() {
   // 一度だけバインド
   if (bindListPageEvents_._done) return;
   bindListPageEvents_._done = true;
-  document.querySelectorAll('#page-entry-list .tab-btn, #page-reception .tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const page = btn.closest('[id^="page-"]');
-      page.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
-      page.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      const t = id_('tab-' + btn.dataset.tab);
-      if (t) t.classList.add('active');
+  document.querySelectorAll('#page-entry-list .tab-bar, #page-reception .tab-bar').forEach(bar => {
+    const btns = [...bar.querySelectorAll('.tab-btn')];
+    bar.style.setProperty('--tab-count', btns.length);
+    const activeIdx = Math.max(0, btns.findIndex(b => b.classList.contains('active')));
+    bar.style.setProperty('--tab-idx', activeIdx);
+    btns.forEach((btn, i) => {
+      btn.addEventListener('click', () => {
+        const page = btn.closest('[id^="page-"]');
+        btns.forEach(b => b.classList.toggle('active', b === btn));
+        bar.style.setProperty('--tab-idx', i);
+        page.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        const t = id_('tab-' + btn.dataset.tab);
+        if (t) t.classList.add('active');
+      });
     });
   });
   id_('btn-save-order')?.addEventListener('click', saveSchoolOrder_);
