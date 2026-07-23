@@ -1732,6 +1732,7 @@ function renderEntries_(entries) {
           <span class="entry-chip lunch-sun">日食:${ll}</span>
         </div>
         <div class="entry-card-actions">
+          <button class="entry-mail-btn" data-mail-idx="${i}">✉ メール</button>
           <button class="entry-edit-btn" data-edit-idx="${i}">✏ 編集</button>
         </div>
       </div>`;
@@ -1743,7 +1744,58 @@ function renderEntries_(entries) {
   list.querySelectorAll('.entry-edit-btn').forEach(btn => {
     btn.addEventListener('click', e => { e.stopPropagation(); openEntryEdit_(+btn.dataset.editIdx); });
   });
+  list.querySelectorAll('.entry-mail-btn').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); openEntryMail_(+btn.dataset.mailIdx); });
+  });
 }
+
+// ── 受付確認メール ──
+function openEntryMail_(idx) {
+  const e = companyEntries_[idx];
+  if (!e) return;
+  const name = e['企業名正式'] || e['社名略称'] || '';
+  const contact = e['担当者名'] || '';
+  const pp = Number(e['人パス']) || 0;
+  const cp = Number(e['車両パス']) || 0;
+  const ls = Number(e['昼食土']) || 0;
+  const ll = Number(e['昼食日']) || 0;
+  const cars = Number(e['展示車両数']) || 0;
+  const demo = e['デモ走行'] || 'なし';
+  const demoDetail = e['デモ走行詳細'] || '';
+  const booth = e['ブース区画'] || 'なし';
+  const content = e['出展内容'] || '';
+  const note = (e['備考'] || '').trim();
+
+  let body = `${name}\n${contact}様\n\nこのたびは、出展申し込みいただき、ありがとうございます。\n以下の内容にて承りましたので、ご確認ください。\n------------------------------------------------------------\n【出展内容】\n出展内容　　　　${content}\nブース区画　　　${booth}\n展示車両数　　　${cars}台\nデモ走行　　　　${demo}`;
+  if (demo === 'あり' && demoDetail) body += `\nデモ走行詳細　　${demoDetail}`;
+  body += `\n\n【パス・昼食】\n人パス　　　　　${pp}枚\n車両パス　　　　${cp}枚\n昼食（土）　　　${ls}食\n昼食（日）　　　${ll}食\n------------------------------------------------------------`;
+  if (note) body += `\n\n【備考】\n${note}`;
+  body += `\n\n人パスおよび車両パスは、後日発送いたします。\nまた、内容に変更等ございましたらご連絡ください。随時対応いたします。\n今後ともよろしくお願いいたします。\n\nMSC株式会社 / 菊武\n\n――――――――――――――――――――――――――――――――――――――――\nMSC株式会社\nFORMULA GYMKHANA 事務局\n阿久津 / 菊武\n\n〒166-0015　東京都杉並区成田東3-13-11\nTEL 03-5305-3553\nFAX 03-5305-3583\nMAIL fso@mscjapan.jp\n――――――――――――――――――――――――――――――――――――――――――`;
+
+  id_('modal-entry-mail-title').textContent = name + ' 受付確認メール';
+  id_('mail-to').textContent = e['メールアドレス'] || '';
+  id_('mail-body').textContent = body;
+  id_('modal-entry-mail').style.display = 'flex';
+}
+
+id_('modal-entry-mail-close').addEventListener('click', () => {
+  id_('modal-entry-mail').style.display = 'none';
+});
+id_('modal-entry-mail').addEventListener('click', ev => {
+  if (ev.target.id === 'modal-entry-mail') id_('modal-entry-mail').style.display = 'none';
+});
+
+document.querySelectorAll('#modal-entry-mail .mail-copy-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = id_(btn.dataset.copy);
+    if (!target) return;
+    navigator.clipboard.writeText(target.textContent).then(() => {
+      btn.textContent = '✓';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'コピー'; btn.classList.remove('copied'); }, 1500);
+    });
+  });
+});
 
 let editEntryIdx_ = -1;
 function openEntryEdit_(idx) {
