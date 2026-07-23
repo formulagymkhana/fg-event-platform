@@ -164,12 +164,6 @@
         <span><span class="label">対象大会 </span><span id="event-name-label">—</span></span>
       </div>
 
-      <div class="info-banner">
-        <strong>複数回送信について</strong><br>
-        同じ学校名で再送信すると、以前の入力内容は破棄され、最新のものが適用されます。
-        変更が生じた場合は改めて全項目をご入力のうえ送信してください。
-      </div>
-
       <div id="form-error-banner" class="form-error-banner"></div>
 
       <!-- 規則同意 -->
@@ -178,11 +172,11 @@
         <div class="consent-box" id="cb-rule">
           <label>
             <input type="checkbox" id="f-rule">
-            <span>
-              <a href="https://formulagymkhana.com/regulation" target="_blank" style="color:var(--fg-blue);text-decoration:underline;font-weight:600">大会規則書</a>
-              をよく読み、理解のうえ本予選会にエントリーします。
-            </span>
+            <span>大会規則書をよく読み、理解のうえ本予選会にエントリーします。</span>
           </label>
+          <p class="doc-links">
+            <a href="https://drive.google.com/file/d/1XWqw4kGrJXHtw5Ol5IWhOaF8piN1Sn8r/view?usp=sharing" target="_blank" rel="noopener">📄 大会規則書を読む</a>
+          </p>
         </div>
         <p class="field-err" id="err-rule">同意が必要です</p>
       </div>
@@ -192,8 +186,9 @@
         <p class="section-label">学校情報</p>
         <div class="form-row">
           <label>学校名<span class="req">*</span></label>
-          <input type="text" id="f-school" placeholder="例：MSC自動車大学校" autocomplete="organization">
-          <p class="hint">同じ学校名で再送信すると内容が上書きされます</p>
+          <input type="text" id="f-school" placeholder="入力すると候補が表示されます" autocomplete="organization" list="dl-universities" maxlength="100">
+          <datalist id="dl-universities"></datalist>
+          <p class="hint">一覧にない場合はそのまま入力（「大学」「大学校」を含めてください）</p>
           <p class="field-err" id="err-school">入力してください</p>
         </div>
       </div>
@@ -225,7 +220,7 @@
         <p class="section-label">入場パス発送先</p>
         <div class="form-row">
           <label>名義人<span class="req">*</span></label>
-          <input type="text" id="f-shipname" placeholder="例：MSC自動車大学校 山田太郎">
+          <input type="text" id="f-shipname" placeholder="例：山田 太郎">
           <p class="field-err" id="err-shipname">入力してください</p>
         </div>
         <div class="form-row">
@@ -294,12 +289,27 @@
         </div>
       </div>
 
+      <!-- 重複時の上書き確認（既提出の場合のみ表示） -->
+      <div class="form-section" id="sec-overwrite" style="display:none">
+        <p class="section-label" style="color:var(--fg-warning)">⚠ 既に提出済みの学校名です</p>
+        <div class="consent-box" id="cb-overwrite" style="background:#FFF7E1;border:1px solid #F5D680">
+          <label>
+            <input type="checkbox" id="f-overwrite">
+            <span>
+              <strong id="overwrite-info">同名の学校で既に提出があります。</strong><br>
+              このまま送信すると以前の内容は破棄され、今回の内容で上書きされます。同意する場合はチェックしてください。
+            </span>
+          </label>
+        </div>
+        <p class="field-err" id="err-overwrite">上書きに同意してください</p>
+      </div>
+
       <button class="submit-btn" id="btn-submit">送信する</button>
     </div>
   </div>
 
   <script src="../js/config.js?v=20260722a"></script>
-  <script src="../js/api.js?v=20260722a"></script>
-  <script src="../js/register-school.js?v=20260722a"></script>
+  <script src="../js/api.js?v=20260723b"></script>
+  <script src="../js/register-school.js?v=20260723b"></script>
 </body>
 </html>

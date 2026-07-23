@@ -109,6 +109,7 @@ function dispatch_(e) {
       case 'submitCompanyEntry':      return actionSubmitCompanyEntry_(p);
       case 'registerSchoolEntry':     return actionRegisterSchoolEntry_(p);   // 出場校エントリー(公開)
       case 'getSchoolEntryFormConfig':return actionGetSchoolEntryFormConfig_(p);
+      case 'checkSchoolEntryExists':  return actionCheckSchoolEntryExists_(p);
       case 'adminRequestReset':       return actionAdminRequestReset_(p);
       case 'adminConfirmReset':       return actionAdminConfirmReset_(p);
       // ── admin (T12) ───────────────────────────────────────────────────
@@ -2617,6 +2618,29 @@ function actionGetSchoolEntryFormConfig_(p) {
     openAt:     fmt(cfg.schoolEntryFormOpenAt),
     deadline:   fmt(cfg.schoolEntryDeadline),
   });
+}
+
+// ============================================================
+// アクション: checkSchoolEntryExists（学校名の既提出チェック・公開）
+// ============================================================
+
+function actionCheckSchoolEntryExists_(p) {
+  if (!p.event || !p.schoolName) return err_('missing_params');
+  const sheet = eventSs_(p.event).getSheetByName(SHEET.SCHOOL_ENTRIES);
+  if (!sheet || sheet.getLastRow() < 2) return ok_({ exists: false });
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const nameCol = headers.indexOf('学校名');
+  const dtCol   = headers.indexOf('提出日時');
+  const updCol  = headers.indexOf('更新回数');
+  const target  = String(p.schoolName).trim();
+  const row = data.slice(1).find(r => String(r[nameCol]).trim() === target);
+  if (!row) return ok_({ exists: false });
+  const tz = Session.getScriptTimeZone();
+  const dt = row[dtCol] instanceof Date
+    ? Utilities.formatDate(row[dtCol], tz, 'yyyy/MM/dd HH:mm')
+    : String(row[dtCol] || '');
+  return ok_({ exists: true, submittedAt: dt, updateCount: Number(row[updCol]) || 1 });
 }
 
 // ============================================================

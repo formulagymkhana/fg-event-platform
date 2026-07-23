@@ -21,22 +21,65 @@ let _event = null;
   _event = FG_API.getParam('event');
   if (!_event) { showState('no-event'); return; }
 
-  const res = await FG_API.getSchoolEntryFormConfig(_event);
-  if (!res.ok) {
-    if (res.error === 'event_inactive') { showState('expired'); return; }
+  const [cfgRes, schoolRes] = await Promise.all([
+    FG_API.getSchoolEntryFormConfig(_event),
+    FG_API.getSchoolList(),
+  ]);
+  if (!cfgRes.ok) {
+    if (cfgRes.error === 'event_inactive') { showState('expired'); return; }
     showState('no-event');
     return;
   }
-  const d = res.data || {};
+  const d = cfgRes.data || {};
   if (d.state === 'not_open') { showState('not-open'); return; }
   if (d.state === 'expired')  { showState('expired');  return; }
   if (d.state === 'inactive') { showState('expired');  return; }
 
   $('event-name-label').textContent = d.eventName || _event;
+  if (schoolRes.ok) fillSchoolList_(schoolRes.data.schools || []);
+
   showState('form');
 
   $('btn-submit').addEventListener('click', submit);
+  $('f-school').addEventListener('blur', checkOverwrite);
+  $('f-school').addEventListener('input', () => {
+    // 学校名が変わったら再判定するまで警告を隠す
+    $('sec-overwrite').style.display = 'none';
+    _overwriteChecked = '';
+  });
 })();
+
+function fillSchoolList_(list) {
+  const dl = $('dl-universities');
+  if (!dl) return;
+  dl.innerHTML = list.map(s => `<option value="${String(s.name || s).replace(/"/g, '&quot;')}">`).join('');
+}
+
+let _overwriteChecked = ''; // 直近チェック済みの学校名（重複警告表示時のみ非空）
+
+async function checkOverwrite() {
+  const name = $('f-school').value.trim();
+  if (!name) { $('sec-overwrite').style.display = 'none'; _overwriteChecked = ''; return; }
+  if (name === _overwriteChecked) return;
+  try {
+    const r = await FG_API.checkSchoolEntryExists(_event, name);
+    if (r.ok && r.data && r.data.exists) {
+      const info = $('overwrite-info');
+      const upd  = r.data.updateCount || 1;
+      const at   = r.data.submittedAt || '';
+      info.textContent = `「${name}」は${at ? at + ' に' : ''}既に提出されています（更新${upd}回）。`;
+      $('sec-overwrite').style.display = '';
+      _overwriteChecked = name;
+    } else {
+      $('sec-overwrite').style.display = 'none';
+      _overwriteChecked = '';
+    }
+  } catch (e) {
+    // 通信失敗時は警告を出さない（送信時にサーバー側で対応）
+    $('sec-overwrite').style.display = 'none';
+    _overwriteChecked = '';
+  }
+}
 
 function showState(name) {
   ['no-event','not-open','expired','loading','form','done'].forEach(s => {
@@ -107,6 +150,13 @@ async function submit() {
   $('err-approval').classList.toggle('show', !!fileTooBig);
   $('f-approval').classList.toggle('error', !!fileTooBig);
   if (fileTooBig) ok = false;
+
+  // 上書き確認: 警告表示中はチェック必須
+  const overwriteShown = $('sec-overwrite').style.display !== 'none';
+  const overwriteAgreed = $('f-overwrite').checked;
+  document.getElementById('cb-overwrite').classList.toggle('error', overwriteShown && !overwriteAgreed);
+  $('err-overwrite').classList.toggle('show', overwriteShown && !overwriteAgreed);
+  if (overwriteShown && !overwriteAgreed) ok = false;
 
   if (!ok) {
     banner.textContent = '入力内容に不備があります。赤字の項目をご確認ください。';
