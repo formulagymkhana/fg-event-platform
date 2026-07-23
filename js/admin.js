@@ -2061,24 +2061,31 @@ async function loadReceptionList_() {
 }
 
 function bindListPageEvents_() {
-  // 一度だけバインド
-  if (bindListPageEvents_._done) return;
-  bindListPageEvents_._done = true;
+  // 初期化: 各tab-barのCSS変数を設定
   document.querySelectorAll('#page-entry-list .tab-bar, #page-reception .tab-bar, #page-forms .tab-bar').forEach(bar => {
     const btns = [...bar.querySelectorAll('.tab-btn')];
     bar.style.setProperty('--tab-count', btns.length);
     const activeIdx = Math.max(0, btns.findIndex(b => b.classList.contains('active')));
     bar.style.setProperty('--tab-idx', activeIdx);
-    btns.forEach((btn, i) => {
-      btn.addEventListener('click', () => {
-        const page = btn.closest('[id^="page-"]');
-        btns.forEach(b => b.classList.toggle('active', b === btn));
-        bar.style.setProperty('--tab-idx', i);
-        page.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        const t = id_('tab-' + btn.dataset.tab);
-        if (t) t.classList.add('active');
-      });
-    });
+  });
+
+  // クリックハンドラは一度だけ（イベント委譲）
+  if (bindListPageEvents_._done) return;
+  bindListPageEvents_._done = true;
+  document.addEventListener('click', ev => {
+    const btn = ev.target.closest('.tab-btn');
+    if (!btn) return;
+    const bar = btn.closest('.tab-bar');
+    if (!bar) return;
+    const page = btn.closest('#page-entry-list, #page-reception, #page-forms');
+    if (!page) return;
+    const btns = [...bar.querySelectorAll('.tab-btn')];
+    const i = btns.indexOf(btn);
+    btns.forEach(b => b.classList.toggle('active', b === btn));
+    bar.style.setProperty('--tab-idx', i);
+    page.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    const t = id_('tab-' + btn.dataset.tab);
+    if (t) t.classList.add('active');
   });
   id_('btn-save-order')?.addEventListener('click', saveSchoolOrder_);
   id_('btn-add-women-pair')?.addEventListener('click', () => {
