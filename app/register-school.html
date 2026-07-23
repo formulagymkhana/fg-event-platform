@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self';
+             script-src 'self';
+             connect-src https://script.google.com
+                         https://script.googleusercontent.com;
+             img-src 'self' https: data:;
+             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+             font-src 'self' https://fonts.gstatic.com;">
+  <title>FORMULA GYMKHANA — 出場校エントリー</title>
+  <link rel="stylesheet" href="../js/style.css?v=20260722a">
+  <style>
+    body { display:flex; flex-direction:column; align-items:center; padding:24px 16px 48px; }
+    .card { width:100%; max-width:460px; }
+    .card-body { padding:26px 22px 30px; text-align:left; }
+
+    .form-section { margin-bottom:20px; }
+    .section-label { font-size:11px; font-weight:700; color:var(--fg-muted); letter-spacing:.1em;
+      text-transform:uppercase; margin-bottom:12px; padding-bottom:6px; border-bottom:1px solid var(--fg-line); }
+    .form-row { margin-bottom:14px; }
+    .form-row label { display:block; font-size:12px; font-weight:600; color:var(--fg-text); margin-bottom:5px; }
+    .form-row label .req { color:var(--fg-error); margin-left:3px; }
+    .form-row input, .form-row select, .form-row textarea {
+      width:100%; padding:11px 13px; border:1.5px solid var(--fg-line); border-radius:8px;
+      font-size:16px; color:var(--fg-text); background:#fff; appearance:none; -webkit-appearance:none;
+      transition:border-color .15s; font-family:inherit;
+    }
+    .form-row textarea { min-height:80px; resize:vertical; font-size:14px; }
+    .form-row input:focus, .form-row select:focus, .form-row textarea:focus { outline:none; border-color:var(--fg-blue); }
+    .form-row input.error, .form-row select.error, .form-row textarea.error { border-color:var(--fg-error); }
+    .form-row .hint { font-size:11px; color:var(--fg-muted); margin-top:4px; line-height:1.5; }
+
+    .radio-group { display:flex; gap:12px; flex-wrap:wrap; }
+    .radio-group.col { flex-direction:column; gap:8px; }
+    .radio-group label { display:flex; align-items:center; gap:6px; font-size:14px; color:var(--fg-text);
+      font-weight:400; cursor:pointer; }
+    .radio-group input[type="radio"] { width:16px; height:16px; flex-shrink:0; padding:0; border:0;
+      appearance:auto; -webkit-appearance:auto; accent-color:var(--fg-blue); cursor:pointer; }
+
+    .consent-box { background:var(--fg-bg); border-radius:10px; padding:14px 16px; margin-bottom:14px; }
+    .consent-box label { display:flex; align-items:flex-start; gap:10px; font-size:13px; color:var(--fg-text);
+      line-height:1.6; cursor:pointer; }
+    .consent-box input[type="checkbox"] { width:18px; height:18px; flex-shrink:0; margin-top:2px;
+      accent-color:var(--fg-blue); cursor:pointer; }
+    .consent-box.error { border:1.5px solid var(--fg-error); }
+    .doc-links { display:flex; flex-wrap:wrap; gap:8px 16px; margin:10px 0 0 28px; }
+    .doc-links a { font-size:12px; font-weight:600; color:var(--fg-blue); text-decoration:underline; }
+    .file-input { width:100%; padding:9px 11px; border:1.5px dashed var(--fg-line); border-radius:8px;
+      font-size:13px; background:var(--fg-bg); color:var(--fg-text); }
+    .file-input:focus { outline:none; border-color:var(--fg-blue); }
+    .file-input.error { border-color:var(--fg-error); }
+
+    .event-badge { background:var(--fg-blue-soft); border-radius:8px; padding:10px 14px; font-size:13px;
+      color:var(--fg-navy); font-weight:600; display:flex; align-items:center; gap:8px; margin-bottom:16px;
+      border:1px solid var(--fg-blue-border); }
+    .event-badge .label { font-size:11px; color:var(--fg-muted); font-weight:400; }
+
+    .info-banner { background:#FFF7E1; border:1px solid #F5D680; border-radius:10px; padding:12px 14px;
+      font-size:13px; color:#5C4200; line-height:1.6; margin-bottom:16px; }
+    .info-banner strong { color:#3F2E00; }
+
+    .submit-btn { width:100%; padding:16px; background:var(--fg-blue); color:#fff; border:none;
+      border-radius:var(--radius-ui); font-size:16px; font-weight:800; cursor:pointer; letter-spacing:.04em;
+      transition:background .15s; margin-top:4px; }
+    .submit-btn:active   { background:#0047A0; }
+    .submit-btn:disabled { background:var(--fg-disabled); cursor:not-allowed; }
+
+    .success-icon { width:72px; height:72px; border-radius:20px; background:var(--fg-blue-soft);
+      color:var(--fg-blue); font-size:32px; font-weight:700; display:flex; align-items:center;
+      justify-content:center; margin:0 auto 20px;
+      animation:popIn .4s cubic-bezier(.175,.885,.32,1.275); }
+    @keyframes popIn { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+    .welcome-sub { font-size:14px; color:var(--fg-muted); margin-bottom:20px; text-align:center; line-height:1.7; }
+
+    .field-err { font-size:11px; color:var(--fg-error); margin-top:4px; display:none; }
+    .field-err.show { display:block; }
+    .form-error-banner { background:var(--fg-error-bg); border-radius:8px; padding:12px 14px;
+      font-size:13px; color:var(--fg-error); margin-bottom:16px; display:none; }
+    .form-error-banner.show { display:block; }
+
+    .state-icon { font-size:44px; text-align:center; margin-bottom:12px; }
+    .state-title { font-size:16px; font-weight:700; color:var(--fg-navy); text-align:center; margin-bottom:8px; }
+    .state-msg { font-size:13px; color:var(--fg-muted); text-align:center; line-height:1.7; }
+  </style>
+</head>
+<body>
+
+  <!-- イベント未指定 -->
+  <div class="card" id="state-no-event" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo"><img class="fg-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
+      <div class="fg-page-name">出場校エントリー</div>
+    </div>
+    <div class="card-body" style="text-align:center">
+      <div class="state-icon">⚠</div>
+      <p class="state-title">登録URLが正しくありません</p>
+      <p class="state-msg">案内された出場校エントリーURL（?event=…付き）からアクセスしてください。</p>
+    </div>
+  </div>
+
+  <!-- 受付開始前 -->
+  <div class="card" id="state-not-open" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo"><img class="fg-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
+      <div class="fg-page-name">出場校エントリー</div>
+    </div>
+    <div class="card-body" style="text-align:center">
+      <div class="state-icon">🕐</div>
+      <p class="state-title">受付開始前です</p>
+      <p class="state-msg">出場校エントリーの受付はまだ始まっていません。<br>案内された開始日時以降に再度アクセスしてください。</p>
+    </div>
+  </div>
+
+  <!-- 締切後 -->
+  <div class="card" id="state-expired" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo"><img class="fg-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
+      <div class="fg-page-name">出場校エントリー</div>
+    </div>
+    <div class="card-body" style="text-align:center">
+      <div class="state-icon">⏰</div>
+      <p class="state-title">受付は終了しました</p>
+      <p class="state-msg">出場校エントリーの受付期間は終了しました。<br>変更・追加のご相談は事務局までご連絡ください。</p>
+    </div>
+  </div>
+
+  <!-- 通信中 -->
+  <div class="card" id="state-loading">
+    <div class="fg-header">
+      <div class="fg-logo"><img class="fg-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
+      <div class="fg-page-name">出場校エントリー</div>
+    </div>
+    <div class="card-body" style="text-align:center">
+      <div class="spinner"></div>
+      <p style="font-size:13px;color:var(--fg-muted);">読み込み中...</p>
+    </div>
+  </div>
+
+  <!-- 送信完了 -->
+  <div class="card" id="state-done" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo"><img class="fg-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
+      <div class="fg-page-name">出場校エントリー</div>
+    </div>
+    <div class="card-body" style="text-align:center">
+      <div class="success-icon">✓</div>
+      <p class="state-title" id="done-title">受付しました</p>
+      <p class="welcome-sub" id="done-msg">エントリー内容を受け付けました。<br>ご登録のメールアドレスに確認メールをお送りしています。</p>
+    </div>
+  </div>
+
+  <!-- フォーム -->
+  <div class="card" id="state-form" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo"><img class="fg-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
+      <div class="fg-page-name">出場校エントリー</div>
+    </div>
+    <div class="card-body">
+      <div class="event-badge">
+        <span><span class="label">対象大会 </span><span id="event-name-label">—</span></span>
+      </div>
+
+      <div class="info-banner">
+        <strong>複数回送信について</strong><br>
+        同じ学校名で再送信すると、以前の入力内容は破棄され、最新のものが適用されます。
+        変更が生じた場合は改めて全項目をご入力のうえ送信してください。
+      </div>
+
+      <div id="form-error-banner" class="form-error-banner"></div>
+
+      <!-- 規則同意 -->
+      <div class="form-section">
+        <p class="section-label">大会規則書</p>
+        <div class="consent-box" id="cb-rule">
+          <label>
+            <input type="checkbox" id="f-rule">
+            <span>
+              <a href="https://formulagymkhana.com/regulation" target="_blank" style="color:var(--fg-blue);text-decoration:underline;font-weight:600">大会規則書</a>
+              をよく読み、理解のうえ本予選会にエントリーします。
+            </span>
+          </label>
+        </div>
+        <p class="field-err" id="err-rule">同意が必要です</p>
+      </div>
+
+      <!-- 学校情報 -->
+      <div class="form-section">
+        <p class="section-label">学校情報</p>
+        <div class="form-row">
+          <label>学校名<span class="req">*</span></label>
+          <input type="text" id="f-school" placeholder="例：MSC自動車大学校" autocomplete="organization">
+          <p class="hint">同じ学校名で再送信すると内容が上書きされます</p>
+          <p class="field-err" id="err-school">入力してください</p>
+        </div>
+      </div>
+
+      <!-- エントリー代表者 -->
+      <div class="form-section">
+        <p class="section-label">エントリー代表者</p>
+        <div class="form-row">
+          <label>氏名<span class="req">*</span></label>
+          <input type="text" id="f-repname" placeholder="例：山田 太郎" autocomplete="name">
+          <p class="field-err" id="err-repname">入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>電話番号<span class="req">*</span></label>
+          <input type="tel" id="f-repphone" placeholder="例：09012345678" inputmode="numeric" maxlength="11" autocomplete="tel">
+          <p class="hint">ハイフン無しの半角数字（10〜11桁）</p>
+          <p class="field-err" id="err-repphone">10〜11桁の半角数字で入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>メールアドレス<span class="req">*</span></label>
+          <input type="email" id="f-repemail" placeholder="例：taro@example.com" inputmode="email" autocomplete="email">
+          <p class="hint">確認メールを送信します</p>
+          <p class="field-err" id="err-repemail">有効なメールアドレスを入力してください</p>
+        </div>
+      </div>
+
+      <!-- 入場パス発送先 -->
+      <div class="form-section">
+        <p class="section-label">入場パス発送先</p>
+        <div class="form-row">
+          <label>名義人<span class="req">*</span></label>
+          <input type="text" id="f-shipname" placeholder="例：MSC自動車大学校 山田太郎">
+          <p class="field-err" id="err-shipname">入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>郵便番号<span class="req">*</span></label>
+          <input type="tel" id="f-shippostal" placeholder="例：1660015" inputmode="numeric" maxlength="7">
+          <p class="hint">ハイフン無しの半角数字7桁</p>
+          <p class="field-err" id="err-shippostal">7桁の半角数字で入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>住所<span class="req">*</span></label>
+          <input type="text" id="f-shipaddress" placeholder="都道府県から番地・建物名まで">
+          <p class="field-err" id="err-shipaddress">入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>電話番号<span class="req">*</span></label>
+          <input type="tel" id="f-shipphone" placeholder="例：0353053553" inputmode="numeric" maxlength="11">
+          <p class="hint">ハイフン無しの半角数字（10〜11桁）</p>
+          <p class="field-err" id="err-shipphone">10〜11桁の半角数字で入力してください</p>
+        </div>
+      </div>
+
+      <!-- 車両入場証 -->
+      <div class="form-section">
+        <p class="section-label">車両入場証</p>
+        <div class="form-row">
+          <label>車両入場証は何枚必要ですか？（最大4枚）<span class="req">*</span></label>
+          <p class="hint" style="margin-top:0;margin-bottom:10px">
+            ※応援学生の分は別途発行します。選手3名分＋補欠ドライバーでの必要数を回答してください。<br>
+            ※女子クラスドライバー分も別途発行します。
+          </p>
+          <div class="radio-group col" id="rg-carpass">
+            <label><input type="radio" name="carPassCount" value="1枚"> 1枚</label>
+            <label><input type="radio" name="carPassCount" value="2枚"> 2枚</label>
+            <label><input type="radio" name="carPassCount" value="3枚"> 3枚</label>
+            <label><input type="radio" name="carPassCount" value="4枚"> 4枚</label>
+            <label><input type="radio" name="carPassCount" value="不要"> 不要</label>
+          </div>
+          <p class="field-err" id="err-carpass">選択してください</p>
+        </div>
+      </div>
+
+      <!-- 学校許可 -->
+      <div class="form-section">
+        <p class="section-label">学校許可・承諾書</p>
+        <div class="form-row">
+          <label>大会出場に必要な学校の許可は全て取得していますか？<span class="req">*</span></label>
+          <div class="radio-group col" id="rg-permission">
+            <label><input type="radio" name="permission" value="はい"> はい</label>
+            <label><input type="radio" name="permission" value="いいえ"> いいえ（事務局よりご連絡いたします）</label>
+          </div>
+          <p class="field-err" id="err-permission">選択してください</p>
+        </div>
+        <div class="form-row">
+          <label>学校職員の参加承諾書</label>
+          <input type="file" id="f-approval" class="file-input" accept=".pdf,.jpg,.jpeg,.png,image/*,application/pdf">
+          <p class="hint">記入済みのファイルをアップロードしてください（PDF/JPEG/PNG、最大10MB）</p>
+          <p class="field-err" id="err-approval">ファイルが大きすぎます（最大10MB）</p>
+        </div>
+      </div>
+
+      <!-- 連絡事項 -->
+      <div class="form-section">
+        <p class="section-label">事務局への連絡事項</p>
+        <div class="form-row">
+          <textarea id="f-note" placeholder="ご質問・ご要望などがあればご記入ください"></textarea>
+        </div>
+      </div>
+
+      <button class="submit-btn" id="btn-submit">送信する</button>
+    </div>
+  </div>
+
+  <script src="../js/config.js?v=20260722a"></script>
+  <script src="../js/api.js?v=20260722a"></script>
+  <script src="../js/register-school.js?v=20260722a"></script>
+</body>
+</html>

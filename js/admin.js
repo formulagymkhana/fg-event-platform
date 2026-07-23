@@ -67,6 +67,12 @@ window.addEventListener('DOMContentLoaded', () => {
     if (txt && !txt.startsWith('（')) copyText_(txt);
   });
 
+  // 出場校エントリーフォームURLコピー
+  id_('btn-copy-school-entry-url')?.addEventListener('click', () => {
+    const txt = id_('school-entry-form-url')?.textContent;
+    if (txt && !txt.startsWith('（')) copyText_(txt);
+  });
+
   // 事前登録CSVダウンロード（QRパス用・区分別）
   id_('btn-prereg-csv-driver')?.addEventListener('click', () => downloadPreRegCsv_('driver'));
   id_('btn-prereg-csv-spectator')?.addEventListener('click', () => downloadPreRegCsv_('spectator'));
@@ -78,6 +84,10 @@ window.addEventListener('DOMContentLoaded', () => {
   id_('btn-entry-csv')?.addEventListener('click', downloadEntryCsv_);
   id_('modal-entry-close')?.addEventListener('click', () => { id_('modal-entry').style.display = 'none'; });
   id_('modal-entry-edit-close')?.addEventListener('click', () => { id_('modal-entry-edit').style.display = 'none'; });
+  id_('modal-school-entry-close')?.addEventListener('click', () => { id_('modal-school-entry').style.display = 'none'; });
+  id_('modal-school-entry')?.addEventListener('click', e => {
+    if (e.target.id === 'modal-school-entry') id_('modal-school-entry').style.display = 'none';
+  });
   id_('btn-save-entry-edit')?.addEventListener('click', saveEntryEdit_);
   id_('modal-entry-body')?.addEventListener('click', e => {
     const btn = e.target.closest('[data-copy]');
@@ -476,7 +486,10 @@ async function loadConfig_(gen, ev) {
   setVal_('cfg-deadlineWomenDriver',toDtLocal_(cfg.deadlineWomenDriver));
   setVal_('cfg-deadlineReserve',    toDtLocal_(cfg.deadlineReserve));
   setVal_('cfg-deadlineMechanic',   toDtLocal_(cfg.deadlineMechanic));
+  setVal_('cfg-schoolEntryFormOpenAt', toDtLocal_(cfg.schoolEntryFormOpenAt));
+  setVal_('cfg-schoolEntryDeadline',   toDtLocal_(cfg.schoolEntryDeadline));
   updatePreRegFormUrl_();
+  updateSchoolEntryFormUrl_();
   updateFormBadge_(cfg);
 }
 
@@ -533,6 +546,8 @@ async function saveConfig_(btnId, fbId) {
     deadlineWomenDriver:  toIso_(getVal_('cfg-deadlineWomenDriver')),
     deadlineReserve:      toIso_(getVal_('cfg-deadlineReserve')),
     deadlineMechanic:     toIso_(getVal_('cfg-deadlineMechanic')),
+    schoolEntryFormOpenAt: toIso_(getVal_('cfg-schoolEntryFormOpenAt')),
+    schoolEntryDeadline:   toIso_(getVal_('cfg-schoolEntryDeadline')),
   };
 
   let failed = false;
@@ -1084,6 +1099,15 @@ function updatePreRegFormUrl_() {
   el.innerHTML = `<a href="${url}" target="_blank" class="url-anchor">${url}</a>`;
 }
 
+function updateSchoolEntryFormUrl_() {
+  const el = id_('school-entry-form-url');
+  if (!el) return;
+  if (!curEvent_) { el.textContent = '（イベント未選択）'; return; }
+  const base = location.origin + location.pathname.replace(/[^/]+$/, 'register-school.html');
+  const url = `${base}?event=${encodeURIComponent(curEvent_)}`;
+  el.innerHTML = `<a href="${url}" target="_blank" class="url-anchor">${url}</a>`;
+}
+
 function updateWalkInUrl_() {
   const el = id_('walkin-url');
   if (!el) return;
@@ -1531,6 +1555,87 @@ function loadUniversities_() {
     if (gen !== loadGen_) return;
     renderUniPending_(res);
   })();
+  // 出場大学（出場校エントリー提出済み）
+  (async () => {
+    const res = await adminCall_('adminGetSchoolEntries', { event: curEvent_ });
+    if (gen !== loadGen_) return;
+    renderSchoolEntries_(res);
+  })();
+}
+
+let schoolEntries_ = [];
+
+function renderSchoolEntries_(res) {
+  const wrap = id_('school-entries-wrap');
+  const cnt  = id_('school-entries-count');
+  if (!wrap) return;
+  if (!res.ok) {
+    wrap.innerHTML = '<p style="font-size:12px;color:var(--fg-warning);text-align:center;padding:16px 0">読み込みに失敗しました</p>';
+    return;
+  }
+  schoolEntries_ = res.data.entries || [];
+  if (cnt) cnt.textContent = `${schoolEntries_.length}校`;
+  if (!schoolEntries_.length) {
+    wrap.innerHTML = '<p style="font-size:12px;color:var(--gray);text-align:center;padding:16px 0">まだ提出されていません</p>';
+    return;
+  }
+  wrap.innerHTML = schoolEntries_.map((e, i) => {
+    const school = esc_(e['学校名'] || '—');
+    const rep    = esc_(e['代表者氏名'] || '—');
+    const carPass = esc_(e['車両入場証枚数'] || '—');
+    const perm   = e['学校許可取得'] === 'はい';
+    const upd    = Number(e['更新回数'] || 1);
+    const permChip = perm
+      ? '<span class="entry-chip booth-yes">許可取得済</span>'
+      : '<span class="entry-chip demo-maybe">許可未取得</span>';
+    const updChip = upd > 1
+      ? `<span class="entry-chip lunch-sun">更新${upd}回</span>`
+      : '';
+    return `
+      <div class="entry-card" data-school-idx="${i}">
+        <div class="entry-card-top">
+          <span class="entry-card-name">${school}</span>
+        </div>
+        <div class="entry-card-contact">${rep} / ${esc_(e['代表者電話'] || '—')}</div>
+        <div class="entry-card-chips">
+          <span class="entry-chip car-yes">車両入場証: ${carPass}</span>
+          ${permChip}
+          ${updChip}
+        </div>
+      </div>`;
+  }).join('');
+  wrap.querySelectorAll('.entry-card').forEach(card => {
+    card.addEventListener('click', () => showSchoolEntryDetail_(schoolEntries_[+card.dataset.schoolIdx]));
+  });
+}
+
+function showSchoolEntryDetail_(e) {
+  if (!e) return;
+  const body = id_('modal-school-entry-body');
+  const grp = (label, val) =>
+    `<div style="margin-bottom:14px"><div style="font-size:11px;color:var(--gray);font-weight:600;margin-bottom:3px">${label}</div><div style="font-size:14px;color:var(--navy);word-break:break-all">${val || '—'}</div></div>`;
+  const link = url =>
+    url ? `<a href="${esc_(url)}" target="_blank" style="color:var(--fg-blue);text-decoration:underline;font-size:13px">開く</a>` : '—';
+  const historyBlock = (e['承諾書履歴'] || '').trim();
+  id_('modal-school-entry-title').textContent = e['学校名'] || '出場校エントリー';
+  body.innerHTML = [
+    grp('提出日時', esc_(e['提出日時'] || '')),
+    grp('更新回数', esc_(e['更新回数'] || '1')),
+    grp('学校名', esc_(e['学校名'] || '')),
+    grp('代表者氏名', esc_(e['代表者氏名'] || '')),
+    grp('代表者電話', esc_(e['代表者電話'] || '')),
+    grp('代表者メール', esc_(e['代表者メール'] || '')),
+    grp('発送先 名義', esc_(e['発送先_名義'] || '')),
+    grp('発送先 郵便番号', esc_(e['発送先_郵便番号'] || '')),
+    grp('発送先 住所', esc_(e['発送先_住所'] || '')),
+    grp('発送先 電話', esc_(e['発送先_電話'] || '')),
+    grp('車両入場証枚数', esc_(e['車両入場証枚数'] || '')),
+    grp('学校許可取得', esc_(e['学校許可取得'] || '')),
+    grp('承諾書', link(e['承諾書URL'])),
+    historyBlock ? grp('承諾書（過去分）', `<div style="font-size:12px;white-space:pre-wrap;background:var(--gray-light);padding:8px 10px;border-radius:6px">${esc_(historyBlock)}</div>`) : '',
+    e['事務局への連絡事項'] ? grp('事務局への連絡事項', `<div style="white-space:pre-wrap">${esc_(e['事務局への連絡事項'])}</div>`) : '',
+  ].join('');
+  id_('modal-school-entry').style.display = 'flex';
 }
 
 /** 参加大学一覧をレンダリング */

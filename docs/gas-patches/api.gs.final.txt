@@ -25,7 +25,16 @@ const SHEET = {
   UNI_MASTER:         '大学マスター',
   PRE_REG:            '事前登録',
   COMPANY_ENTRIES:    '出展申込',
+  SCHOOL_ENTRIES:     '出場校エントリー',
 };
+
+// 出場校エントリーの列（重複時は同名の学校を上書き。承諾書履歴は改行区切りで蓄積）
+const SCHOOL_ENTRY_COLS = [
+  '提出日時','eventId','学校名','代表者氏名','代表者電話','代表者メール',
+  '発送先_名義','発送先_郵便番号','発送先_住所','発送先_電話',
+  '車両入場証枚数','学校許可取得','事務局への連絡事項',
+  '承諾書URL','承諾書履歴','規則同意','更新回数',
+];
 
 // 事前登録シートのフル列（共通＋区分別＋同意＋ファイルURL）
 const PRE_REG_COLS = [
@@ -98,6 +107,8 @@ function dispatch_(e) {
       case 'getSchoolList':           return actionGetSchoolList_(p);      // 大学候補リスト(公開)
       // 管理者パスワード復旧(公開・ロックアウト時用。認証不要)
       case 'submitCompanyEntry':      return actionSubmitCompanyEntry_(p);
+      case 'registerSchoolEntry':     return actionRegisterSchoolEntry_(p);   // 出場校エントリー(公開)
+      case 'getSchoolEntryFormConfig':return actionGetSchoolEntryFormConfig_(p);
       case 'adminRequestReset':       return actionAdminRequestReset_(p);
       case 'adminConfirmReset':       return actionAdminConfirmReset_(p);
       // ── admin (T12) ───────────────────────────────────────────────────
@@ -128,6 +139,7 @@ function dispatch_(e) {
       case 'adminUpdateStudent':          return actionAdminUpdateStudent_(p);
       case 'adminGetCompanyEntries':      return actionAdminGetCompanyEntries_(p);
       case 'adminUpdateEntry':             return actionAdminUpdateEntry_(p);
+      case 'adminGetSchoolEntries':       return actionAdminGetSchoolEntries_(p);
       default:                        return err_('unknown_action');
     }
   } catch (e) {
@@ -882,6 +894,26 @@ function isPastCategoryDeadline_(cfg, attr) {
   }[attr];
   if (!dl) return false;
   return new Date() > new Date(dl);
+}
+
+/** 出場校エントリーフォームの公開状態を返す */
+function schoolEntryFormState_(cfg) {
+  const now = new Date();
+  if (cfg.schoolEntryFormOpenAt) {
+    const openAt = new Date(cfg.schoolEntryFormOpenAt);
+    if (!isNaN(openAt) && now < openAt) return 'not_open';
+  }
+  if (cfg.schoolEntryDeadline) {
+    const dl = new Date(cfg.schoolEntryDeadline);
+    if (!isNaN(dl) && now > dl) return 'expired';
+  }
+  return 'open';
+}
+
+/** 出場校エントリー承諾書の保存フォルダ（イベント別） */
+function getSchoolEntryEventFolder_(eventId) {
+  const root = getOrCreateChildFolder_(DriveApp.getRootFolder(), 'FG出場校エントリー書類');
+  return getOrCreateChildFolder_(root, String(eventId));
 }
 
 /** eventId の開催期間内（当日）かを EVENT_LIST で確認 */
@@ -2567,6 +2599,193 @@ function actionSubmitCompanyEntry_(p) {
   [7, 8, 10].forEach(c => sheet.getRange(newRow, c).setNumberFormat('@'));
 
   return ok_({ message: '受付しました' });
+}
+
+// ============================================================
+// アクション: getSchoolEntryFormConfig（出場校フォームの公開状態）
+// ============================================================
+
+function actionGetSchoolEntryFormConfig_(p) {
+  if (!p.event) return err_('missing_event');
+  if (isEventInactive_(p.event)) return ok_({ state: 'inactive', eventName: '' });
+  const cfg = getConfig_(p.event);
+  const tz  = Session.getScriptTimeZone();
+  const fmt = v => v ? Utilities.formatDate(new Date(v), tz, "yyyy/MM/dd HH:mm") : '';
+  return ok_({
+    state:      schoolEntryFormState_(cfg),
+    eventName:  cfg.eventName || '',
+    openAt:     fmt(cfg.schoolEntryFormOpenAt),
+    deadline:   fmt(cfg.schoolEntryDeadline),
+  });
+}
+
+// ============================================================
+// アクション: registerSchoolEntry（出場校エントリー提出）
+// 重複時（同一学校名）は既存行を上書き、承諾書は履歴として蓄積。
+// ============================================================
+
+function actionRegisterSchoolEntry_(p) {
+  if (!p.event) return err_('missing_event');
+  if (isEventInactive_(p.event)) return err_('event_inactive');
+
+  const cfg   = getConfig_(p.event);
+  const state = schoolEntryFormState_(cfg);
+  if (state === 'not_open') return err_('form_not_open');
+  if (state === 'expired')  return err_('registration_closed');
+
+  const required = ['schoolName','repName','repPhone','repEmail','shipName','shipPostal','shipAddress','shipPhone','carPassCount','schoolPermission','ruleConsent'];
+  for (const k of required) {
+    if (!p[k] && p[k] !== 0) return err_('missing_' + k);
+  }
+
+  const ss = eventSs_(p.event);
+  let sheet = ss.getSheetByName(SHEET.SCHOOL_ENTRIES);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET.SCHOOL_ENTRIES);
+    sheet.getRange(1, 1, 1, SCHOOL_ENTRY_COLS.length).setValues([SCHOOL_ENTRY_COLS]);
+    sheet.setFrozenRows(1);
+  }
+
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch (e) { return err_('lock_timeout'); }
+  try {
+    const data    = sheet.getDataRange().getValues();
+    const headers = data[0].map(String);
+    const idx     = n => headers.indexOf(n);
+    const nameCol = idx('学校名');
+
+    // 承諾書ファイルを保存（あれば）
+    let approvalUrl = '';
+    if (p.approval && p.approval.b64) {
+      try {
+        const folder = getSchoolEntryEventFolder_(p.event);
+        const bytes  = Utilities.base64Decode(p.approval.b64);
+        const fname  = [Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss'),
+                        String(p.schoolName).trim(), (p.approval.name || 'approval')].join('_');
+        const blob   = Utilities.newBlob(bytes, p.approval.mime || 'application/octet-stream', fname);
+        approvalUrl  = folder.createFile(blob).getUrl();
+      } catch (err) { console.error('school entry file save', err); }
+    }
+
+    const now = new Date();
+    const normSchool = String(p.schoolName).trim();
+    const existingRowIdx = data.slice(1).findIndex(r => String(r[nameCol]).trim() === normSchool);
+    let isUpdate = false;
+    let updateCount = 1;
+    let historyStr = '';
+    if (existingRowIdx >= 0) {
+      isUpdate = true;
+      const existRow = data[existingRowIdx + 1];
+      const prevUrl  = String(existRow[idx('承諾書URL')] || '');
+      const prevHist = String(existRow[idx('承諾書履歴')] || '');
+      updateCount    = (Number(existRow[idx('更新回数')]) || 1) + 1;
+      if (prevUrl) {
+        const stamp = Utilities.formatDate(new Date(existRow[idx('提出日時')] || now), Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
+        historyStr = (prevHist ? prevHist + '\n' : '') + `[${stamp}] ${prevUrl}`;
+      } else {
+        historyStr = prevHist;
+      }
+    }
+
+    const finalApprovalUrl = approvalUrl || (isUpdate ? String(data[existingRowIdx + 1][idx('承諾書URL')] || '') : '');
+
+    const rowMap = {
+      '提出日時':       now,
+      'eventId':        p.event,
+      '学校名':          normSchool,
+      '代表者氏名':      String(p.repName || '').trim(),
+      '代表者電話':      String(p.repPhone || ''),
+      '代表者メール':    String(p.repEmail || '').trim(),
+      '発送先_名義':     String(p.shipName || '').trim(),
+      '発送先_郵便番号': String(p.shipPostal || ''),
+      '発送先_住所':     String(p.shipAddress || '').trim(),
+      '発送先_電話':     String(p.shipPhone || ''),
+      '車両入場証枚数':  String(p.carPassCount || ''),
+      '学校許可取得':    String(p.schoolPermission || ''),
+      '事務局への連絡事項': String(p.note || ''),
+      '承諾書URL':       finalApprovalUrl,
+      '承諾書履歴':      historyStr,
+      '規則同意':        p.ruleConsent === 'true' || p.ruleConsent === true ? 'true' : 'false',
+      '更新回数':        updateCount,
+    };
+    const newRow = SCHOOL_ENTRY_COLS.map(h => rowMap[h] !== undefined ? rowMap[h] : '');
+
+    let targetRow;
+    if (isUpdate) {
+      targetRow = existingRowIdx + 2; // header + 1-index
+      sheet.getRange(targetRow, 1, 1, newRow.length).setValues([newRow]);
+    } else {
+      targetRow = sheet.getLastRow() + 1;
+      sheet.getRange(targetRow, 1, 1, newRow.length).setValues([newRow]);
+    }
+    // 電話・郵便番号をテキスト書式に
+    ['代表者電話','発送先_郵便番号','発送先_電話'].forEach(col => {
+      const ci = SCHOOL_ENTRY_COLS.indexOf(col);
+      if (ci >= 0) sheet.getRange(targetRow, ci + 1).setNumberFormat('@');
+    });
+
+    // 確認メール送信（非同期・失敗しても登録は成立）
+    sendSchoolEntryConfirmMail_(p.event, {
+      to:       p.repEmail,
+      repName:  p.repName,
+      school:   normSchool,
+      isUpdate: isUpdate,
+    });
+
+    return ok_({ message: isUpdate ? '内容を更新しました' : '受付しました', isUpdate: isUpdate });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** 出場校エントリー確認メール */
+function sendSchoolEntryConfirmMail_(eventId, info) {
+  if (!info.to) return;
+  try {
+    const cfg    = getConfig_(eventId);
+    const evName = cfg.eventName || eventId;
+    const subject = info.isUpdate
+      ? `【${evName}】出場校エントリーの更新を受け付けました`
+      : `【${evName}】出場校エントリーを受け付けました`;
+    const body =
+      `${info.repName || ''} 様\n\n` +
+      `${evName} の出場校エントリー（${info.school}）を${info.isUpdate ? '更新' : '受付け'}ました。\n\n` +
+      (info.isUpdate
+        ? '以前の入力内容は破棄され、今回の内容が最新として保存されました。\n'
+        : '内容に変更がある場合は、同じフォームから再度送信してください（最新のもので上書きされます）。\n') +
+      `\n入場パスは後日発送いたします。\n\n── FORMULA GYMKHANA 事務局`;
+    MailApp.sendEmail({ to: String(info.to), subject: subject, body: body });
+  } catch (err) {
+    console.error('sendSchoolEntryConfirmMail_ error:', err);
+  }
+}
+
+// ============================================================
+// アクション: adminGetSchoolEntries（管理者向け出場校エントリー一覧）
+// ============================================================
+
+function actionAdminGetSchoolEntries_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.event) return err_('missing_event');
+
+  const sheet = eventSs_(p.event).getSheetByName(SHEET.SCHOOL_ENTRIES);
+  if (!sheet || sheet.getLastRow() < 2) return ok_({ entries: [] });
+
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const tz      = Session.getScriptTimeZone();
+
+  const entries = data.slice(1).map(row => {
+    const o = {};
+    headers.forEach((h, i) => {
+      const v = row[i];
+      if (v instanceof Date) o[h] = Utilities.formatDate(v, tz, 'yyyy/MM/dd HH:mm');
+      else o[h] = v == null ? '' : String(v);
+    });
+    return o;
+  });
+  return ok_({ entries: entries });
 }
 
 // ============================================================

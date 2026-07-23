@@ -12,7 +12,7 @@
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src 'self' https://fonts.gstatic.com;">
   <title>FG 管理パネル</title>
-  <link rel="stylesheet" href="../js/style.css?v=20260702a">
+  <link rel="stylesheet" href="../js/style.css?v=20260723a">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     :root{
@@ -802,6 +802,33 @@
       </div>
 
       <div class="section">
+        <div class="section-hd" data-section="f-school">
+          <span class="section-title">🏫 出場校エントリーフォーム設定</span>
+          <span class="section-toggle" id="toggle-f-school">▼</span>
+        </div>
+        <div class="section-body" id="body-f-school">
+          <div class="cfg-group" style="margin-top:0">
+            <div class="cfg-hint" style="margin-bottom:8px">複数人出場する学校のパス発送先や入場証枚数をまとめて受け付けます。同じ学校名で再送信すると内容が上書きされます。</div>
+            <div class="cfg-row">
+              <label>フォーム公開開始日時</label>
+              <input type="datetime-local" class="cfg-input" max="2099-12-31T23:59" id="cfg-schoolEntryFormOpenAt">
+            </div>
+            <div class="cfg-row">
+              <label>締切日時</label>
+              <input type="datetime-local" class="cfg-input" max="2099-12-31T23:59" id="cfg-schoolEntryDeadline">
+            </div>
+            <div class="cfg-row" style="margin-top:8px">
+              <label>出場校エントリーフォームURL</label>
+              <div class="url-box">
+                <div class="url-val" id="school-entry-form-url">—</div>
+                <button class="sm-btn" id="btn-copy-school-entry-url">URLをコピー</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
         <div class="section-hd" data-section="f-mail">
           <span class="section-title">✉️ 事前登録 確認メール</span>
           <span class="section-toggle" id="toggle-f-mail">▼</span>
@@ -868,6 +895,31 @@
           <div id="uni-list-wrap">
             <p style="font-size:12px;color:var(--gray);text-align:center;padding:20px 0">読み込み中...</p>
           </div>
+        </div>
+      </div>
+
+      <!-- 出場大学（出場校エントリー提出済み） -->
+      <div class="section">
+        <div class="section-hd" data-section="u-entries">
+          <span class="section-title">🏁 出場大学 <span class="section-count" id="school-entries-count"></span></span>
+          <span class="section-toggle" id="toggle-u-entries">▼</span>
+        </div>
+        <div class="section-body" id="body-u-entries">
+          <p class="step-note" style="margin-top:0;margin-bottom:12px">出場校エントリーフォームから提出があった大学一覧です。提出順に表示されます。同じ学校名で再送信された場合は最新のもので上書きされます。</p>
+          <div id="school-entries-wrap">
+            <p style="font-size:12px;color:var(--gray);text-align:center;padding:20px 0">読み込み中...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 出場校エントリー 詳細モーダル -->
+      <div class="modal-ov" id="modal-school-entry" style="display:none">
+        <div class="modal-card">
+          <div class="modal-hd">
+            <span class="modal-title" id="modal-school-entry-title">出場校エントリー詳細</span>
+            <button class="modal-close" id="modal-school-entry-close">✕</button>
+          </div>
+          <div class="modal-bd" id="modal-school-entry-body" style="overflow-y:auto;max-height:70vh;"></div>
         </div>
       </div>
 
@@ -987,6 +1039,6 @@
 <div class="toast" id="toast"></div>
 <script src="../js/vendor/qrcode.min.js"></script>
 <script src="../js/config.js?v=20260722a"></script>
-<script src="../js/admin.js?v=20260722a"></script>
+<script src="../js/admin.js?v=20260723a"></script>
 </body>
 </html>

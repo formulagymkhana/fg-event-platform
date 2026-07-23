@@ -207,6 +207,16 @@ const FG_API = (() => {
     return postCall_('submitCompanyEntry', params);
   }
 
+  /** 出場校エントリー（公開）。POST送信。承諾書ファイルも送るため postCall_。 */
+  function registerSchoolEntry(params) {
+    return postCall_('registerSchoolEntry', params);
+  }
+
+  /** 出場校エントリーフォームの公開状態を取得 */
+  function getSchoolEntryFormConfig(event) {
+    return call_('getSchoolEntryFormConfig', { event });
+  }
+
   // ── 景品交換API(スタッフ用) ──────────────────
 
   /** 学生cardTokenとスタッフキーで景品交換状況を取得 */
@@ -314,6 +324,9 @@ const FG_API = (() => {
     getSchoolList,
     // 企業出展申込
     submitCompanyEntry,
+    // 出場校エントリー
+    registerSchoolEntry,
+    getSchoolEntryFormConfig,
     // 企業閲覧
     getCompanyView,
     getCompanyStampVisitors,
