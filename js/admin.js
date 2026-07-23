@@ -2135,7 +2135,7 @@ function renderSchoolOrder_() {
   const wrap = id_('school-order-wrap');
   if (!wrap) return;
   if (!schoolOrder_.length) {
-    wrap.innerHTML = '<p style="font-size:12px;color:var(--gray);text-align:center;padding:16px 0">Aドライバーの事前登録がまだありません</p>';
+    wrap.innerHTML = '<p style="font-size:12px;color:var(--gray);text-align:center;padding:16px 0">ドライバーの事前登録がまだありません</p>';
     return;
   }
   const total = schoolOrder_.length;
@@ -2300,7 +2300,7 @@ function renderEntryList_() {
   </tr>`;
 
   const header = `<thead><tr>
-    <th>大学名</th><th>走行順</th><th>ヒート</th>
+    <th>大学名</th><th>走行順</th><th>ドライバー</th>
     <th>選手名</th><th>よみがな</th><th>入部何年</th>
   </tr></thead>`;
   const emptyBody = `<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:12px 0">該当なし</td></tr>`;
@@ -2386,7 +2386,7 @@ function renderReceptionList_() {
   wrap.innerHTML = `
     <div class="list-scroll"><table class="list-tbl">
       <thead><tr>
-        <th>大学名</th><th>ヒート</th><th>選手名</th><th>よみがな</th>
+        <th>大学名</th><th>ドライバー</th><th>選手名</th><th>よみがな</th>
         <th>受付(土)</th><th>受付(日)</th><th>紹介カード</th><th>リストバンド</th>
         <th>必要書類</th><th>ID</th>
       </tr></thead>
@@ -2478,7 +2478,7 @@ function renderOrderList_() {
     <td>${esc_(r.clubYears)}</td>
   </tr>`;
   const header = `<thead><tr>
-    <th>学校名</th><th>出走順</th><th>ヒート</th>
+    <th>学校名</th><th>出走順</th><th>ドライバー</th>
     <th>氏名</th><th>ふりがな</th><th>入部何年</th>
   </tr></thead>`;
   const emptyBody = `<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:12px 0">該当なし</td></tr>`;
@@ -2509,7 +2509,7 @@ function downloadCsv_(filename, csv) {
 function downloadEntryListCsv_() {
   const orders = computeRunningOrder_();
   const rows   = buildEntryListRows_(orders);
-  const headers = ['大学名', '走行順', 'ヒート', '選手名', 'よみがな', '入部何年', 'クラス', 'studentId'];
+  const headers = ['大学名', '走行順', 'ドライバー', '選手名', 'よみがな', '入部何年', 'クラス', 'studentId'];
   const data = rows.map(r => [
     r.school, r.order, r.cls, r.name, r.furigana, r.clubYears,
     r.section === 'men' ? 'Formula Gymkhana' : 'Formula Gymkhana 女子', r.studentId,
@@ -2520,7 +2520,7 @@ function downloadEntryListCsv_() {
 function downloadReceptionCsv_() {
   const orders = computeRunningOrder_();
   const rows   = buildEntryListRows_(orders);
-  const headers = ['大学名', 'ヒート', '選手名', 'よみがな',
+  const headers = ['大学名', 'ドライバー', '選手名', 'よみがな',
     '受付(土曜日)', '受付(日曜日)', '紹介カード', 'リストバンド', '必要書類', 'ID'];
   const data = rows.map(r => [r.school, r.cls, r.name, r.furigana, '', '', '', '', '', r.studentId]);
   downloadCsv_(`選手受付リスト_${curEvent_}.csv`, toCsv_(headers, data));
@@ -2541,7 +2541,7 @@ function downloadOrderCsv_() {
   const rows = buildEntryListRows_(orders)
     .filter(r => r.order)
     .sort((a, b) => a.order - b.order);
-  const headers = ['学校名', '出走順', 'ヒート', '氏名', 'ふりがな', '入部何年', 'studentId'];
+  const headers = ['学校名', '出走順', 'ドライバー', '氏名', 'ふりがな', '入部何年', 'studentId'];
   const data = rows.map(r => [r.school, r.order, r.cls, r.name, r.furigana, r.clubYears, r.studentId]);
   downloadCsv_(`出走リスト_${curEvent_}.csv`, toCsv_(headers, data));
 }
