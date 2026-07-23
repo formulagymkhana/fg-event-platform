@@ -2303,12 +2303,13 @@ function renderEntryList_() {
     <th>大学名</th><th>走行順</th><th>ヒート</th>
     <th>選手名</th><th>よみがな</th><th>入部何年</th>
   </tr></thead>`;
+  const emptyBody = `<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:12px 0">該当なし</td></tr>`;
 
   wrap.innerHTML = `
     <div class="list-section-title">Formula Gymkhana クラス</div>
-    <div class="list-scroll"><table class="list-tbl">${header}<tbody>${men.map(row).join('')}</tbody></table></div>
-    ${women.length ? `<div class="list-section-title">Formula Gymkhana 女子クラス</div>
-      <div class="list-scroll"><table class="list-tbl">${header}<tbody>${women.map(row).join('')}</tbody></table></div>` : ''}
+    <div class="list-scroll"><table class="list-tbl">${header}<tbody>${men.length ? men.map(row).join('') : emptyBody}</tbody></table></div>
+    <div class="list-section-title">Formula Gymkhana 女子クラス</div>
+    <div class="list-scroll"><table class="list-tbl">${header}<tbody>${women.length ? women.map(row).join('') : emptyBody}</tbody></table></div>
   `;
 }
 
@@ -2429,10 +2430,6 @@ function renderSupportList_() {
   const wrap = id_('support-list-wrap');
   if (!wrap) return;
   const rows = buildSupportRows_();
-  if (!rows.length) {
-    wrap.innerHTML = '<p style="font-size:12px;color:var(--gray);text-align:center;padding:16px 0">応援学生の事前登録がありません</p>';
-    return;
-  }
   const trs = rows.map(r => `<tr>
     <td>${esc_(r.school)}</td>
     <td>${esc_(r.name)}</td>
@@ -2445,6 +2442,7 @@ function renderSupportList_() {
     <td>${esc_(r.needDoc)}</td>
     <td class="num">${esc_(r.studentId)}</td>
   </tr>`).join('');
+  const emptyBody = `<tr><td colspan="10" style="text-align:center;color:var(--gray);padding:16px 0">応援学生の事前登録がありません</td></tr>`;
   wrap.innerHTML = `
     <div class="list-scroll"><table class="list-tbl">
       <thead><tr>
@@ -2452,7 +2450,7 @@ function renderSupportList_() {
         <th>受付</th><th>補欠選手登録</th><th>メカニック登録</th>
         <th>土曜昼食</th><th>日曜昼食</th><th>必要書類</th><th>ID</th>
       </tr></thead>
-      <tbody>${trs}</tbody>
+      <tbody>${rows.length ? trs : emptyBody}</tbody>
     </table></div>`;
 }
 
@@ -2483,10 +2481,11 @@ function renderOrderList_() {
     <th>学校名</th><th>出走順</th><th>ヒート</th>
     <th>氏名</th><th>ふりがな</th><th>入部何年</th>
   </tr></thead>`;
+  const emptyBody = `<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:12px 0">該当なし</td></tr>`;
 
-  const tbl = (label, xs) => xs.length ? `
+  const tbl = (label, xs) => `
     <div class="list-section-title">${label}</div>
-    <div class="list-scroll"><table class="list-tbl">${header}<tbody>${xs.map(row).join('')}</tbody></table></div>` : '';
+    <div class="list-scroll"><table class="list-tbl">${header}<tbody>${xs.length ? xs.map(row).join('') : emptyBody}</tbody></table></div>`;
 
   wrap.innerHTML = tbl('第1ヒート', heatA) + tbl('第2ヒート', heatB) + tbl('第3ヒート', heatC);
 }
