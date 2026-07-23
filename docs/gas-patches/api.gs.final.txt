@@ -1188,6 +1188,10 @@ function actionRegisterWalkIn_(p) {
         return map[h] !== undefined ? map[h] : '';
       });
       studentSheet.appendRow(newRow);
+      const phoneCol = sHeaders.indexOf('電話番号');
+      if (phoneCol >= 0) {
+        studentSheet.getRange(studentSheet.getLastRow(), phoneCol + 1).setNumberFormat('@');
+      }
 
       // スタンプ参加者シートに追加（シート未存在時は自動作成）
       const stampToken = Utilities.getUuid();
@@ -1311,6 +1315,10 @@ function actionRegisterPreStudent_(p) {
       return map[h] !== undefined ? map[h] : '';
     });
     studentSheet.appendRow(newRow);
+    const phoneIdx = idx('電話番号');
+    if (phoneIdx >= 0) {
+      studentSheet.getRange(studentSheet.getLastRow(), phoneIdx + 1).setNumberFormat('@');
+    }
   } finally {
     lock.releaseLock();
   }
@@ -1399,6 +1407,11 @@ function appendPreRegRow_(ss, p, studentId, cardToken) {
   };
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
   sheet.appendRow(headers.map(h => (val[h] !== undefined ? val[h] : '')));
+  const lastRow = sheet.getLastRow();
+  ['電話番号', '郵便番号'].forEach(col => {
+    const ci = headers.indexOf(col);
+    if (ci >= 0) sheet.getRange(lastRow, ci + 1).setNumberFormat('@');
+  });
 }
 
 // 確認メール送信（GASオーナーGmailから。失敗しても登録は成立させる）
@@ -2540,14 +2553,18 @@ function actionSubmitCompanyEntry_(p) {
   }
 
   const toInt = v => { const n = parseInt(v, 10); return isNaN(n) ? 0 : n; };
-  sheet.appendRow([
+  const rowData = [
     new Date(), eventId,
     p.companyName, p.companyShort || '', p.director, p.contact, p.tel, p.contactTel, p.email,
     p.zip, p.prefecture || '', p.address,
     p.content, p.booth, toInt(p.carCount), p.demo, p.demoDetail || '',
     toInt(p.personPass), toInt(p.carPass), toInt(p.lunchSat), toInt(p.lunchSun),
     p.note || '', '受付済',
-  ]);
+  ];
+  const newRow = sheet.getLastRow() + 1;
+  sheet.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
+  // 電話番号(7列目), 担当者電話(8列目), 郵便番号(10列目) をテキスト書式に
+  [7, 8, 10].forEach(c => sheet.getRange(newRow, c).setNumberFormat('@'));
 
   return ok_({ message: '受付しました' });
 }
