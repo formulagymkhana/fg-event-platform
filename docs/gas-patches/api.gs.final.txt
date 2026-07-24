@@ -2613,10 +2613,11 @@ function actionGetSchoolEntryFormConfig_(p) {
   const tz  = Session.getScriptTimeZone();
   const fmt = v => v ? Utilities.formatDate(new Date(v), tz, "yyyy/MM/dd HH:mm") : '';
   return ok_({
-    state:      schoolEntryFormState_(cfg),
-    eventName:  cfg.eventName || '',
-    openAt:     fmt(cfg.schoolEntryFormOpenAt),
-    deadline:   fmt(cfg.schoolEntryDeadline),
+    state:       schoolEntryFormState_(cfg),
+    eventName:   cfg.eventName || '',
+    openAt:      fmt(cfg.schoolEntryFormOpenAt),
+    deadline:    fmt(cfg.schoolEntryDeadline),
+    approvalUrl: String(cfg.schoolEntryApprovalUrl || ''),
   });
 }
 

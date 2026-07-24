@@ -12,7 +12,7 @@
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src 'self' https://fonts.gstatic.com;">
   <title>FG 管理パネル</title>
-  <link rel="stylesheet" href="../js/style.css?v=20260724b">
+  <link rel="stylesheet" href="../js/style.css?v=20260724f">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     :root{
@@ -911,6 +911,11 @@
               <label>締切日時</label>
               <input type="datetime-local" class="cfg-input" max="2099-12-31T23:59" id="cfg-schoolEntryDeadline">
             </div>
+            <div class="cfg-row">
+              <label>学校職員の参加承諾書URL</label>
+              <input type="url" class="cfg-input" id="cfg-schoolEntryApprovalUrl" placeholder="https://drive.google.com/file/d/…/view">
+              <div class="cfg-hint" style="margin-top:4px">エントリーフォームのアップロード欄からリンクされるPDF/URL。大会ごとに差し替えてください。</div>
+            </div>
             <div class="cfg-row" style="margin-top:8px">
               <label>出場校エントリーフォームURL</label>
               <div class="url-box">
@@ -1257,8 +1262,8 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<script src="../js/vendor/qrcode.min.js?v=20260724b"></script>
-<script src="../js/config.js?v=20260724b"></script>
-<script src="../js/admin.js?v=20260724b"></script>
+<script src="../js/vendor/qrcode.min.js?v=20260724f"></script>
+<script src="../js/config.js?v=20260724f"></script>
+<script src="../js/admin.js?v=20260724f"></script>
 </body>
 </html>

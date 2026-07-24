@@ -38,6 +38,10 @@ let _event = null;
 
   $('event-name-label').textContent = d.eventName || _event;
   if (schoolRes.ok) fillSchoolList_(schoolRes.data.schools || []);
+  if (d.approvalUrl) {
+    const a = $('link-approval-doc');
+    if (a) a.href = d.approvalUrl;
+  }
 
   showState('form');
 
