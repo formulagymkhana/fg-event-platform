@@ -12,7 +12,7 @@
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src 'self' https://fonts.gstatic.com;">
   <title>FG 管理パネル</title>
-  <link rel="stylesheet" href="../js/style.css?v=20260723f">
+  <link rel="stylesheet" href="../js/style.css?v=20260724a">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     :root{
@@ -133,6 +133,10 @@
     .section-toggle.open{transform:rotate(180deg)}
     .section-body{padding:0 16px 14px;display:none}
     .section-body.open{display:block}
+    /* 折りたたみ無効セクション（常時展開） */
+    .section.no-fold .section-hd{cursor:default}
+    .section.no-fold .section-toggle{display:none}
+    .section.no-fold .section-body{display:block}
 
     /* ── Tables ── */
     .data-tbl{width:100%;border-collapse:collapse;font-size:12px}
@@ -846,12 +850,11 @@
 
       <div class="tab-content active" id="tab-fm-form">
 
-      <div class="section">
-        <div class="section-hd" data-section="f-form">
+      <div class="section no-fold">
+        <div class="section-hd">
           <span class="section-title">📝 事前登録フォーム設定</span>
-          <span class="section-toggle open" id="toggle-f-form">▼</span>
         </div>
-        <div class="section-body open" id="body-f-form">
+        <div class="section-body" id="body-f-form">
           <div class="cfg-group" style="margin-top:0">
             <div class="cfg-hint" style="margin-bottom:8px">締切を過ぎた区分はフォーム上で選択不可になります。空欄＝制限なし。</div>
             <div class="cfg-row">
@@ -893,10 +896,9 @@
         </div>
       </div>
 
-      <div class="section">
-        <div class="section-hd" data-section="f-school">
+      <div class="section no-fold">
+        <div class="section-hd">
           <span class="section-title">🏫 出場校エントリーフォーム設定</span>
-          <span class="section-toggle" id="toggle-f-school">▼</span>
         </div>
         <div class="section-body" id="body-f-school">
           <div class="cfg-group" style="margin-top:0">
@@ -924,10 +926,9 @@
 
       <div class="tab-content" id="tab-fm-mail">
 
-      <div class="section">
-        <div class="section-hd" data-section="f-mail">
+      <div class="section no-fold">
+        <div class="section-hd">
           <span class="section-title">✉️ 事前登録 確認メール</span>
-          <span class="section-toggle" id="toggle-f-mail">▼</span>
         </div>
         <div class="section-body" id="body-f-mail">
           <div class="cfg-group" style="margin-top:0">
@@ -944,10 +945,9 @@
         </div>
       </div>
 
-      <div class="section">
-        <div class="section-hd" data-section="f-walkin-mail">
+      <div class="section no-fold">
+        <div class="section-hd">
           <span class="section-title">✉️ 当日参加 受付メール</span>
-          <span class="section-toggle" id="toggle-f-walkin-mail">▼</span>
         </div>
         <div class="section-body" id="body-f-walkin-mail">
           <div class="cfg-group" style="margin-top:0">
@@ -959,6 +959,29 @@
             <div class="cfg-row">
               <label>本文</label>
               <textarea class="cfg-input" id="cfg-walkInMailBody" rows="9" style="resize:vertical;line-height:1.6"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section no-fold">
+        <div class="section-hd">
+          <span class="section-title">✉️ 出場校エントリー 確認メール</span>
+        </div>
+        <div class="section-body" id="body-f-school-mail">
+          <div class="cfg-group" style="margin-top:0">
+            <div class="cfg-hint" style="margin-bottom:8px">使える差し込み: <code>{repName}</code>＝代表者氏名、<code>{school}</code>＝学校名、<code>{eventName}</code>＝大会名、<code>{updateNote}</code>＝更新時の追記文</div>
+            <div class="cfg-row">
+              <label>件名（新規）</label>
+              <input type="text" class="cfg-input" id="cfg-schoolEntryMailSubject" placeholder="【{eventName}】出場校エントリーを受け付けました">
+            </div>
+            <div class="cfg-row">
+              <label>件名（更新時）</label>
+              <input type="text" class="cfg-input" id="cfg-schoolEntryMailSubjectUpdate" placeholder="【{eventName}】出場校エントリーの更新を受け付けました">
+            </div>
+            <div class="cfg-row">
+              <label>本文</label>
+              <textarea class="cfg-input" id="cfg-schoolEntryMailBody" rows="10" style="resize:vertical;line-height:1.6"></textarea>
             </div>
           </div>
         </div>
@@ -1236,6 +1259,6 @@
 <div class="toast" id="toast"></div>
 <script src="../js/vendor/qrcode.min.js"></script>
 <script src="../js/config.js?v=20260723d"></script>
-<script src="../js/admin.js?v=20260723f"></script>
+<script src="../js/admin.js?v=20260724a"></script>
 </body>
 </html>

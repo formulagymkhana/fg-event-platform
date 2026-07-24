@@ -509,6 +509,9 @@ async function loadConfig_(gen, ev) {
   setVal_('cfg-deadlineMechanic',   toDtLocal_(cfg.deadlineMechanic));
   setVal_('cfg-schoolEntryFormOpenAt', toDtLocal_(cfg.schoolEntryFormOpenAt));
   setVal_('cfg-schoolEntryDeadline',   toDtLocal_(cfg.schoolEntryDeadline));
+  setVal_('cfg-schoolEntryMailSubject',       cfg.schoolEntryMailSubject       || SCHOOL_ENTRY_MAIL_SUBJECT_DEFAULT);
+  setVal_('cfg-schoolEntryMailSubjectUpdate', cfg.schoolEntryMailSubjectUpdate || SCHOOL_ENTRY_MAIL_SUBJECT_UPDATE_DEFAULT);
+  setVal_('cfg-schoolEntryMailBody',          cfg.schoolEntryMailBody          || SCHOOL_ENTRY_MAIL_BODY_DEFAULT);
   updatePreRegFormUrl_();
   updateSchoolEntryFormUrl_();
   updateFormBadge_(cfg);
@@ -548,6 +551,16 @@ const WALKIN_MAIL_BODY_DEFAULT =
   '・スタンプの進捗が消えてしまった場合も、このページから元に戻せます。\n\n' +
   '── FORMULA GYMKHANA 事務局';
 
+// 出場校エントリー 確認メールの既定文面（GAS sendSchoolEntryConfirmMail_ のフォールバックと一致させる）
+const SCHOOL_ENTRY_MAIL_SUBJECT_DEFAULT        = '【{eventName}】出場校エントリーを受け付けました';
+const SCHOOL_ENTRY_MAIL_SUBJECT_UPDATE_DEFAULT = '【{eventName}】出場校エントリーの更新を受け付けました';
+const SCHOOL_ENTRY_MAIL_BODY_DEFAULT =
+  '{repName} 様\n\n' +
+  '{eventName} の出場校エントリー（{school}）を受け付けました。\n\n' +
+  '{updateNote}' +
+  '入場パスは後日発送いたします。\n\n' +
+  '── FORMULA GYMKHANA 事務局';
+
 async function saveConfig_(btnId, fbId) {
   if (!curEvent_) return;
   const btn = id_(btnId);
@@ -569,6 +582,9 @@ async function saveConfig_(btnId, fbId) {
     deadlineMechanic:     toIso_(getVal_('cfg-deadlineMechanic')),
     schoolEntryFormOpenAt: toIso_(getVal_('cfg-schoolEntryFormOpenAt')),
     schoolEntryDeadline:   toIso_(getVal_('cfg-schoolEntryDeadline')),
+    schoolEntryMailSubject:       getVal_('cfg-schoolEntryMailSubject'),
+    schoolEntryMailSubjectUpdate: getVal_('cfg-schoolEntryMailSubjectUpdate'),
+    schoolEntryMailBody:          getVal_('cfg-schoolEntryMailBody'),
   };
 
   let failed = false;

@@ -2762,22 +2762,33 @@ function actionRegisterSchoolEntry_(p) {
   }
 }
 
-/** 出場校エントリー確認メール */
+/** 出場校エントリー確認メール
+ *  件名・本文は設定シート（schoolEntryMailSubject / schoolEntryMailSubjectUpdate / schoolEntryMailBody）で編集可。
+ *  差し込み: {repName} 代表者氏名, {school} 学校名, {eventName} 大会名, {updateNote} 更新時の追記文
+ */
 function sendSchoolEntryConfirmMail_(eventId, info) {
   if (!info.to) return;
   try {
     const cfg    = getConfig_(eventId);
     const evName = cfg.eventName || eventId;
-    const subject = info.isUpdate
-      ? `【${evName}】出場校エントリーの更新を受け付けました`
-      : `【${evName}】出場校エントリーを受け付けました`;
-    const body =
-      `${info.repName || ''} 様\n\n` +
-      `${evName} の出場校エントリー（${info.school}）を${info.isUpdate ? '更新' : '受付け'}ました。\n\n` +
-      (info.isUpdate
-        ? '以前の入力内容は破棄され、今回の内容が最新として保存されました。\n'
-        : '内容に変更がある場合は、同じフォームから再度送信してください（最新のもので上書きされます）。\n') +
-      `\n入場パスは後日発送いたします。\n\n── FORMULA GYMKHANA 事務局`;
+    const subjNewTpl = cfg.schoolEntryMailSubject       || '【{eventName}】出場校エントリーを受け付けました';
+    const subjUpdTpl = cfg.schoolEntryMailSubjectUpdate || '【{eventName}】出場校エントリーの更新を受け付けました';
+    const bodyTpl    = cfg.schoolEntryMailBody ||
+      ('{repName} 様\n\n' +
+       '{eventName} の出場校エントリー（{school}）を受け付けました。\n\n' +
+       '{updateNote}' +
+       '入場パスは後日発送いたします。\n\n' +
+       '── FORMULA GYMKHANA 事務局');
+    const updateNote = info.isUpdate
+      ? '以前の入力内容は破棄され、今回の内容が最新として保存されました。\n\n'
+      : '内容に変更がある場合は、同じフォームから再度送信してください（最新のもので上書きされます）。\n\n';
+    const fill = s => String(s)
+      .replace(/\{repName\}/g,   info.repName || '')
+      .replace(/\{school\}/g,    info.school  || '')
+      .replace(/\{eventName\}/g, evName)
+      .replace(/\{updateNote\}/g, updateNote);
+    const subject = fill(info.isUpdate ? subjUpdTpl : subjNewTpl);
+    const body    = fill(bodyTpl);
     MailApp.sendEmail({ to: String(info.to), subject: subject, body: body });
   } catch (err) {
     console.error('sendSchoolEntryConfirmMail_ error:', err);
