@@ -1238,11 +1238,12 @@ function actionRegisterWalkIn_(p) {
         };
         return map[h] !== undefined ? map[h] : '';
       });
-      studentSheet.appendRow(newRow);
       const phoneCol = sHeaders.indexOf('電話番号');
+      const nextStudentRow = studentSheet.getLastRow() + 1;
       if (phoneCol >= 0) {
-        studentSheet.getRange(studentSheet.getLastRow(), phoneCol + 1).setNumberFormat('@');
+        studentSheet.getRange(nextStudentRow, phoneCol + 1).setNumberFormat('@');
       }
+      studentSheet.getRange(nextStudentRow, 1, 1, newRow.length).setValues([newRow]);
 
       // スタンプ参加者シートに追加（シート未存在時は自動作成）
       const stampToken = Utilities.getUuid();
@@ -1365,11 +1366,12 @@ function actionRegisterPreStudent_(p) {
       };
       return map[h] !== undefined ? map[h] : '';
     });
-    studentSheet.appendRow(newRow);
     const phoneIdx = idx('電話番号');
+    const nextPreRow = studentSheet.getLastRow() + 1;
     if (phoneIdx >= 0) {
-      studentSheet.getRange(studentSheet.getLastRow(), phoneIdx + 1).setNumberFormat('@');
+      studentSheet.getRange(nextPreRow, phoneIdx + 1).setNumberFormat('@');
     }
+    studentSheet.getRange(nextPreRow, 1, 1, newRow.length).setValues([newRow]);
   } finally {
     lock.releaseLock();
   }
@@ -1457,12 +1459,13 @@ function appendPreRegRow_(ss, p, studentId, cardToken) {
     '保険証明URL': p.insuranceUrl || '', '承諾書URL': p.approvalUrl || '',
   };
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
-  sheet.appendRow(headers.map(h => (val[h] !== undefined ? val[h] : '')));
-  const lastRow = sheet.getLastRow();
+  const rowData = headers.map(h => (val[h] !== undefined ? val[h] : ''));
+  const lastRow = sheet.getLastRow() + 1;
   ['電話番号', '郵便番号'].forEach(col => {
     const ci = headers.indexOf(col);
     if (ci >= 0) sheet.getRange(lastRow, ci + 1).setNumberFormat('@');
   });
+  sheet.getRange(lastRow, 1, 1, rowData.length).setValues([rowData]);
 }
 
 // 確認メール送信（GASオーナーGmailから。失敗しても登録は成立させる）
@@ -2613,9 +2616,9 @@ function actionSubmitCompanyEntry_(p) {
     p.note || '', '受付済',
   ];
   const newRow = sheet.getLastRow() + 1;
-  sheet.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
-  // 電話番号(7列目), 担当者電話(8列目), 郵便番号(10列目) をテキスト書式に
+  // 電話番号(7列目), 担当者電話(8列目), 郵便番号(10列目) をテキスト書式に（書き込み前）
   [7, 8, 10].forEach(c => sheet.getRange(newRow, c).setNumberFormat('@'));
+  sheet.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
 
   return ok_({ message: '受付しました' });
 }
@@ -2758,19 +2761,13 @@ function actionRegisterSchoolEntry_(p) {
     };
     const newRow = SCHOOL_ENTRY_COLS.map(h => rowMap[h] !== undefined ? rowMap[h] : '');
 
-    let targetRow;
-    if (isUpdate) {
-      targetRow = existingRowIdx + 2; // header + 1-index
-      sheet.getRange(targetRow, 1, 1, newRow.length).setValues([newRow]);
-    } else {
-      targetRow = sheet.getLastRow() + 1;
-      sheet.getRange(targetRow, 1, 1, newRow.length).setValues([newRow]);
-    }
-    // 電話・郵便番号をテキスト書式に
+    const targetRow = isUpdate ? existingRowIdx + 2 : sheet.getLastRow() + 1;
+    // 電話・郵便番号をテキスト書式に（書き込み前）
     ['代表者電話','発送先_郵便番号','発送先_電話'].forEach(col => {
       const ci = SCHOOL_ENTRY_COLS.indexOf(col);
       if (ci >= 0) sheet.getRange(targetRow, ci + 1).setNumberFormat('@');
     });
+    sheet.getRange(targetRow, 1, 1, newRow.length).setValues([newRow]);
 
     // 確認メール送信（非同期・失敗しても登録は成立）
     sendSchoolEntryConfirmMail_(p.event, {
