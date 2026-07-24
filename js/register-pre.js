@@ -59,6 +59,10 @@ let _formConfig = {};
 
   if (cfgRes.ok) {
     _formConfig = cfgRes.data || {};
+    // 書類URL上書き（設定があればアンカーの href を差し替え）
+    const du = _formConfig.docUrls || {};
+    if (du.rulebook) { const a = $('link-doc-rulebook'); if (a) a.href = du.rulebook; }
+    if (du.pledge)   { const a = $('link-doc-pledge');   if (a) a.href = du.pledge;   }
     const now = new Date();
 
     // フォーム公開開始前

@@ -38,10 +38,11 @@ let _event = null;
 
   $('event-name-label').textContent = d.eventName || _event;
   if (schoolRes.ok) fillSchoolList_(schoolRes.data.schools || []);
-  if (d.approvalUrl) {
-    const a = $('link-approval-doc');
-    if (a) a.href = d.approvalUrl;
-  }
+  // 書類URL上書き（設定があればアンカーの href を差し替え）
+  const du = d.docUrls || {};
+  const approvalUrl = du.schoolApproval || d.approvalUrl;
+  if (approvalUrl)    { const a = $('link-approval-doc'); if (a) a.href = approvalUrl; }
+  if (du.rulebook)    { const a = $('link-doc-rulebook'); if (a) a.href = du.rulebook; }
 
   showState('form');
 

@@ -12,7 +12,7 @@
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src 'self' https://fonts.gstatic.com;">
   <title>FG 管理パネル</title>
-  <link rel="stylesheet" href="../js/style.css?v=20260724f">
+  <link rel="stylesheet" href="../js/style.css?v=20260724h">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     :root{
@@ -846,6 +846,7 @@
       <div class="tab-bar">
         <button class="tab-btn active" data-tab="fm-form">フォーム設定</button>
         <button class="tab-btn" data-tab="fm-mail">メール設定</button>
+        <button class="tab-btn" data-tab="fm-docs">書類URL設定</button>
       </div>
 
       <div class="tab-content active" id="tab-fm-form">
@@ -910,11 +911,6 @@
             <div class="cfg-row">
               <label>締切日時</label>
               <input type="datetime-local" class="cfg-input" max="2099-12-31T23:59" id="cfg-schoolEntryDeadline">
-            </div>
-            <div class="cfg-row">
-              <label>学校職員の参加承諾書URL</label>
-              <input type="url" class="cfg-input" id="cfg-schoolEntryApprovalUrl" placeholder="https://drive.google.com/file/d/…/view">
-              <div class="cfg-hint" style="margin-top:4px">エントリーフォームのアップロード欄からリンクされるPDF/URL。大会ごとに差し替えてください。</div>
             </div>
             <div class="cfg-row" style="margin-top:8px">
               <label>出場校エントリーフォームURL</label>
@@ -993,6 +989,36 @@
       </div>
 
       </div><!-- /tab-fm-mail -->
+
+      <div class="tab-content" id="tab-fm-docs">
+
+      <div class="section no-fold">
+        <div class="section-hd">
+          <span class="section-title">📄 書類URL</span>
+        </div>
+        <div class="section-body" id="body-f-docs">
+          <div class="cfg-group" style="margin-top:0">
+            <div class="cfg-hint" style="margin-bottom:8px">各フォームからリンクされる書類PDFのURL。空欄の場合は各ページのデフォルトURLが使われます。大会ごとに差し替えてください。</div>
+            <div class="cfg-row">
+              <label>大会規則書URL</label>
+              <input type="url" class="cfg-input" id="cfg-docUrlRulebook" placeholder="https://drive.google.com/file/d/…/view">
+              <div class="cfg-hint" style="margin-top:4px">事前登録・当日参加・出場校エントリー各フォームからリンクされます。</div>
+            </div>
+            <div class="cfg-row">
+              <label>誓約書URL</label>
+              <input type="url" class="cfg-input" id="cfg-docUrlPledge" placeholder="https://drive.google.com/file/d/…/view">
+              <div class="cfg-hint" style="margin-top:4px">事前登録・当日参加フォームからリンクされます。</div>
+            </div>
+            <div class="cfg-row">
+              <label>学校職員の参加承諾書URL</label>
+              <input type="url" class="cfg-input" id="cfg-schoolEntryApprovalUrl" placeholder="https://drive.google.com/file/d/…/view">
+              <div class="cfg-hint" style="margin-top:4px">出場校エントリーフォームのアップロード欄からリンクされるテンプレート。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      </div><!-- /tab-fm-docs -->
 
       <div class="cfg-group">
         <button class="save-btn" id="btn-save-form-config">保存</button>
@@ -1262,8 +1288,8 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<script src="../js/vendor/qrcode.min.js?v=20260724f"></script>
-<script src="../js/config.js?v=20260724f"></script>
-<script src="../js/admin.js?v=20260724f"></script>
+<script src="../js/vendor/qrcode.min.js?v=20260724h"></script>
+<script src="../js/config.js?v=20260724h"></script>
+<script src="../js/admin.js?v=20260724h"></script>
 </body>
 </html>

@@ -509,7 +509,9 @@ async function loadConfig_(gen, ev) {
   setVal_('cfg-deadlineMechanic',   toDtLocal_(cfg.deadlineMechanic));
   setVal_('cfg-schoolEntryFormOpenAt',  toDtLocal_(cfg.schoolEntryFormOpenAt));
   setVal_('cfg-schoolEntryDeadline',    toDtLocal_(cfg.schoolEntryDeadline));
-  setVal_('cfg-schoolEntryApprovalUrl', cfg.schoolEntryApprovalUrl || '');
+  setVal_('cfg-docUrlRulebook',         cfg.docUrlRulebook          || '');
+  setVal_('cfg-docUrlPledge',           cfg.docUrlPledge            || '');
+  setVal_('cfg-schoolEntryApprovalUrl', cfg.schoolEntryApprovalUrl  || '');
   setVal_('cfg-schoolEntryMailSubject',       cfg.schoolEntryMailSubject       || SCHOOL_ENTRY_MAIL_SUBJECT_DEFAULT);
   setVal_('cfg-schoolEntryMailSubjectUpdate', cfg.schoolEntryMailSubjectUpdate || SCHOOL_ENTRY_MAIL_SUBJECT_UPDATE_DEFAULT);
   setVal_('cfg-schoolEntryMailBody',          cfg.schoolEntryMailBody          || SCHOOL_ENTRY_MAIL_BODY_DEFAULT);
@@ -583,6 +585,8 @@ async function saveConfig_(btnId, fbId) {
     deadlineMechanic:     toIso_(getVal_('cfg-deadlineMechanic')),
     schoolEntryFormOpenAt: toIso_(getVal_('cfg-schoolEntryFormOpenAt')),
     schoolEntryDeadline:   toIso_(getVal_('cfg-schoolEntryDeadline')),
+    docUrlRulebook:        getVal_('cfg-docUrlRulebook'),
+    docUrlPledge:          getVal_('cfg-docUrlPledge'),
     schoolEntryApprovalUrl: getVal_('cfg-schoolEntryApprovalUrl'),
     schoolEntryMailSubject:       getVal_('cfg-schoolEntryMailSubject'),
     schoolEntryMailSubjectUpdate: getVal_('cfg-schoolEntryMailSubjectUpdate'),

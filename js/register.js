@@ -39,6 +39,10 @@ let pageEvent_ = null;
     pageEvent_ = d.eventId || null;
     const label = formatEventDate_(d.startDate, d.eventName);
     setText('event-date-label', label);
+    // 書類URL上書き（設定があればアンカーの href を差し替え）
+    const du = d.docUrls || {};
+    if (du.rulebook) { const a = document.getElementById('link-doc-rulebook'); if (a) a.href = du.rulebook; }
+    if (du.pledge)   { const a = document.getElementById('link-doc-pledge');   if (a) a.href = du.pledge;   }
   } else {
     // イベントが見つからない場合もフォームは表示する(GAS側でも再チェック)
     setText('event-date-label', formatToday_());

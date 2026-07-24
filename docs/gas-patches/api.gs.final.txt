@@ -677,6 +677,11 @@ function actionGetFormConfig_(p) {
     deadlineWomenDriver: fmt(cfg.deadlineWomenDriver),
     deadlineReserve:     fmt(cfg.deadlineReserve),
     deadlineMechanic:    fmt(cfg.deadlineMechanic),
+    docUrls: {
+      rulebook:       String(cfg.docUrlRulebook       || ''),
+      pledge:         String(cfg.docUrlPledge         || ''),
+      schoolApproval: String(cfg.schoolEntryApprovalUrl || ''),
+    },
   });
 }
 
@@ -1104,8 +1109,20 @@ function actionGetCurrentEvent_(p) {
 
   if (!row) return err_('no_active_event');
 
+  const eventId = String(row[idCol]);
+  // 書類URL（当日フォームなどが同期取得できるように含める）
+  let docUrls = { rulebook: '', pledge: '', schoolApproval: '' };
+  try {
+    const cfg = getConfig_(eventId);
+    docUrls = {
+      rulebook:       String(cfg.docUrlRulebook       || ''),
+      pledge:         String(cfg.docUrlPledge         || ''),
+      schoolApproval: String(cfg.schoolEntryApprovalUrl || ''),
+    };
+  } catch (e) { /* 失敗時は空URL（HTMLフォールバックが使われる） */ }
+
   return ok_({
-    eventId:   String(row[idCol]),
+    eventId:   eventId,
     eventName: row[nameCol],
     startDate: row[startCol] instanceof Date
       ? Utilities.formatDate(row[startCol], Session.getScriptTimeZone(), 'yyyy/MM/dd')
@@ -1113,6 +1130,7 @@ function actionGetCurrentEvent_(p) {
     endDate: row[endCol] instanceof Date
       ? Utilities.formatDate(row[endCol], Session.getScriptTimeZone(), 'yyyy/MM/dd')
       : String(row[endCol]),
+    docUrls: docUrls,
   });
 }
 
@@ -2618,6 +2636,11 @@ function actionGetSchoolEntryFormConfig_(p) {
     openAt:      fmt(cfg.schoolEntryFormOpenAt),
     deadline:    fmt(cfg.schoolEntryDeadline),
     approvalUrl: String(cfg.schoolEntryApprovalUrl || ''),
+    docUrls: {
+      rulebook:       String(cfg.docUrlRulebook       || ''),
+      pledge:         String(cfg.docUrlPledge         || ''),
+      schoolApproval: String(cfg.schoolEntryApprovalUrl || ''),
+    },
   });
 }
 
