@@ -12,7 +12,7 @@
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src 'self' https://fonts.gstatic.com;">
   <title>FORMULA GYMKHANA — 出場校エントリー</title>
-  <link rel="stylesheet" href="../js/style.css?v=20260722a">
+  <link rel="stylesheet" href="../js/style.css?v=20260724b">
   <style>
     body { display:flex; flex-direction:column; align-items:center; padding:24px 16px 48px; }
     .card { width:100%; max-width:460px; }
@@ -203,8 +203,8 @@
         </div>
         <div class="form-row">
           <label>電話番号<span class="req">*</span></label>
-          <input type="tel" id="f-repphone" placeholder="例：09012345678" inputmode="numeric" maxlength="11" autocomplete="tel">
-          <p class="hint">ハイフン無しの半角数字（10〜11桁）</p>
+          <input type="tel" id="f-repphone" placeholder="例：090-1234-5678 または 09012345678" inputmode="tel" maxlength="13" autocomplete="tel">
+          <p class="hint">半角数字（ハイフンあり・なしどちらでも可）</p>
           <p class="field-err" id="err-repphone">10〜11桁の半角数字で入力してください</p>
         </div>
         <div class="form-row">
@@ -225,8 +225,8 @@
         </div>
         <div class="form-row">
           <label>郵便番号<span class="req">*</span></label>
-          <input type="tel" id="f-shippostal" placeholder="例：1660015" inputmode="numeric" maxlength="7">
-          <p class="hint">ハイフン無しの半角数字7桁</p>
+          <input type="tel" id="f-shippostal" placeholder="例：166-0015 または 1660015" inputmode="numeric" maxlength="8">
+          <p class="hint">半角数字（ハイフンあり・なしどちらでも可）</p>
           <p class="field-err" id="err-shippostal">7桁の半角数字で入力してください</p>
         </div>
         <div class="form-row">
@@ -236,8 +236,8 @@
         </div>
         <div class="form-row">
           <label>電話番号<span class="req">*</span></label>
-          <input type="tel" id="f-shipphone" placeholder="例：0353053553" inputmode="numeric" maxlength="11">
-          <p class="hint">ハイフン無しの半角数字（10〜11桁）</p>
+          <input type="tel" id="f-shipphone" placeholder="例：03-5305-3553 または 0353053553" inputmode="tel" maxlength="13">
+          <p class="hint">半角数字（ハイフンあり・なしどちらでも可）</p>
           <p class="field-err" id="err-shipphone">10〜11桁の半角数字で入力してください</p>
         </div>
       </div>
@@ -308,8 +308,8 @@
     </div>
   </div>
 
-  <script src="../js/config.js?v=20260723d"></script>
-  <script src="../js/api.js?v=20260723b"></script>
-  <script src="../js/register-school.js?v=20260723b"></script>
+  <script src="../js/config.js?v=20260724b"></script>
+  <script src="../js/api.js?v=20260724b"></script>
+  <script src="../js/register-school.js?v=20260724b"></script>
 </body>
 </html>

@@ -192,6 +192,7 @@ async function readBranchFiles(cat) {
 const NAME_RE  = /.+[ 　].+/;        // 姓と名の間にスペース
 const PHONE_RE = /^[0-9]{10,11}$/;
 const POSTAL_RE = /^[0-9]{7}$/;
+const stripHyphen_ = s => String(s || '').replace(/[-−ー－]/g, '');
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SIM_RE   = /^[0-9]{1,2}:[0-5][0-9]\.[0-9]{3}$/;  // 1:15.001
 
@@ -319,8 +320,8 @@ function validate(d) {
   fail('birthday',   !d.birthday);
   fail('email',      !EMAIL_RE.test(d.email));
   fail('email-confirm', !d.emailConfirm || d.email !== d.emailConfirm);
-  fail('phone',      !PHONE_RE.test(d.phone));
-  fail('postal',     !POSTAL_RE.test(d.postal));
+  fail('phone',      !PHONE_RE.test(stripHyphen_(d.phone)));
+  fail('postal',     !POSTAL_RE.test(stripHyphen_(d.postal)));
   fail('prefecture', !d.prefecture);
   fail('address',    !d.address);
 
@@ -426,7 +427,26 @@ async function submitForm() {
   btn.textContent = '事前登録する';
 
   if (res.ok) {
-    showState('success');
+    const d = res.data || {};
+    const warnings = [];
+    if (d.filesSaved === false) warnings.push('ファイルの保存に失敗した可能性があります');
+    if (d.mailSent   === false) warnings.push('確認メールの送信に失敗した可能性があります');
+    if (warnings.length) {
+      showState('success');
+      // 成功画面上部に注意喚起を追記（事務局へ連絡を促す）
+      const succ = document.getElementById('state-success');
+      if (succ) {
+        const note = document.createElement('div');
+        note.style.cssText = 'background:#FFF7E1;border:1px solid #F5D680;border-radius:8px;padding:10px 12px;margin:12px 0;font-size:12px;color:#5C4200;line-height:1.6';
+        note.innerHTML = '<strong>ご注意:</strong> 登録は完了しましたが、' +
+          warnings.join('・') +
+          '。<br>お手数ですが事務局までご連絡ください。';
+        const body = succ.querySelector('.card-body') || succ;
+        body.insertBefore(note, body.firstChild);
+      }
+    } else {
+      showState('success');
+    }
     return;
   }
 

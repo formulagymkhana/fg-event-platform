@@ -140,10 +140,11 @@ function v2_() {
     showErr_('err-email-confirm', 'f-email-confirm', 'メールアドレスが一致しません'); ok = false;
   }
   const zip = val_('f-zip');
+  const zipDigits = zip.replace(/[-−ー－]/g, '');
   if (!zip) {
     showErr_('err-zip', 'f-zip', '郵便番号を入力してください'); ok = false;
-  } else if (!/^\d{7}$/.test(zip)) {
-    showErr_('err-zip', 'f-zip', 'ハイフンなし7桁の数字で入力してください'); ok = false;
+  } else if (!/^\d{7}$/.test(zipDigits)) {
+    showErr_('err-zip', 'f-zip', '7桁の数字で入力してください（ハイフン可）'); ok = false;
   }
   if (!val_('f-pref'))    { showErr_('err-pref',    'f-pref',    '都道府県を選択してください'); ok = false; }
   if (!val_('f-address')) { showErr_('err-address', 'f-address', '住所（市区町村以降）を入力してください'); ok = false; }
@@ -152,6 +153,7 @@ function v2_() {
 
 function v3_() {
   let ok = true;
+  if (!val_('f-content'))      { showErr_('err-content','f-content','出展内容・PR内容を入力してください'); ok = false; }
   if (!checkedRadio_('booth')) { showErr_('err-booth', null, 'ブース区画を選択してください'); ok = false; }
   if (!checkedRadio_('demo'))  { showErr_('err-demo',  null, 'デモ走行を選択してください'); ok = false; }
   return ok;

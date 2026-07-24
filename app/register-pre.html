@@ -12,7 +12,7 @@
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src 'self' https://fonts.gstatic.com;">
   <title>FORMULA GYMKHANA — 学生 事前登録</title>
-  <link rel="stylesheet" href="../js/style.css?v=20260629c">
+  <link rel="stylesheet" href="../js/style.css?v=20260724b">
   <style>
     body { display: flex; flex-direction: column; align-items: center; padding: 24px 16px 48px; }
     .card { width: 100%; max-width: 420px; }
@@ -217,14 +217,14 @@
         </div>
         <div class="form-row">
           <label>電話番号<span class="req">*</span></label>
-          <input type="tel" id="f-phone" placeholder="例：09012345678" autocomplete="tel" inputmode="numeric" maxlength="11">
-          <p class="hint">ハイフン無しの半角数字（10〜11桁）</p>
+          <input type="tel" id="f-phone" placeholder="例：090-1234-5678 または 09012345678" autocomplete="tel" inputmode="tel" maxlength="13">
+          <p class="hint">半角数字（ハイフンあり・なしどちらでも可）</p>
           <p class="field-err" id="err-phone">10〜11桁の半角数字で入力してください</p>
         </div>
         <div class="form-row-half">
           <div class="form-row">
             <label>郵便番号<span class="req">*</span></label>
-            <input type="tel" id="f-postal" placeholder="例：1000001" inputmode="numeric" maxlength="7">
+            <input type="tel" id="f-postal" placeholder="例：100-0001 または 1000001" inputmode="numeric" maxlength="8">
             <p class="field-err" id="err-postal">7桁の半角数字で入力してください</p>
           </div>
           <div class="form-row">
@@ -266,7 +266,7 @@
             <label><input type="radio" name="category" value="見学・応援学生(メカニック登録含む)"> 見学・応援学生（メカニック登録含む）</label>
           </div>
           <p class="field-err" id="err-category">参加区分を選択してください</p>
-          <p class="hint">区分を選ぶと追加項目が表示されます。誓約書・免許証などの書類提出は後日ご案内します。</p>
+          <p class="hint">区分を選ぶと追加項目（誓約書・免許証などの書類アップロード欄）が表示されます。</p>
         </div>
       </div>
 
@@ -588,8 +588,8 @@
     </div>
   </div>
 
-  <script src="../js/config.js?v=20260723d"></script>
-  <script src="../js/api.js?v=20260612f"></script>
-  <script src="../js/register-pre.js?v=20260629a"></script>
+  <script src="../js/config.js?v=20260724b"></script>
+  <script src="../js/api.js?v=20260724b"></script>
+  <script src="../js/register-pre.js?v=20260724b"></script>
 </body>
 </html>
