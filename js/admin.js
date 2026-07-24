@@ -43,6 +43,14 @@ window.addEventListener('DOMContentLoaded', () => {
   id_('btn-clear-cache')?.addEventListener('click', handleClearCache_);
   id_('btn-change-key')?.addEventListener('click', handleChangeKey_);
   id_('btn-copy-url')?.addEventListener('click', handleCopyUrl_);
+  id_('btn-copy-admin-url')?.addEventListener('click', () => {
+    const txt = id_('admin-url')?.textContent;
+    if (txt) copyText_(txt);
+  });
+  // 管理画面URL を即時表示（イベント非依存）
+  const adminUrl = location.origin + location.pathname;
+  const adminEl = id_('admin-url');
+  if (adminEl) adminEl.innerHTML = `<a href="${adminUrl}" target="_blank" class="url-anchor">${adminUrl}</a>`;
 
   // 企業管理ページ
   id_('btn-add-company')?.addEventListener('click', handleAddCompany_);
