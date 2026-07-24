@@ -12,7 +12,7 @@
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src 'self' https://fonts.gstatic.com;">
   <title>FORMULA GYMKHANA — 出場校エントリー</title>
-  <link rel="stylesheet" href="../js/style.css?v=20260724b">
+  <link rel="stylesheet" href="../js/style.css?v=20260724c">
   <style>
     body { display:flex; flex-direction:column; align-items:center; padding:24px 16px 48px; }
     .card { width:100%; max-width:460px; }
@@ -275,8 +275,11 @@
         </div>
         <div class="form-row">
           <label>学校職員の参加承諾書</label>
+          <p class="doc-links" style="margin:0 0 8px">
+            <a href="https://drive.google.com/file/d/121N5KeCR_Jqw3BJ7-WdyzbpetuomZyQ0/view?usp=drive_link" target="_blank" rel="noopener">📄 学校職員の参加承諾書テンプレートを開く</a>
+          </p>
           <input type="file" id="f-approval" class="file-input" accept=".pdf,.jpg,.jpeg,.png,image/*,application/pdf">
-          <p class="hint">記入済みのファイルをアップロードしてください（PDF/JPEG/PNG、最大10MB）</p>
+          <p class="hint">上記テンプレートを印刷し、学校職員に記入・押印いただいたものをアップロードしてください（PDF/JPEG/PNG、最大10MB）</p>
           <p class="field-err" id="err-approval">ファイルが大きすぎます（最大10MB）</p>
         </div>
       </div>
@@ -308,8 +311,8 @@
     </div>
   </div>
 
-  <script src="../js/config.js?v=20260724b"></script>
-  <script src="../js/api.js?v=20260724b"></script>
-  <script src="../js/register-school.js?v=20260724b"></script>
+  <script src="../js/config.js?v=20260724c"></script>
+  <script src="../js/api.js?v=20260724c"></script>
+  <script src="../js/register-school.js?v=20260724c"></script>
 </body>
 </html>
