@@ -182,6 +182,7 @@ async function submit() {
       shipPostal:       shipPostal,
       shipAddress:      shipAddr,
       shipPhone:        shipPhone,
+      carPassCount:     '1枚',
       schoolPermission: permission,
       note:             note,
       ruleConsent:      'true',
