@@ -222,6 +222,11 @@ const FG_API = (() => {
     return call_('checkSchoolEntryExists', { event, schoolName });
   }
 
+  /** 事前登録/当日登録で同一メアドが既に登録済みか確認 */
+  function checkStudentEmailExists(event, email) {
+    return call_('checkStudentEmailExists', { event, email });
+  }
+
   // ── 景品交換API(スタッフ用) ──────────────────
 
   /** 学生cardTokenとスタッフキーで景品交換状況を取得 */
@@ -333,6 +338,7 @@ const FG_API = (() => {
     registerSchoolEntry,
     getSchoolEntryFormConfig,
     checkSchoolEntryExists,
+    checkStudentEmailExists,
     // 企業閲覧
     getCompanyView,
     getCompanyStampVisitors,

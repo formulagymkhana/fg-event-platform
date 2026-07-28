@@ -12,7 +12,7 @@
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src 'self' https://fonts.gstatic.com;">
   <title>FORMULA GYMKHANA — 学生 事前登録</title>
-  <link rel="stylesheet" href="../js/style.css?v=20260724h">
+  <link rel="stylesheet" href="../js/style.css?v=20260728a">
   <style>
     body { display: flex; flex-direction: column; align-items: center; padding: 24px 16px 48px; }
     .card { width: 100%; max-width: 420px; }
@@ -214,6 +214,18 @@
           <input type="email" id="f-email-confirm" placeholder="もう一度入力してください" autocomplete="off" inputmode="email">
           <p class="hint">入力ミス防止のため、コピー＆ペーストせず再度ご入力ください</p>
           <p class="field-err" id="err-email-confirm">メールアドレスが一致しません</p>
+        </div>
+        <div class="form-row" id="sec-email-dup" style="display:none">
+          <div class="consent-box" style="background:#FFF7E1;border:1px solid #F5D680">
+            <label>
+              <input type="checkbox" id="f-email-dup-ack">
+              <span>
+                <strong>⚠ このメールアドレスは既に登録されています。</strong><br>
+                このメールアドレスは私個人のものです（部活代表や共有アドレスではありません）。
+              </span>
+            </label>
+          </div>
+          <p class="field-err" id="err-email-dup-ack">個人アドレスであることに同意してください</p>
         </div>
         <div class="form-row">
           <label>電話番号<span class="req">*</span></label>
@@ -588,8 +600,8 @@
     </div>
   </div>
 
-  <script src="../js/config.js?v=20260724h"></script>
-  <script src="../js/api.js?v=20260724h"></script>
-  <script src="../js/register-pre.js?v=20260724h"></script>
+  <script src="../js/config.js?v=20260728a"></script>
+  <script src="../js/api.js?v=20260728a"></script>
+  <script src="../js/register-pre.js?v=20260728a"></script>
 </body>
 </html>

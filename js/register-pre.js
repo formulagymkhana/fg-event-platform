@@ -101,6 +101,37 @@ $('btn-submit')?.addEventListener('click', submitForm);
   ['paste', 'drop'].forEach(ev => el.addEventListener(ev, e => e.preventDefault()));
 });
 
+// メアド重複警告（部活代表・共有アドレスの使い回し抑止）
+let _emailDupChecked = ''; // 直近で警告を表示したメアド
+$('f-email')?.addEventListener('blur', checkEmailDup_);
+$('f-email')?.addEventListener('input', () => {
+  // メアドが変わったら警告を隠して同意チェックもリセット
+  const sec = $('sec-email-dup'); if (sec) sec.style.display = 'none';
+  const ack = $('f-email-dup-ack'); if (ack) ack.checked = false;
+  const err = $('err-email-dup-ack'); if (err) err.classList.remove('show');
+  _emailDupChecked = '';
+});
+
+async function checkEmailDup_() {
+  const email = $('f-email').value.trim();
+  if (!email || !EMAIL_RE.test(email)) return;
+  if (email.toLowerCase() === _emailDupChecked) return;
+  try {
+    const r = await FG_API.checkStudentEmailExists(_event, email);
+    if (r.ok && r.data && r.data.exists) {
+      $('sec-email-dup').style.display = '';
+      _emailDupChecked = email.toLowerCase();
+    } else {
+      $('sec-email-dup').style.display = 'none';
+      _emailDupChecked = '';
+    }
+  } catch (e) {
+    // 通信失敗時は警告を出さない（送信時にサーバー側で対応）
+    $('sec-email-dup').style.display = 'none';
+    _emailDupChecked = '';
+  }
+}
+
 
 // ── 参加区分による分岐表示 ──────────────────────
 const BRANCH_BY_CAT = {
@@ -324,6 +355,13 @@ function validate(d) {
   fail('birthday',   !d.birthday);
   fail('email',      !EMAIL_RE.test(d.email));
   fail('email-confirm', !d.emailConfirm || d.email !== d.emailConfirm);
+
+  // メアド重複警告が表示されている場合、同意チェックが必須
+  const dupSec = $('sec-email-dup');
+  if (dupSec && dupSec.style.display !== 'none') {
+    const acked = $('f-email-dup-ack')?.checked;
+    fail('email-dup-ack', !acked);
+  }
   fail('phone',      !PHONE_RE.test(stripHyphen_(d.phone)));
   fail('postal',     !POSTAL_RE.test(stripHyphen_(d.postal)));
   fail('prefecture', !d.prefecture);
@@ -424,6 +462,7 @@ async function submitForm() {
     serviceClass:   d._branch.serviceClass  || '',
     competing:      d._branch.competing     || '',
     mediaConsent:   d._branch.mediaConsent  || 'false',
+    emailDupAcknowledged: $('f-email-dup-ack')?.checked ? 'true' : 'false',
     files,
   });
 
@@ -458,6 +497,16 @@ async function submitForm() {
     banner.textContent = 'この氏名・大学名ではすでに事前登録済みです。内容変更は事務局へご連絡ください。';
     banner.classList.add('show');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  if (res.error === 'email_already_used') {
+    // フロントの blur チェックが走らなかった場合の保険。警告を強制表示。
+    $('sec-email-dup').style.display = '';
+    _emailDupChecked = d.email.toLowerCase();
+    banner.textContent = 'このメールアドレスは既に登録されています。ご自身の個人アドレスかご確認のうえ、同意チェックを入れて再送信してください。';
+    banner.classList.add('show');
+    document.getElementById('sec-email-dup').scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
 

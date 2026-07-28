@@ -110,6 +110,7 @@ function dispatch_(e) {
       case 'registerSchoolEntry':     return actionRegisterSchoolEntry_(p);   // 出場校エントリー(公開)
       case 'getSchoolEntryFormConfig':return actionGetSchoolEntryFormConfig_(p);
       case 'checkSchoolEntryExists':  return actionCheckSchoolEntryExists_(p);
+      case 'checkStudentEmailExists': return actionCheckStudentEmailExists_(p); // 事前登録/当日登録のメアド重複照会(公開)
       case 'adminRequestReset':       return actionAdminRequestReset_(p);
       case 'adminConfirmReset':       return actionAdminConfirmReset_(p);
       // ── admin (T12) ───────────────────────────────────────────────────
@@ -1054,6 +1055,7 @@ function err_(code) {
     no_active_event:       '本日開催のイベントが見つかりません', // T6 追加
     invalid_code:          '登録コードが無効です',               // T6 追加
     already_registered:    'すでに本日のイベントに登録済みです', // T6 追加
+    email_already_used:    'このメールアドレスは既に登録されています',
     no_email:              'この参加者にはメールアドレスが登録されていません',
     form_not_open:         '受付がまだ開始されていません',
     registration_closed:   '受付期間が終了しました',
@@ -1202,6 +1204,17 @@ function actionRegisterWalkIn_(p) {
       const result = buildStampResult_(p.event, existStudentId, count, { stampToken, cardToken: existCardToken });
       outcome_ = { type: 'existing', existStudentId, existCardToken, stampResult: result };
     } else {
+      // メアド重複チェック（部活代表や共有アドレスの使い回し抑止）
+      // フロントで警告表示→同意チェックを経由した場合のみ emailDupAcknowledged=true が送られてくる。
+      const acknowledged = String(p.emailDupAcknowledged) === 'true';
+      if (!acknowledged && p.email) {
+        const emailCol = sHeaders.indexOf('メールアドレス');
+        const target = String(p.email).trim().toLowerCase();
+        if (emailCol >= 0 && target) {
+          const dup = sData.slice(1).some(r => String(r[emailCol]).trim().toLowerCase() === target);
+          if (dup) return err_('email_already_used');
+        }
+      }
       // 新規: studentId 採番・両シートへの appendRow をロック内で完結
       const yearMatch  = String(p.event).match(/(\d{4})/);
       const yearSuffix = yearMatch ? yearMatch[1].slice(-1) : String(new Date().getFullYear()).slice(-1);
@@ -1327,6 +1340,18 @@ function actionRegisterPreStudent_(p) {
       return { ok: false, error: 'already_registered',
         data: { studentId: String(existing[idx('studentId')]), cardToken: String(existing[idx('cardToken')]) },
         message: 'すでに事前登録済みです' };
+    }
+
+    // メアド重複チェック（部活代表や共有アドレスの使い回し抑止）
+    // フロントで警告表示→同意チェックを経由した場合のみ emailDupAcknowledged=true が送られてくる。
+    const acknowledged = String(p.emailDupAcknowledged) === 'true';
+    if (!acknowledged) {
+      const emailCol = idx('メールアドレス');
+      const target = String(p.email).trim().toLowerCase();
+      if (emailCol >= 0 && target) {
+        const dup = sData.slice(1).some(r => String(r[emailCol]).trim().toLowerCase() === target);
+        if (dup) return err_('email_already_used');
+      }
     }
 
     // 参加区分 → クラスコード（attr は上で採番前に確定済み）
@@ -2668,6 +2693,26 @@ function actionCheckSchoolEntryExists_(p) {
     ? Utilities.formatDate(row[dtCol], tz, 'yyyy/MM/dd HH:mm')
     : String(row[dtCol] || '');
   return ok_({ exists: true, submittedAt: dt, updateCount: Number(row[updCol]) || 1 });
+}
+
+// ============================================================
+// アクション: checkStudentEmailExists（同一メアドの既存登録チェック・公開）
+// 事前登録/当日登録のフォームで、部活代表や共有アドレスの使い回しを検知するために使用。
+// 件数は返さず exists の真偽のみ返す（個人情報の露出を避ける）。
+// ============================================================
+
+function actionCheckStudentEmailExists_(p) {
+  if (!p.event || !p.email) return err_('missing_params');
+  const sheet = eventSs_(p.event).getSheetByName(SHEET.STUDENTS);
+  if (!sheet || sheet.getLastRow() < 2) return ok_({ exists: false });
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const emailCol = headers.indexOf('メールアドレス');
+  if (emailCol < 0) return ok_({ exists: false });
+  const target = String(p.email).trim().toLowerCase();
+  if (!target) return ok_({ exists: false });
+  const hit = data.slice(1).some(r => String(r[emailCol]).trim().toLowerCase() === target);
+  return ok_({ exists: hit });
 }
 
 // ============================================================

@@ -20,6 +20,38 @@ document.getElementById('btn-retry')?.addEventListener('click', () => {
   ['paste', 'drop'].forEach(ev => el.addEventListener(ev, e => e.preventDefault()));
 });
 
+// メアド重複警告（部活代表・共有アドレスの使い回し抑止）
+let emailDupChecked_ = ''; // 直近で警告を表示したメアド
+document.getElementById('f-email')?.addEventListener('blur', checkEmailDup_);
+document.getElementById('f-email')?.addEventListener('input', () => {
+  const sec = document.getElementById('sec-email-dup'); if (sec) sec.style.display = 'none';
+  const ack = document.getElementById('f-email-dup-ack'); if (ack) ack.checked = false;
+  const err = document.getElementById('err-email-dup-ack'); if (err) err.classList.remove('show');
+  emailDupChecked_ = '';
+});
+
+async function checkEmailDup_() {
+  const email = document.getElementById('f-email').value.trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+  if (email.toLowerCase() === emailDupChecked_) return;
+  if (!pageEvent_) return; // イベント未解決時はチェックを飛ばす
+  try {
+    const r = await FG_API.checkStudentEmailExists(pageEvent_, email);
+    const sec = document.getElementById('sec-email-dup');
+    if (r.ok && r.data && r.data.exists) {
+      sec.style.display = '';
+      emailDupChecked_ = email.toLowerCase();
+    } else {
+      sec.style.display = 'none';
+      emailDupChecked_ = '';
+    }
+  } catch (e) {
+    // 通信失敗時は警告を出さない（送信時にサーバー側で対応）
+    document.getElementById('sec-email-dup').style.display = 'none';
+    emailDupChecked_ = '';
+  }
+}
+
 
 // 成功画面のマイページリンク組み立て用に、解決済みイベントIDを保持
 let pageEvent_ = null;
@@ -79,6 +111,8 @@ async function handleSubmit() {
     privacyConsent: document.getElementById('cb-privacy').checked ? 'true' : 'false',
     // 個人ページ(氏名+QR)リンクをメールに載せるための app/ ディレクトリ絶対URL
     appBase:    new URL('.', location.href).href,
+    // メアド重複警告への同意（表示された場合のみtrueが送られる）
+    emailDupAcknowledged: document.getElementById('f-email-dup-ack')?.checked ? 'true' : 'false',
   };
 
   const res = await FG_API.registerWalkIn(params);
@@ -92,6 +126,14 @@ async function handleSubmit() {
     FG_API.saveStampToken(res.data.stampToken);
     renderSuccess_(res.data);
     showState('success');
+  } else if (res.error === 'email_already_used') {
+    // フロントの blur チェックが走らなかった場合の保険。警告を強制表示してフォームに戻す。
+    showState('form');
+    document.getElementById('sec-email-dup').style.display = '';
+    emailDupChecked_ = params.email.toLowerCase();
+    setErrText_('err-email-dup-ack', '個人アドレスであることに同意してください');
+    showErr_('err-email-dup-ack', 'f-email-dup-ack');
+    document.getElementById('sec-email-dup').scrollIntoView({ behavior: 'smooth', block: 'center' });
   } else {
     showState('error');
     const msgs = {
@@ -172,6 +214,14 @@ function validateForm_() {
   } else if (email !== emailConfirm) {
     setErrText_('err-email-confirm', 'メールアドレスが一致しません');
     showErr_('err-email-confirm', 'f-email-confirm'); ok = false;
+  }
+  // メアド重複警告が表示されている場合、同意チェックが必須
+  const dupSec = document.getElementById('sec-email-dup');
+  if (dupSec && dupSec.style.display !== 'none') {
+    const acked = document.getElementById('f-email-dup-ack')?.checked;
+    if (!acked) {
+      showErr_('err-email-dup-ack', 'f-email-dup-ack'); ok = false;
+    }
   }
   // 電話番号: 必須 + ハイフン無し半角数字のみ（フォーム規則）
   const phone = val_('f-phone').trim();
