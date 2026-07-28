@@ -130,7 +130,6 @@ async function submit() {
   const shipPostal = $('f-shippostal').value.trim();
   const shipAddr   = $('f-shipaddress').value.trim();
   const shipPhone  = $('f-shipphone').value.trim();
-  const carPass    = getRadio('carPassCount');
   const permission = getRadio('permission');
   const note       = $('f-note').value.trim();
   const file       = ($('f-approval').files || [])[0];
@@ -149,7 +148,6 @@ async function submit() {
   setErr('shipaddress', !shipAddr);                               if (!shipAddr) ok = false;
   setErr('shipphone',   !PHONE_RE.test(stripHyphen_(shipPhone))); if (!PHONE_RE.test(stripHyphen_(shipPhone))) ok = false;
 
-  const rgCarErr = $('err-carpass'); rgCarErr.classList.toggle('show', !carPass); if (!carPass) ok = false;
   const rgPermErr = $('err-permission'); rgPermErr.classList.toggle('show', !permission); if (!permission) ok = false;
 
   const fileTooBig = file && file.size > MAX_FILE;
@@ -184,7 +182,6 @@ async function submit() {
       shipPostal:       shipPostal,
       shipAddress:      shipAddr,
       shipPhone:        shipPhone,
-      carPassCount:     carPass,
       schoolPermission: permission,
       note:             note,
       ruleConsent:      'true',

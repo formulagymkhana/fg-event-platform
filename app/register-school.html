@@ -215,9 +215,9 @@
         </div>
       </div>
 
-      <!-- 入場パス発送先 -->
+      <!-- 車両入場証発送先 -->
       <div class="form-section">
-        <p class="section-label">入場パス発送先</p>
+        <p class="section-label">車両入場証発送先</p>
         <div class="form-row">
           <label>名義人<span class="req">*</span></label>
           <input type="text" id="f-shipname" placeholder="例：山田 太郎">
@@ -245,20 +245,9 @@
       <!-- 車両入場証 -->
       <div class="form-section">
         <p class="section-label">車両入場証</p>
-        <div class="form-row">
-          <label>車両入場証は何枚必要ですか？（最大4枚）<span class="req">*</span></label>
-          <p class="hint" style="margin-top:0;margin-bottom:10px">
-            ※応援学生の分は別途発行します。選手3名分＋補欠ドライバーでの必要数を回答してください。<br>
-            ※女子クラスドライバー分も別途発行します。
-          </p>
-          <div class="radio-group col" id="rg-carpass">
-            <label><input type="radio" name="carPassCount" value="1枚"> 1枚</label>
-            <label><input type="radio" name="carPassCount" value="2枚"> 2枚</label>
-            <label><input type="radio" name="carPassCount" value="3枚"> 3枚</label>
-            <label><input type="radio" name="carPassCount" value="4枚"> 4枚</label>
-            <label><input type="radio" name="carPassCount" value="不要"> 不要</label>
-          </div>
-          <p class="field-err" id="err-carpass">選択してください</p>
+        <div class="info-banner">
+          <strong>車両入場証は一校につき一枚配布します。</strong><br>
+          準備や撤収の際にピットに個人・学校の車両を入れる場合にミラーに掲示してください。
         </div>
       </div>
 
@@ -310,6 +299,6 @@
 
   <script src="../js/config.js?v=20260724h"></script>
   <script src="../js/api.js?v=20260724h"></script>
-  <script src="../js/register-school.js?v=20260724h"></script>
+  <script src="../js/register-school.js?v=20260728b"></script>
 </body>
 </html>
