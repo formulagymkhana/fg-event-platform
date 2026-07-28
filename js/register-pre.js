@@ -168,7 +168,7 @@ document.querySelectorAll('input[name="sService"]').forEach(r =>
   }));
 
 // ── ファイル（区分別） ──────────────────────────
-const MAX_FILE  = 8 * 1024 * 1024;   // 1ファイル上限 8MB
+const MAX_FILE  = 10 * 1024 * 1024;  // 1ファイル上限 10MB
 const MAX_TOTAL = 20 * 1024 * 1024;  // 合計上限 20MB（GAS POSTの実用上限・base64膨張を考慮）
 
 // 選択中ファイルの合計バイト数
@@ -310,11 +310,11 @@ function validateBranch(cat, b) {
     const sw = radioVal('sService');
     need('sService', !sw);
     if (sw === 'はい') need('s-serviceclass', !$('f-s-serviceclass').value);
-    const mediaBad = b.mediaConsent !== 'true';
-    $('cb-wrap-media').classList.toggle('error', mediaBad);
-    errToggle('media', mediaBad);
-    if (mediaBad) ok = false;
   }
+  const mediaBad = b.mediaConsent !== 'true';
+  $('cb-wrap-media').classList.toggle('error', mediaBad);
+  errToggle('media', mediaBad);
+  if (mediaBad) ok = false;
   return ok;
 }
 
