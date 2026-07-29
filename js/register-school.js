@@ -151,9 +151,10 @@ async function submit() {
   const rgPermErr = $('err-permission'); rgPermErr.classList.toggle('show', !permission); if (!permission) ok = false;
 
   const fileTooBig = file && file.size > MAX_FILE;
-  $('err-approval').classList.toggle('show', !!fileTooBig);
-  $('f-approval').classList.toggle('error', !!fileTooBig);
-  if (fileTooBig) ok = false;
+  const fileMissing = !file;
+  $('err-approval').classList.toggle('show', fileMissing || fileTooBig);
+  $('f-approval').classList.toggle('error', fileMissing || fileTooBig);
+  if (fileMissing || fileTooBig) ok = false;
 
   // 上書き確認: 警告表示中はチェック必須
   const overwriteShown = $('sec-overwrite').style.display !== 'none';
