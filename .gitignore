@@ -1,2 +1,6 @@
 .DS_Store
 .claude/
+
+# スクショ画像は生成物（docs/screenshots/take-screenshots.js で再生成可能）。
+# 生成スクリプト自体はソースなので追跡する。
+docs/screenshots/*.png
