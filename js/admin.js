@@ -2228,9 +2228,11 @@ function renderWomenPairs_() {
     }
   }
 
-  const opt = (sel) => {
+  // exclude: 同じペア内の相手側で選択済みの学生を選択肢から除外（自分自身の現在値は残す）
+  const opt = (sel, exclude) => {
     let html = '<option value="">選択</option>';
     womenDrivers.forEach(w => {
+      if (w.studentId === exclude && w.studentId !== sel) return;
       const label = `${w['大学名'] || ''} / ${w['氏名'] || ''}`;
       const s = w.studentId === sel ? ' selected' : '';
       html += `<option value="${esc_(w.studentId)}"${s}>${esc_(label)}</option>`;
@@ -2243,8 +2245,8 @@ function renderWomenPairs_() {
     womenPairings_.map((p, i) => `
       <div class="women-pair-row">
         <span class="women-pair-label">ペア${i + 1}</span>
-        <div class="women-pair-slot"><span class="heat-lbl">A</span><select data-pair="${i}" data-heat="a">${opt(p.a)}</select></div>
-        <div class="women-pair-slot"><span class="heat-lbl">B</span><select data-pair="${i}" data-heat="b">${opt(p.b)}</select></div>
+        <div class="women-pair-slot"><span class="heat-lbl">A</span><select data-pair="${i}" data-heat="a">${opt(p.a, p.b)}</select></div>
+        <div class="women-pair-slot"><span class="heat-lbl">B</span><select data-pair="${i}" data-heat="b">${opt(p.b, p.a)}</select></div>
         <button class="women-pair-del" data-del="${i}" title="ペアを削除">×</button>
       </div>`).join('');
 
@@ -2252,6 +2254,7 @@ function renderWomenPairs_() {
     sel.addEventListener('change', () => {
       const i = +sel.dataset.pair;
       womenPairings_[i][sel.dataset.heat] = sel.value;
+      renderWomenPairs_(); // 相手側selectの除外リストを再計算するため再描画
     });
   });
   wrap.querySelectorAll('[data-del]').forEach(btn => {
@@ -2415,7 +2418,16 @@ function renderReceptionList_() {
   const orders = computeRunningOrder_();
   const rows = buildEntryListRows_(orders);
 
-  const trs = rows.map(r => `<tr>
+  const men   = rows.filter(r => r.section === 'men');
+  const women = rows.filter(r => r.section === 'women');
+
+  const header = `<thead><tr>
+        <th>大学名</th><th>ドライバー</th><th>選手名</th><th>よみがな</th>
+        <th>受付(土)</th><th>受付(日)</th><th>紹介カード</th><th>リストバンド</th>
+        <th>必要書類</th><th>ID</th>
+      </tr></thead>`;
+  const emptyBody = `<tr><td colspan="10" style="text-align:center;color:var(--gray);padding:12px 0">該当なし</td></tr>`;
+  const row = r => `<tr>
     <td>${esc_(r.school)}</td>
     <td class="center cls-${r.cls}">${r.cls}</td>
     <td>${esc_(r.name)}</td>
@@ -2424,17 +2436,13 @@ function renderReceptionList_() {
     <td class="center"></td><td class="center"></td>
     <td></td>
     <td class="num">${esc_(r.studentId)}</td>
-  </tr>`).join('');
+  </tr>`;
 
-  wrap.innerHTML = `
-    <div class="list-scroll"><table class="list-tbl">
-      <thead><tr>
-        <th>大学名</th><th>ドライバー</th><th>選手名</th><th>よみがな</th>
-        <th>受付(土)</th><th>受付(日)</th><th>紹介カード</th><th>リストバンド</th>
-        <th>必要書類</th><th>ID</th>
-      </tr></thead>
-      <tbody>${trs}</tbody>
-    </table></div>`;
+  const tbl = (label, xs) => `
+    <div class="list-section-title">${label}</div>
+    <div class="list-scroll"><table class="list-tbl">${header}<tbody>${xs.length ? xs.map(row).join('') : emptyBody}</tbody></table></div>`;
+
+  wrap.innerHTML = tbl('Formula Gymkhana クラス', men) + tbl('Formula Gymkhana 女子クラス', women);
 }
 
 // ── 応援学生受付リスト表示 ────────────
@@ -2564,8 +2572,9 @@ function downloadReceptionCsv_() {
   const orders = computeRunningOrder_();
   const rows   = buildEntryListRows_(orders);
   const headers = ['大学名', 'ドライバー', '選手名', 'よみがな',
-    '受付(土曜日)', '受付(日曜日)', '紹介カード', 'リストバンド', '必要書類', 'ID'];
-  const data = rows.map(r => [r.school, r.cls, r.name, r.furigana, '', '', '', '', '', r.studentId]);
+    '受付(土曜日)', '受付(日曜日)', '紹介カード', 'リストバンド', '必要書類', 'クラス', 'ID'];
+  const data = rows.map(r => [r.school, r.cls, r.name, r.furigana, '', '', '', '', '',
+    r.section === 'men' ? 'Formula Gymkhana' : 'Formula Gymkhana 女子', r.studentId]);
   downloadCsv_(`選手受付リスト_${curEvent_}.csv`, toCsv_(headers, data));
 }
 
