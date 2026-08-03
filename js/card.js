@@ -83,16 +83,30 @@ function autoViewLog_(token, pageEvent) {
   const vk = FG_API.getCompanyViewKey();
   if (vk) {
     FG_API.saveViewLogAuto(token, vk, pageEvent)
-      .then(r => { if (r && r.ok) showCompanyRegistered_(); })
+      .then(r => {
+        if (!r || !r.ok) return;
+        // GAS未反映(companyName未対応の旧レスポンス)時は undefined のままにして
+        // showCompanyRegistered_ 側のlocalStorageフォールバックに委ねる
+        const name = (r.data && r.data.companyName) || undefined;
+        // サーバが解決した最新の企業名でローカルキャッシュも補正する
+        if (name) { try { localStorage.setItem('fg_company_name', name); } catch (e) {} }
+        showCompanyRegistered_(name);
+      })
       .catch(() => {});
   } else {
     $('company-section').style.display = 'block';
   }
 }
 
-function showCompanyRegistered_() {
-  let name = '';
-  try { name = localStorage.getItem('fg_company_name') || ''; } catch (e) {}
+/**
+ * name省略時はlocalStorageキャッシュにフォールバック
+ * （企業QR読み取り直後のonCompanyQR_からは省略呼び出しされる。
+ *   その時点でlocalStorageは直前に更新済みのため一致する）
+ */
+function showCompanyRegistered_(name) {
+  if (name === undefined) {
+    try { name = localStorage.getItem('fg_company_name') || ''; } catch (e) { name = ''; }
+  }
   const el = $('company-registered');
   el.textContent = name
     ? `✓ ${name} の閲覧リストに自動記録されています`
