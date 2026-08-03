@@ -2155,12 +2155,14 @@ function classOf_(r) {
 }
 
 function computeMenSchools_(all) {
-  // ドライバーが1人でも登録されている大学のリスト（A/B/C/女子問わず。重複除去、登録順を維持）
+  // FGクラス(A/B/C)ドライバーが1人でも登録されている大学のリスト（重複除去、登録順を維持）
+  // ⚠ 女子クラスドライバー(W)は含めない。ここは走行順計算のN(男子登録大学数)の母集団であり、
+  //   女子のみ登録の大学を含めるとNが水増しされ、男子B/C・女子A/Bの走行順が全てズレる。
   const seen = new Set();
   const out = [];
   all.forEach(r => {
     const cls = classOf_(r);
-    if (['A', 'B', 'C', 'W'].includes(cls)) {
+    if (['A', 'B', 'C'].includes(cls)) {
       const s = String(r['大学名'] || r.school || '').trim();
       if (s && !seen.has(s)) { seen.add(s); out.push(s); }
     }
