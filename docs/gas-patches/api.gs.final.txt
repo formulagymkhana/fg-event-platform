@@ -2023,22 +2023,55 @@ function actionAdminGetStats_(p) {
   const studentSheet = ss.getSheetByName(SHEET.STUDENTS);
   let studentCount = 0, walkInCount = 0;
   let stuLunchSat = 0, stuLunchSun = 0;
+
+  // 弁当希望(はい/いいえ)は「事前登録」シートにのみ記録される(STUDENTSには書き込まれない)。
+  // studentId をキーに引けるようマップ化しておく。
+  const preRegLunch = {};
+  const preRegSheet = ss.getSheetByName(SHEET.PRE_REG);
+  if (preRegSheet && preRegSheet.getLastRow() > 1) {
+    const pData  = preRegSheet.getDataRange().getValues();
+    const pHdrs  = pData[0].map(String);
+    const sidCol = pHdrs.indexOf('studentId');
+    const lsCol  = pHdrs.indexOf('弁当_土');
+    const llCol  = pHdrs.indexOf('弁当_日');
+    if (sidCol >= 0) {
+      pData.slice(1).forEach(r => {
+        preRegLunch[String(r[sidCol])] = {
+          sat: lsCol >= 0 ? String(r[lsCol]) : '',
+          sun: llCol >= 0 ? String(r[llCol]) : '',
+        };
+      });
+    }
+  }
+
+  // 土日両日参加が前提のため、そもそも弁当希望を聞いていない区分(出場選手クラス)は
+  // STUDENTSの属性(＝現在の正式な名簿。手動でのクラス変更・選手交代も反映済み)を基準に
+  // 無条件で+1する。それ以外(補欠ドライバー/メカニック/応援学生)は事前登録の回答を見る。
+  const AUTO_LUNCH_ATTRS = ['Aドライバー', 'Bドライバー', 'Cドライバー', '女子クラスドライバー'];
+
   if (studentSheet && studentSheet.getLastRow() > 1) {
     const sData    = studentSheet.getDataRange().getValues();
     const sHeaders = sData[0].map(String);
     const regCol   = sHeaders.indexOf('登録種別');
+    const attrCol  = sHeaders.indexOf('属性');
+    const sidCol   = sHeaders.indexOf('studentId');
     studentCount = sData.length - 1;
     walkInCount  = regCol >= 0
       ? sData.slice(1).filter(r => String(r[regCol]) === '当日').length
       : 0;
-    const lsCol = sHeaders.indexOf('弁当_土');
-    const llCol = sHeaders.indexOf('弁当_日');
-    if (lsCol >= 0 || llCol >= 0) {
-      sData.slice(1).forEach(r => {
-        if (lsCol >= 0) { var vs = String(r[lsCol]); stuLunchSat += vs === 'はい' ? 1 : (Number(vs) || 0); }
-        if (llCol >= 0) { var vl = String(r[llCol]); stuLunchSun += vl === 'はい' ? 1 : (Number(vl) || 0); }
-      });
-    }
+
+    sData.slice(1).forEach(r => {
+      const attr = attrCol >= 0 ? String(r[attrCol]) : '';
+      if (AUTO_LUNCH_ATTRS.indexOf(attr) >= 0) {
+        stuLunchSat += 1;
+        stuLunchSun += 1;
+        return;
+      }
+      const lunch = sidCol >= 0 ? preRegLunch[String(r[sidCol])] : null;
+      if (!lunch) return;
+      stuLunchSat += lunch.sat === 'はい' ? 1 : (Number(lunch.sat) || 0);
+      stuLunchSun += lunch.sun === 'はい' ? 1 : (Number(lunch.sun) || 0);
+    });
   }
 
   // 企業側の食券（出展申込シート）
