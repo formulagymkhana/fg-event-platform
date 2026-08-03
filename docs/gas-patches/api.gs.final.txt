@@ -222,13 +222,15 @@ function actionSaveViewLog_(p) {
   const student = findStudentByCardToken_(p.token, p.event);
   if (!student) return err_('invalid_token');
 
-  let companyId = p.company || '';
-  let source    = 'manual_email';
+  let companyId   = p.company || '';
+  let companyName = '';
+  let source      = 'manual_email';
   if (p.vk) {
     const company = findCompanyByViewKey_(p.vk, p.event);
     if (!company) return err_('invalid_key');
-    companyId = company.companyId;
-    source    = 'company_auto';
+    companyId   = company.companyId;
+    companyName = company.companyName;
+    source      = 'company_auto';
   }
   if (!companyId) return err_('missing_params');
 
@@ -245,7 +247,7 @@ function actionSaveViewLog_(p) {
     );
     if (idx >= 0) {
       sheet.getRange(idx + 2, 1).setValue(new Date());
-      return ok_({ logged: true, updated: true });
+      return ok_({ logged: true, updated: true, companyName });
     }
   }
 
@@ -253,7 +255,7 @@ function actionSaveViewLog_(p) {
     new Date(), p.event, student.studentId, companyId, p.email || '', source,
   ]);
 
-  return ok_({ logged: true });
+  return ok_({ logged: true, companyName });
 }
 
 // ============================================================
