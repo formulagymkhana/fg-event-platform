@@ -68,10 +68,11 @@ npx serve -p 8744 .
 
 - [CLAUDE.md](CLAUDE.md) … **作業ルール・設計上の確定事項**（Claude Code 用だが、人が読んでもよい）
 - [docs/USER_MANUAL.txt](docs/USER_MANUAL.txt) … 事務局向け取扱説明書（配布物）
-- [docs/HANDOFF_2026-07-24.md](docs/HANDOFF_2026-07-24.md) … セッション引き継ぎ（日付ごとのスナップショット）
-- [docs/AUDIT_2026-07-29.md](docs/AUDIT_2026-07-29.md) … 実装・ドキュメントの現状調査
+- [docs/HANDOFF_2026-07-24.md](docs/HANDOFF_2026-07-24.md) … セッション引き継ぎ（アーカイブ。次回は新ファイルを作成）
+- [docs/AUDIT_2026-07-29.md](docs/AUDIT_2026-07-29.md) … 実装・ドキュメントの現状調査（アーカイブ。提案は実行済み）
 - [docs/NOTES.md](docs/NOTES.md) … 設計メモ・未解決事項
 - [docs/CHANGELOG.md](docs/CHANGELOG.md) … GAS再デプロイの要否・デプロイ済みバージョン
 - [docs/TASK_HISTORY.md](docs/TASK_HISTORY.md) … 過去のタスク指示書（アーカイブ）
+- [assets/README.md](assets/README.md) … 静的画像アセットの置き場ルール
 
 **実装が正、ドキュメントは参考。** 記述が実装と食い違う場合はコードを信じること。
