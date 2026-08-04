@@ -791,7 +791,7 @@
       </div>
 
       <!-- 事前登録 -->
-      <div class="section" style="margin-bottom:12px">
+      <div class="section no-fold" style="margin-bottom:12px">
         <div class="section-hd" data-section="prereg">
           <span class="section-title">📝 事前登録 <span class="section-count" id="prereg-count"></span></span>
           <span class="section-toggle" id="toggle-prereg">▼</span>
@@ -803,11 +803,15 @@
             <button class="act-btn act-btn-ghost" id="btn-prereg-csv-spectator">⬇ 応援・見学用</button>
             <button class="act-btn act-btn-ghost" id="btn-prereg-csv-all">⬇ 全員</button>
           </div>
+          <p class="step-note" style="margin-top:12px;margin-bottom:8px">宿泊希望リストCSV（学生ID／大学名／氏名／性別）</p>
+          <div class="action-row">
+            <button class="act-btn act-btn-ghost" id="btn-prereg-csv-hotel" style="flex:1">⬇ 宿泊リスト</button>
+          </div>
         </div>
       </div>
 
       <!-- 当日登録 -->
-      <div class="section" style="margin-bottom:12px">
+      <div class="section no-fold" style="margin-bottom:12px">
         <div class="section-hd" data-section="walkin">
           <span class="section-title">🚶 当日登録 <span class="section-count" id="walkin-count"></span></span>
           <span class="section-toggle" id="toggle-walkin">▼</span>
@@ -1296,6 +1300,6 @@
 <div class="toast" id="toast"></div>
 <script src="../js/vendor/qrcode.min.js?v=20260724h"></script>
 <script src="../js/config.js?v=20260724h"></script>
-<script src="../js/admin.js?v=20260804b"></script>
+<script src="../js/admin.js?v=20260804c"></script>
 </body>
 </html>

@@ -77,6 +77,7 @@ window.addEventListener('DOMContentLoaded', () => {
   id_('btn-prereg-csv-driver')?.addEventListener('click', () => downloadPreRegCsv_('driver'));
   id_('btn-prereg-csv-spectator')?.addEventListener('click', () => downloadPreRegCsv_('spectator'));
   id_('btn-prereg-csv-all')?.addEventListener('click', () => downloadPreRegCsv_('all'));
+  id_('btn-prereg-csv-hotel')?.addEventListener('click', downloadHotelListCsv_);
   id_('btn-student-qr-csv')?.addEventListener('click', downloadStudentQrCsv_);
 
   // 出展申込ページ
@@ -417,6 +418,35 @@ function downloadPreRegCsv_(kind) {
   const a     = document.createElement('a');
   a.href = url;
   a.download = `QRパス_${label}_${curEvent_}_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// 宿泊希望リストCSV（学生ID／大学名／氏名／性別）。宿泊希望=はい の学生のみ。
+function downloadHotelListCsv_() {
+  const { headers, rows } = preRegData_;
+  if (!headers.length) { showToast_('事前登録データがありません'); return; }
+  const c = n => headers.indexOf(n);
+  const ci = { sid: c('studentId'), school: c('大学名'), name: c('氏名'), gender: c('性別'), hotel: c('宿泊希望') };
+
+  const filtered = rows.filter(r => (r[ci.hotel] || '') === 'はい');
+  if (!filtered.length) { showToast_('宿泊希望の学生がいません'); return; }
+
+  const esc = v => {
+    const s = String(v == null ? '' : v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const head = ['学生ID', '大学名', '氏名', '性別'];
+  const lines = [head.join(',')].concat(filtered.map(r => [
+    r[ci.sid] || '', r[ci.school] || '', r[ci.name] || '', r[ci.gender] || '',
+  ].map(esc).join(',')));
+
+  const csv  = '﻿' + lines.join('\r\n'); // BOM付きでExcel文字化け回避
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `宿泊リスト_${curEvent_}_${new Date().toISOString().slice(0,10)}.csv`;
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
 }
