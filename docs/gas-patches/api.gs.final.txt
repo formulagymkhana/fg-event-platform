@@ -591,10 +591,13 @@ function actionGetCompanyView_(p) {
     ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues()
     : [];
 
+  // STUDENTSは来訪者ごとに読み直さず、1回だけ読んだMapを使い回す(N+1回避)
+  const studentIndex = buildStudentIndex_(p.event);
+
   const visitors = rows
     .filter(r => String(r[1]) === String(p.event) && String(r[3]) === String(company.companyId))
     .map(r => {
-      const s = findStudentById_(r[2], p.event);
+      const s = studentIndex.get(String(r[2]));
       if (!s) return null;
       return {
         name: s.name, furigana: s.furigana, school: s.school,
@@ -626,10 +629,13 @@ function actionGetCompanyStampVisitors_(p) {
     ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).getValues()
     : [];
 
+  // STUDENTSは来訪者ごとに読み直さず、1回だけ読んだMapを使い回す(N+1回避)
+  const studentIndex = buildStudentIndex_(p.event);
+
   const visitors = rows
     .filter(r => String(r[1]) === String(p.event) && String(r[7]) === String(company.companyId))
     .map(r => {
-      const s = findStudentById_(r[2], p.event);
+      const s = studentIndex.get(String(r[2]));
       return {
         name: r[3], school: r[4], category: r[5],
         furigana: s ? s.furigana : '',
@@ -1010,6 +1016,26 @@ function mapStudent_(headers, row) {
     email:      g('メールアドレス'),
     regType:    g('登録種別'),
   };
+}
+
+// STUDENTSシートを1回だけ読み込み、studentId→mapStudent_と同じ形の学生情報を持つ
+// Mapを作る。企業向け一覧（閲覧履歴・スタンプ来訪者）のように、複数行それぞれで
+// findStudentById_を呼ぶとシート全体を毎回読み直すN+1になるため、そのループの前に
+// 1回だけ呼んで使い回す用途の共有ヘルパー。mapStudent_をそのまま使うため、
+// 個別にfindStudentById_した場合と返る形は完全に同一。
+function buildStudentIndex_(eventId) {
+  const map = new Map();
+  const sheet = eventSs_(eventId).getSheetByName(SHEET.STUDENTS);
+  if (!sheet || sheet.getLastRow() < 2) return map;
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const idCol   = headers.indexOf('studentId');
+  if (idCol < 0) return map;
+  data.slice(1).forEach(row => {
+    const sid = String(row[idCol] || '');
+    if (sid) map.set(sid, mapStudent_(headers, row));
+  });
+  return map;
 }
 
 // ============================================================
