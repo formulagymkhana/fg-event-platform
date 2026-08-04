@@ -2161,12 +2161,15 @@ async function loadEntryList_() {
   ];
 
   // 女子ペアリング: 保存済みが女子ドライバーの範囲外なら削除
+  // ⚠ Cヒートは大会によって使わない場合があるが、キー自体は必ず維持すること。
+  //   a/bだけを再構築するとCヒートの値が毎回無条件に消えてしまう不具合があった。
   const womenIds = new Set(preRegAll_
     .filter(r => classOf_(r) === 'W')
     .map(r => r.studentId));
   womenPairings_ = womenPairings_.map(p => ({
     a: womenIds.has(p.a) ? p.a : '',
     b: womenIds.has(p.b) ? p.b : '',
+    c: womenIds.has(p.c) ? p.c : '',
   }));
 
   renderSchoolOrder_();
@@ -2229,7 +2232,7 @@ function bindListPageEvents_() {
   });
   id_('btn-save-order')?.addEventListener('click', saveSchoolOrder_);
   id_('btn-add-women-pair')?.addEventListener('click', () => {
-    womenPairings_.push({ a: '', b: '' });
+    womenPairings_.push({ a: '', b: '', c: '' });
     renderWomenPairs_();
   });
   id_('btn-entry-list-csv')?.addEventListener('click', () => downloadEntryListCsv_());
@@ -2348,11 +2351,11 @@ function renderWomenPairs_() {
     }
   }
 
-  // exclude: 同じペア内の相手側で選択済みの学生を選択肢から除外（自分自身の現在値は残す）
-  const opt = (sel, exclude) => {
+  // excludes: 同じペア内の他ヒートで選択済みの学生を選択肢から除外（自分自身の現在値は残す）
+  const opt = (sel, excludes) => {
     let html = '<option value="">選択</option>';
     womenDrivers.forEach(w => {
-      if (w.studentId === exclude && w.studentId !== sel) return;
+      if (excludes.includes(w.studentId) && w.studentId !== sel) return;
       const label = `${w['大学名'] || ''} / ${w['氏名'] || ''}`;
       const s = w.studentId === sel ? ' selected' : '';
       html += `<option value="${esc_(w.studentId)}"${s}>${esc_(label)}</option>`;
@@ -2361,12 +2364,13 @@ function renderWomenPairs_() {
   };
 
   wrap.innerHTML =
-    `<div class="women-pair-row header"><span></span><span>Aヒート</span><span>Bヒート</span><span></span></div>` +
+    `<div class="women-pair-row header"><span></span><span>Aヒート</span><span>Bヒート</span><span>Cヒート</span><span></span></div>` +
     womenPairings_.map((p, i) => `
       <div class="women-pair-row">
         <span class="women-pair-label">ペア${i + 1}</span>
-        <div class="women-pair-slot"><span class="heat-lbl">A</span><select data-pair="${i}" data-heat="a">${opt(p.a, p.b)}</select></div>
-        <div class="women-pair-slot"><span class="heat-lbl">B</span><select data-pair="${i}" data-heat="b">${opt(p.b, p.a)}</select></div>
+        <div class="women-pair-slot"><span class="heat-lbl">A</span><select data-pair="${i}" data-heat="a">${opt(p.a, [p.b, p.c])}</select></div>
+        <div class="women-pair-slot"><span class="heat-lbl">B</span><select data-pair="${i}" data-heat="b">${opt(p.b, [p.a, p.c])}</select></div>
+        <div class="women-pair-slot"><span class="heat-lbl">C</span><select data-pair="${i}" data-heat="c">${opt(p.c, [p.a, p.b])}</select></div>
         <button class="women-pair-del" data-del="${i}" title="ペアを削除">×</button>
       </div>`).join('');
 
@@ -2409,7 +2413,10 @@ async function saveSchoolOrder_() {
 }
 
 // ── 走行順の計算 ────────────
-// 男子A: 1..N / 女子A: N+1..N+M / 男子B: N+M+1..2N+M / 女子B: 2N+M+1..2N+2M / 男子C: 2N+2M+1..3N+2M
+// 男子A: 1..N / 女子A: N+1..N+M / 男子B: N+M+1..2N+M / 女子B: 2N+M+1..2N+2M /
+// 男子C: 2N+2M+1..3N+2M / 女子C: 3N+2M+1..3N+2M+Mc
+// (Mc=Cヒートが選ばれているペア数。大会によって女子Cを使わない場合は0のままで、
+//  その場合は既存の男子C以前の計算式に一切影響しない)
 function computeRunningOrder_() {
   const N = schoolOrder_.length;
   const M = womenPairings_.length;
@@ -2440,6 +2447,14 @@ function computeRunningOrder_() {
   womenPairings_.forEach((p, i) => {
     if (p.a) byId[p.a] = N + i + 1;
     if (p.b) byId[p.b] = 2 * N + M + i + 1;
+  });
+
+  // 女子Cヒート: Cが選ばれているペアだけ、男子Cの後ろに詰めて連番を振る
+  let cSeq = 0;
+  womenPairings_.forEach(p => {
+    if (!p.c) return;
+    cSeq++;
+    byId[p.c] = 3 * N + 2 * M + cSeq;
   });
 
   return byId;
@@ -2510,15 +2525,16 @@ function buildEntryListRows_(orders) {
   });
 
   // 女子ペア
+  const WOMEN_HEAT_CLS = { a: 'A', b: 'B', c: 'C' };
   womenPairings_.forEach(p => {
-    ['a', 'b'].forEach(k => {
+    ['a', 'b', 'c'].forEach(k => {
       if (!p[k]) return;
       const r = preRegAll_.find(x => x.studentId === p[k]);
       if (!r) return;
       rows.push({
         section: 'women',
         school:    String(r['大学名'] || '').trim(),
-        cls:       k === 'a' ? 'A' : 'B',
+        cls:       WOMEN_HEAT_CLS[k],
         order:     orders[r.studentId] || '',
         studentId: r.studentId,
         name:      r['氏名'] || '',
