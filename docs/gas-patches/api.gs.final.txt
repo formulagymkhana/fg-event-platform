@@ -138,6 +138,7 @@ function dispatch_(e) {
       case 'adminResendWalkInMail': return actionAdminResendWalkInMail_(p);
       case 'adminGetPendingUniversities': return actionAdminGetPendingUniversities_(p);
       case 'adminConfirmUniversity':      return actionAdminConfirmUniversity_(p);
+      case 'adminMergeUniversity':        return actionAdminMergeUniversity_(p);
       case 'adminUpdateStudent':          return actionAdminUpdateStudent_(p);
       case 'adminGetCompanyEntries':      return actionAdminGetCompanyEntries_(p);
       case 'adminUpdateEntry':             return actionAdminUpdateEntry_(p);
@@ -1069,6 +1070,7 @@ function err_(code) {
     event_already_exists:     '同じイベントIDが既に存在します',
     invalid_reading:          '読みの頭文字が判定できません',
     university_not_found:      '対象の大学が見つかりません',
+    same_university:           '統合元と統合先が同じ大学です',
     no_events:             'イベントが1件も登録されていません',
     // 管理者パスワード復旧
     reset_not_requested:   '再設定コードが発行されていません。先にコードを送信してください',
@@ -1774,6 +1776,96 @@ function rewriteStudentUniCode_(oldCode, newCode) {
     });
   });
   return updated;
+}
+
+// 大学名テキストを全シート横断で書き換える（表記ゆれの統合用）。
+// 一覧画面(出走大学リスト等)は studentId ではなく大学名テキストでグルーピングするため、
+// コード書き換え(rewriteStudentUniCode_)だけでは統合が完了しない。
+// 出場校エントリーは studentId を持たないため、ここで学校名列も対象にする。
+function rewriteUniversityName_(oldName, newName) {
+  oldName = String(oldName).trim();
+  newName = String(newName).trim();
+  if (!oldName || !newName || oldName === newName) return 0;
+
+  // シート名 → 大学名を保持する列名
+  var NAME_COLS = {};
+  NAME_COLS[SHEET.STUDENTS]       = '大学名';
+  NAME_COLS[SHEET.PRE_REG]        = '大学名';
+  NAME_COLS[SHEET.SCHOOL_ENTRIES] = '学校名';
+
+  var evSheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+  if (!evSheet || evSheet.getLastRow() < 2) return 0;
+  var evData  = evSheet.getDataRange().getValues();
+  var evIdCol = evData[0].map(String).indexOf('eventId');
+  var updated = 0;
+
+  evData.slice(1).forEach(function (evRow) {
+    var eventId = String(evRow[evIdCol] || '').trim();
+    if (!eventId) return;
+    var ss;
+    try { ss = eventSs_(eventId); } catch (e) { return; }
+
+    Object.keys(NAME_COLS).forEach(function (sheetName) {
+      var sheet = ss.getSheetByName(sheetName);
+      if (!sheet || sheet.getLastRow() < 2) return;
+      var data = sheet.getDataRange().getValues();
+      var col  = data[0].map(String).indexOf(NAME_COLS[sheetName]);
+      if (col < 0) return;
+      for (var i = 1; i < data.length; i++) {
+        if (String(data[i][col] || '').trim() === oldName) {
+          sheet.getRange(i + 1, col + 1).setValue(newName);
+          updated++;
+        }
+      }
+    });
+  });
+  return updated;
+}
+
+// 表記ゆれで生まれた大学を、既存の確定済み大学へ統合する。
+// ⚠ 統合先の判定は一切自動化しない。呼び出し元(管理画面)でスタッフが手動選択した
+//   name(統合元) と target(統合先) をそのまま信頼して実行する。
+function actionAdminMergeUniversity_(p) {
+  var e = validateAdmin_(p);
+  if (e) return e;
+  var name   = String(p.name || '').trim();    // 統合元（表記ゆれ側・消える方）
+  var target = String(p.target || '').trim();  // 統合先（正しい大学名・残る方）
+  if (!name || !target) return err_('missing_params');
+  if (name === target) return err_('same_university');
+
+  var sheet = masterSs_().getSheetByName(SHEET.UNI_MASTER);
+  if (!sheet || sheet.getLastRow() < 2) return err_('university_not_found');
+  var data      = sheet.getDataRange().getValues();
+  var headers   = data[0].map(String);
+  var nameCol   = headers.indexOf('大学名');
+  var codeCol   = headers.indexOf('コード');
+
+  var srcRow = -1, srcCode = '';
+  var dstCode = '';
+  data.slice(1).forEach(function (row, i) {
+    var rowName = String(row[nameCol] || '').trim();
+    var raw  = String(row[codeCol] || '').trim().replace(/[０-９]/g, function(c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); });
+    var code = raw.padStart(4, '0');
+    if (rowName === name)   { srcRow = i + 2; srcCode = code; }
+    if (rowName === target) { dstCode = code; }
+  });
+  if (srcRow < 0 || !dstCode) return err_('university_not_found');
+
+  // 学生ID内の大学コード部を統合先コードへ + 大学名テキストを統合先名へ
+  var rewrittenIds   = (srcCode && srcCode !== dstCode) ? rewriteStudentUniCode_(srcCode, dstCode) : 0;
+  var rewrittenNames = rewriteUniversityName_(name, target);
+
+  // 統合元の行はマスターから削除する。
+  // ⚠ 意図的に「統合した」という記録を残さない。記録を残して次回以降に自動解決させると、
+  //   同じ表記が再入力されたときに人の目に触れないまま同一大学として扱われてしまう
+  //   （大学名テキストは学生の入力値のまま保存されるため、一覧では再び分裂する）。
+  //   記録をヒント表示するだけでも次の判断を引きずるため、痕跡ごと残さない。
+  //   同じ表記が再入力されたら、また承認待ちに上がって毎回ゼロから人が判断する。
+  // 旧仮コードは rewriteStudentUniCode_ で全データから消えているため、
+  // 将来この番号が自動採番で再利用されても衝突しない。
+  sheet.deleteRow(srcRow);
+
+  return ok_({ code: dstCode, rewrittenIds: rewrittenIds, rewrittenNames: rewrittenNames });
 }
 
 // 学生情報を全シート横断で一括修正（氏名/ふりがな/大学名/属性/メールアドレス）

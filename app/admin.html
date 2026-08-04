@@ -159,6 +159,12 @@
     .uni-prev{font-family:monospace;font-size:13px;color:var(--navy-mid);min-width:42px}
     .uni-confirm{flex-shrink:0}
     .uni-done{font-size:14px;font-weight:700;color:var(--fg-success,#1A6640);font-family:monospace}
+    .uni-merge{display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)}
+    .uni-merge-lbl{font-size:11px;color:var(--gray);flex-shrink:0}
+    .uni-merge-sel{flex:1;min-width:0;padding:7px 8px;border:1.5px solid var(--border);border-radius:7px;
+      font-size:13px;color:var(--fg-text);background:#fff}
+    .uni-merge-sel:focus{outline:none;border-color:var(--navy)}
+    .uni-merge-btn{flex-shrink:0}
 
     /* ── Config form ── */
     .cfg-group{margin-bottom:18px}
@@ -1082,7 +1088,7 @@
           <span class="section-toggle" id="toggle-u-pending">▼</span>
         </div>
         <div class="section-body" id="body-u-pending">
-          <p class="step-note" style="margin-top:0;margin-bottom:12px">大学名の最初の一文字をひらがなで入力すると大学IDが自動生成されます。生成された大学IDは大学マスターに自動登録されます。</p>
+          <p class="step-note" style="margin-top:0;margin-bottom:12px">大学名の最初の一文字をひらがなで入力すると大学IDが自動生成されます。生成された大学IDは大学マスターに自動登録されます。<br>表記ゆれ（既に登録済みの大学と同じもの）だった場合は、「既存の大学に統合」から統合先を選んでください。</p>
           <div id="uni-pending-wrap">
             <p style="font-size:12px;color:var(--gray);text-align:center;padding:20px 0">読み込み中...</p>
           </div>
@@ -1290,6 +1296,6 @@
 <div class="toast" id="toast"></div>
 <script src="../js/vendor/qrcode.min.js?v=20260724h"></script>
 <script src="../js/config.js?v=20260724h"></script>
-<script src="../js/admin.js?v=20260803c"></script>
+<script src="../js/admin.js?v=20260803d"></script>
 </body>
 </html>
