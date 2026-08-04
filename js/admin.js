@@ -2351,11 +2351,16 @@ function renderWomenPairs_() {
     }
   }
 
-  // excludes: 同じペア内の他ヒートで選択済みの学生を選択肢から除外（自分自身の現在値は残す）
-  const opt = (sel, excludes) => {
+  // ドライバー1人につき出走枠は1つなので、全ペア横断で既に選ばれている学生を
+  // 選択肢から除外する（同一ペア内の他ヒートだけでなく、別ペアでの重複も禁止）。
+  // 自分自身の現在値だけは残す。
+  const allUsed = new Set();
+  womenPairings_.forEach(p => { [p.a, p.b, p.c].forEach(v => { if (v) allUsed.add(v); }); });
+
+  const opt = sel => {
     let html = '<option value="">選択</option>';
     womenDrivers.forEach(w => {
-      if (excludes.includes(w.studentId) && w.studentId !== sel) return;
+      if (allUsed.has(w.studentId) && w.studentId !== sel) return;
       const label = `${w['大学名'] || ''} / ${w['氏名'] || ''}`;
       const s = w.studentId === sel ? ' selected' : '';
       html += `<option value="${esc_(w.studentId)}"${s}>${esc_(label)}</option>`;
@@ -2368,9 +2373,9 @@ function renderWomenPairs_() {
     womenPairings_.map((p, i) => `
       <div class="women-pair-row">
         <span class="women-pair-label">ペア${i + 1}</span>
-        <div class="women-pair-slot"><span class="heat-lbl">A</span><select data-pair="${i}" data-heat="a">${opt(p.a, [p.b, p.c])}</select></div>
-        <div class="women-pair-slot"><span class="heat-lbl">B</span><select data-pair="${i}" data-heat="b">${opt(p.b, [p.a, p.c])}</select></div>
-        <div class="women-pair-slot"><span class="heat-lbl">C</span><select data-pair="${i}" data-heat="c">${opt(p.c, [p.a, p.b])}</select></div>
+        <div class="women-pair-slot"><span class="heat-lbl">A</span><select data-pair="${i}" data-heat="a">${opt(p.a)}</select></div>
+        <div class="women-pair-slot"><span class="heat-lbl">B</span><select data-pair="${i}" data-heat="b">${opt(p.b)}</select></div>
+        <div class="women-pair-slot"><span class="heat-lbl">C</span><select data-pair="${i}" data-heat="c">${opt(p.c)}</select></div>
         <button class="women-pair-del" data-del="${i}" title="ペアを削除">×</button>
       </div>`).join('');
 
