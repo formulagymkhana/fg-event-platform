@@ -54,7 +54,8 @@ function visitorRow(v) {
     : `<div class="visitor-row">`;
   const close = url ? '</a>' : '</div>';
   const dept = v.department ? ` · ${esc(v.department)}` : '';
-  const yr   = v.year ? ` · ${esc(v.year)}年` : '';
+  // 学年は「大学学部1年生」等それ自体が完結した表記のため「年」を付け足さない
+  const yr   = v.year ? ` · ${esc(v.year)}` : '';
   return `
     ${outer}
       <div class="v-head">
