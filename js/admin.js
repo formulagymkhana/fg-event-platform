@@ -1794,13 +1794,33 @@ async function mergeUniversity_(row) {
   const name   = row.dataset.name;
   const target = row.querySelector('.uni-merge-sel').value;
   if (!target) { showToast_('統合先の大学を選択してください'); return; }
-  if (!window.confirm(`「${name}」を「${target}」に統合します。\n\n` +
-    '・所属学生の大学名と学生IDが統合先のものに書き換わります\n' +
-    '・全イベントが対象です\n' +
-    '・この操作は元に戻せません\n\n実行しますか？')) return;
 
   const btn = row.querySelector('.uni-merge-btn');
-  btn.disabled = true; btn.textContent = '…';
+  btn.disabled = true; btn.textContent = '確認中…';
+
+  // 1段階目: 件数だけ確認（書き込みなし）
+  const dry = await adminCall_('adminMergeUniversity', { event: curEvent_, name, target, dryRun: 'true' });
+  if (!dry.ok) {
+    btn.disabled = false; btn.textContent = '統合';
+    showToast_(dry.message || '確認に失敗しました');
+    return;
+  }
+  const dd = dry.data || {};
+  const confirmMsg = dd.students > 0
+    ? `「${name}」を「${target}」に統合します。\n\n` +
+      `・対象: 学生 ${dd.students}名（${dd.events}イベント）\n` +
+      '・学生IDは統合先の大学コード配下で新規に振り直されます\n' +
+      '・出場校エントリーが両方に提出済みの場合、名称だけ揃えます（重複行は消しません。要手動確認）\n' +
+      '・この操作は元に戻せません\n\n実行しますか？'
+    : `「${name}」に該当する学生が見つかりませんでした（対象0名）。\n` +
+      'それでも大学マスターから統合元を削除しますか？';
+  if (!window.confirm(confirmMsg)) {
+    btn.disabled = false; btn.textContent = '統合';
+    return;
+  }
+
+  // 2段階目: 実行
+  btn.textContent = '…';
   const res = await adminCall_('adminMergeUniversity', { event: curEvent_, name, target });
   if (!res.ok) {
     btn.disabled = false; btn.textContent = '統合';
@@ -1808,7 +1828,8 @@ async function mergeUniversity_(row) {
     return;
   }
   const d = res.data || {};
-  showToast_(`✓ ${name} → ${target}（学生ID ${d.rewrittenIds || 0}件 / 大学名 ${d.rewrittenNames || 0}件を更新）`);
+  const dupNote = d.schoolEntryDup ? '\n⚠ 出場校エントリーに重複行があります。大学管理→出場大学でご確認ください' : '';
+  showToast_(`✓ ${name} → ${target}（学生 ${d.students || 0}名 / ${d.events || 0}イベントを更新）${dupNote}`);
   loadUniversities_();
   updateUniBadge_(loadGen_);
 }
