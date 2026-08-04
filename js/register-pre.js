@@ -167,6 +167,24 @@ document.querySelectorAll('input[name="sService"]').forEach(r =>
     if (no)  no.style.display  = (r.value === 'いいえ' && r.checked) ? 'block' : 'none';
   }));
 
+// 学年「その他」→ 直下の自由記述欄を表示（選び直したら内容とエラーをクリア）
+$('f-year')?.addEventListener('change', () => {
+  const other = $('f-year').value === 'その他';
+  const row = $('row-year-other');
+  if (row) row.style.display = other ? 'block' : 'none';
+  if (!other) {
+    if ($('f-year-other')) $('f-year-other').value = '';
+    setErr('year-other', false);
+  }
+});
+
+// 学年の送信値。「その他」選択時は自由記述の内容をそのまま値にする（接頭辞は付けない）
+function yearValue_() {
+  const v = $('f-year').value;
+  if (v !== 'その他') return v;
+  return $('f-year-other') ? $('f-year-other').value.trim() : '';
+}
+
 // ── ファイル（区分別） ──────────────────────────
 const MAX_FILE  = 10 * 1024 * 1024;  // 1ファイル上限 10MB
 const MAX_TOTAL = 20 * 1024 * 1024;  // 合計上限 20MB（GAS POSTの実用上限・base64膨張を考慮）
@@ -325,7 +343,7 @@ function collect() {
     furigana:   $('f-furigana').value.trim().replace(/　/g, ' '),
     school:     $('f-school').value.trim(),
     department: $('f-department').value.trim(),
-    year:       $('f-year').value,
+    year:       yearValue_(),
     clubYears:  $('f-club-years').value,
     gender:     $('f-gender').value,
     birthday:   $('f-birthday').value,
@@ -349,7 +367,10 @@ function validate(d) {
   fail('furigana',   !NAME_RE.test(d.furigana));
   fail('school',     !(d.school.includes('大学')));
   fail('department', !d.department);
-  fail('year',       !d.year);
+  // 学年は select 自体の未選択と、「その他」選択時の自由記述未入力を分けて判定する
+  const yearSel = $('f-year').value;
+  fail('year',       !yearSel);
+  fail('year-other', yearSel === 'その他' && !d.year);
   fail('club-years', !d.clubYears);
   fail('gender',     !d.gender);
   fail('birthday',   !d.birthday);
