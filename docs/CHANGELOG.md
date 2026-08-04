@@ -31,6 +31,26 @@ GAS はリポジトリ管理外のため、push しても自動反映されま�
 
 ---
 
+## 2026-08-04 企業画面のN+1解消・adminGetConfig重複排除
+
+- 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `js/admin.js`
+- 変更内容: `actionGetCompanyView_`/`actionGetCompanyStampVisitors_`が来訪者ごとにSTUDENTSシート全体を読み直していたN+1を解消（`buildStudentIndex_`で1回だけ読み込み、Mapを使い回す）。管理画面ダッシュボード表示時の`adminGetConfig`二重取得も解消
+- 理由/背景: 表示速度低減（軽量化）の一環。既存の関数構造・キャッシュ設計（`EVENT_SS_CACHE_`、`fg_event_id`のlocalStorageキャッシュ）には触れていない
+- GAS: **再デプロイ必須（実施済み）**
+
+---
+
+## 2026-08-04 表記ゆれ大学の手動統合機能を追加
+
+- 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `js/admin.js`, `app/admin.html`
+- 変更内容: 承認待ち大学（自動割当の仮コード）を、既存の確定済み大学へスタッフが手動で統合できる機能を追加。studentIdの大学コード部分・大学名テキストを、学生マスター/事前登録/QR閲覧ログ/スタンプログ/スタンプ参加者/景品交換ログ/womenPairings/schoolRunningOrder/出場校エントリーの全箇所で追従させる
+- 設計: 大学統合履歴シート（新規）に「イベント単位の旧ID→新ID対応表」を先に永続化してから実データを書き換える、再開可能な設計。途中で失敗しても、同じ統合元/統合先で再度実行すれば自動的に続きから再開する。類似度判定・候補の自動サジェストは一切実装していない（統合するかどうかの判断は常にスタッフが個別に行う）
+- 経緯: 4回の外部レビューを経て、studentId衝突・対応表消失・接続先漏れ・統合先分裂・走行順重複等のP0/P1級の欠陥を段階的に修正した（詳細は`git log`参照）。実データでの実行検証はまだ（`docs/NOTES.md`参照）
+- GAS: **再デプロイ必須（実施済み）**
+- 申し送り: `actionAdminConfirmUniversity_`（未登録大学の確定フロー）には同種の脆弱性が未対応のまま残っている（`docs/NOTES.md`参照）
+
+---
+
 ## 2026-08-03 学生カード企業名表示・食券集計の不具合修正
 
 - 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `js/card.js`, `app/card.html`
