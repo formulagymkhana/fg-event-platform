@@ -1798,8 +1798,9 @@ async function mergeUniversity_(row) {
   const btn = row.querySelector('.uni-merge-btn');
   btn.disabled = true; btn.textContent = '確認中…';
 
-  // 1段階目: 件数だけ確認（書き込みなし）
-  const dry = await adminCall_('adminMergeUniversity', { event: curEvent_, name, target, dryRun: 'true' });
+  // 1段階目: 件数だけ確認（書き込みなし・専用アクション。
+  // 旧GASに未反映の場合はここで unknown_action として安全に失敗する）
+  const dry = await adminCall_('adminPreviewUniversityMerge', { name, target });
   if (!dry.ok) {
     btn.disabled = false; btn.textContent = '統合';
     showToast_(dry.message || '確認に失敗しました');
@@ -1819,15 +1820,22 @@ async function mergeUniversity_(row) {
     return;
   }
 
-  // 2段階目: 実行
+  // 2段階目: 実行（途中で失敗しても、同じ組み合わせで再度「統合」を押せば
+  // サーバー側が自動的に前回の続きから再開する）
   btn.textContent = '…';
-  const res = await adminCall_('adminMergeUniversity', { event: curEvent_, name, target });
+  const res = await adminCall_('adminMergeUniversity', { name, target });
   if (!res.ok) {
     btn.disabled = false; btn.textContent = '統合';
     showToast_(res.message || '統合に失敗しました');
     return;
   }
   const d = res.data || {};
+  if (d.needsReview) {
+    btn.disabled = false; btn.textContent = '統合（再開）';
+    showToast_(`⚠ 一部のイベントで接続に失敗し中断しました（学生 ${d.students || 0}名 / ${d.events || 0}イベントは完了）。\n` +
+      'もう一度「統合」を押すと続きから再開します。解決しない場合は大学統合履歴シートをご確認ください。');
+    return;
+  }
   const dupNote = d.schoolEntryDup ? '\n⚠ 出場校エントリーに重複行があります。大学管理→出場大学でご確認ください' : '';
   showToast_(`✓ ${name} → ${target}（学生 ${d.students || 0}名 / ${d.events || 0}イベントを更新）${dupNote}`);
   loadUniversities_();

@@ -26,6 +26,7 @@ const SHEET = {
   PRE_REG:            '事前登録',
   COMPANY_ENTRIES:    '出展申込',
   SCHOOL_ENTRIES:     '出場校エントリー',
+  MERGE_HISTORY:      '大学統合履歴',
 };
 
 // 出場校エントリーの列（重複時は同名の学校を上書き。承諾書履歴は改行区切りで蓄積）
@@ -138,6 +139,7 @@ function dispatch_(e) {
       case 'adminResendWalkInMail': return actionAdminResendWalkInMail_(p);
       case 'adminGetPendingUniversities': return actionAdminGetPendingUniversities_(p);
       case 'adminConfirmUniversity':      return actionAdminConfirmUniversity_(p);
+      case 'adminPreviewUniversityMerge': return actionAdminPreviewUniversityMerge_(p);
       case 'adminMergeUniversity':        return actionAdminMergeUniversity_(p);
       case 'adminUpdateStudent':          return actionAdminUpdateStudent_(p);
       case 'adminGetCompanyEntries':      return actionAdminGetCompanyEntries_(p);
@@ -1072,6 +1074,7 @@ function err_(code) {
     university_not_found:      '対象の大学が見つかりません',
     same_university:           '統合元と統合先が同じ大学です',
     target_not_confirmed:      '統合先が確定済みの大学ではありません',
+    source_already_confirmed:  '統合元は既に確定済みです（他の操作と競合した可能性があります）',
     locked:                    '他の処理が進行中です。しばらくしてから再度お試しください',
     no_events:             'イベントが1件も登録されていません',
     // 管理者パスワード復旧
@@ -1780,11 +1783,87 @@ function rewriteStudentUniCode_(oldCode, newCode) {
   return updated;
 }
 
-// 指定イベント内で、統合元大学(oldName)に属する学生に、統合先大学コード(newCode)配下の
-// 新しいstudentIdを割り当てる。西暦・クラス文字は維持し、連番だけ振り直す
-// （統合先に既存の学生がいても衝突しない。統合対象が複数人いる場合の内部衝突も避ける）。
+// 大学マスターを読み、統合元(name)・統合先(target)の行情報をまとめて返す。
+// ロック取得後に必ず呼び直すこと（直前に読んだ状態を信頼しない＝P0-2対策）。
+function findMergeUniversityRows_(name, target) {
+  var sheet = masterSs_().getSheetByName(SHEET.UNI_MASTER);
+  if (!sheet || sheet.getLastRow() < 2) return { found: false };
+  var data      = sheet.getDataRange().getValues();
+  var headers   = data[0].map(String);
+  var nameCol   = headers.indexOf('大学名');
+  var codeCol   = headers.indexOf('コード');
+  var statusCol = headers.indexOf('状態');
+
+  var srcRow = -1, srcStatus = '', dstCode = '', dstStatus = '';
+  data.slice(1).forEach(function (row, i) {
+    var rowName = String(row[nameCol] || '').trim();
+    if (rowName === name) {
+      srcRow    = i + 2;
+      srcStatus = statusCol >= 0 ? String(row[statusCol] || '').trim() : '';
+    }
+    if (rowName === target) {
+      var raw = String(row[codeCol] || '').trim().replace(/[０-９]/g, function(c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); });
+      dstCode   = raw.padStart(4, '0');
+      dstStatus = statusCol >= 0 ? String(row[statusCol] || '').trim() : '';
+    }
+  });
+  if (srcRow < 0 || !dstCode) return { found: false };
+  return { found: true, sheet: sheet, srcRow: srcRow, srcStatus: srcStatus, dstCode: dstCode, dstStatus: dstStatus };
+}
+
+// ============================================================
+// 大学統合履歴（再開可能な統合処理のための永続化）
+// ============================================================
+
+function getMergeHistorySheet_() {
+  var sheet = masterSs_().getSheetByName(SHEET.MERGE_HISTORY);
+  if (!sheet) {
+    sheet = masterSs_().insertSheet(SHEET.MERGE_HISTORY);
+    sheet.getRange(1, 1, 1, 7).setValues([['operationId', '統合元', '統合先', 'eventId', '状態', '対応表', '更新時刻']]);
+    formatHeaderRow_(sheet);
+  }
+  return sheet;
+}
+
+function findMergeHistoryRow_(sheet, operationId, eventId) {
+  if (sheet.getLastRow() < 2) return -1;
+  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues();
+  for (var i = 0; i < data.length; i++) {
+    if (String(data[i][0]) === operationId && String(data[i][3]) === eventId) return i + 2;
+  }
+  return -1;
+}
+
+function upsertMergeHistory_(sheet, operationId, name, target, eventId, status, mapJson) {
+  var row = findMergeHistoryRow_(sheet, operationId, eventId);
+  var values = [[operationId, name, target, eventId, status, mapJson || '', new Date()]];
+  if (row < 0) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, 1, 7).setValues(values);
+  } else {
+    sheet.getRange(row, 1, 1, 7).setValues(values);
+  }
+}
+
+// 同じ統合元/統合先の組み合わせで、まだ完了していない operationId が無いか探す。
+// 見つかればそれを使い続けることで、UI側にIDを持たせなくても「統合」を再度押すだけで
+// 自動的に前回の続きから再開できる（見つからなければ新しい operationId を発行する）。
+function findActiveMergeOperation_(historySheet, name, target) {
+  if (historySheet.getLastRow() < 2) return '';
+  var data = historySheet.getRange(2, 1, historySheet.getLastRow() - 1, 5).getValues();
+  for (var i = data.length - 1; i >= 0; i--) {
+    if (String(data[i][1]) === name && String(data[i][2]) === target &&
+        (String(data[i][4]) === '処理中' || String(data[i][4]) === '要確認')) {
+      return String(data[i][0]);
+    }
+  }
+  return '';
+}
+
+// 指定イベントの学生マスターを見て、統合元大学(oldName)に属する学生に、
+// 統合先大学コード(newCode)配下の新しいstudentIdを割り当てる。
+// 西暦・クラス文字は維持し、連番だけ振り直す（統合先に既存の学生がいても衝突しない）。
 // 戻り値: { 旧studentId: 新studentId, ... }
-function reassignStudentIds_(ss, oldName, newCode) {
+function buildUniMergeIdMap_(ss, oldName, newCode) {
   var map = {};
   var sheet = ss.getSheetByName(SHEET.STUDENTS);
   if (!sheet || sheet.getLastRow() < 2) return map;
@@ -1794,7 +1873,6 @@ function reassignStudentIds_(ss, oldName, newCode) {
   var nameCol = headers.indexOf('大学名');
   if (sidCol < 0 || nameCol < 0) return map;
 
-  // 統合先コード配下、プレフィクス(西暦1+コード4+クラス1)ごとの現在の最大連番を把握
   var maxSeq = {};
   for (var i = 1; i < data.length; i++) {
     var sid = String(data[i][sidCol] || '');
@@ -1803,7 +1881,6 @@ function reassignStudentIds_(ss, oldName, newCode) {
     var seq    = Number(sid.substring(6)) || 0;
     if (!maxSeq[prefix] || seq > maxSeq[prefix]) maxSeq[prefix] = seq;
   }
-
   for (var i = 1; i < data.length; i++) {
     if (String(data[i][nameCol] || '').trim() !== oldName) continue;
     var oldSid = String(data[i][sidCol] || '');
@@ -1817,27 +1894,32 @@ function reassignStudentIds_(ss, oldName, newCode) {
 }
 
 // 指定シートに対し、studentId をマップに従って書き換え、大学名テキストも統合先へ書き換える。
-// (大学名列を持たないシート＝スタンプ参加者/景品交換ログでは studentId のみ書き換える)
-function applyStudentIdMap_(ss, sheetName, idMap, oldName, newName) {
+// シート単位で一括読み込み・一括書き込みする（セル単位のAPI呼び出しを避けてロック保持時間を縮める）。
+// マップに無い(既に書き換え済みの)行は自然にスキップされるため、この関数自体が
+// 再実行しても安全＝冪等になっている。
+function applyUniMergeToSheet_(ss, sheetName, idMap, oldName, newName) {
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet || sheet.getLastRow() < 2) return 0;
-  var data    = sheet.getDataRange().getValues();
+  var range   = sheet.getDataRange();
+  var data    = range.getValues();
   var headers = data[0].map(String);
   var sidCol  = headers.indexOf('studentId');
   var nameCol = headers.indexOf('大学名');
+  if (sidCol < 0 && nameCol < 0) return 0;
   var updated = 0;
   for (var i = 1; i < data.length; i++) {
     var changed = false;
     if (sidCol >= 0) {
       var newSid = idMap[String(data[i][sidCol] || '')];
-      if (newSid) { sheet.getRange(i + 1, sidCol + 1).setValue("'" + newSid); changed = true; }
+      if (newSid) { data[i][sidCol] = "'" + newSid; changed = true; }
     }
     if (nameCol >= 0 && String(data[i][nameCol] || '').trim() === oldName) {
-      sheet.getRange(i + 1, nameCol + 1).setValue(newName);
+      data[i][nameCol] = newName;
       changed = true;
     }
     if (changed) updated++;
   }
+  if (updated > 0) range.setValues(data);
   return updated;
 }
 
@@ -1866,71 +1948,112 @@ function reconcileSchoolEntry_(ss, oldName, newName) {
   return alreadyHasTarget; // true = 重複が発生した(要手動確認)
 }
 
-// アクティブイベントの女子ペアリング設定(CONFIG.womenPairings, JSON)を、
-// studentId変更に追従させる。過去イベントのCONFIGは対象外（運用上編集されないため）。
-function remapWomenPairingsConfig_(ss, idMap) {
-  if (!Object.keys(idMap).length) return;
+// 対象イベントのCONFIGを更新する。womenPairings(studentId)は新IDへ、
+// schoolRunningOrder(大学名)は統合先名へ、それぞれ位置を保ったまま追従させる。
+function applyUniMergeToConfig_(ss, idMap, oldName, newName) {
   var sheet = ss.getSheetByName(SHEET.CONFIG);
   if (!sheet || sheet.getLastRow() < 1) return;
   var data = sheet.getDataRange().getValues();
   for (var i = 0; i < data.length; i++) {
-    if (String(data[i][0]) !== 'womenPairings') continue;
-    var raw = String(data[i][1] || '');
-    if (!raw) return;
-    var arr;
-    try { arr = JSON.parse(raw); } catch (err) { return; }
-    if (!Array.isArray(arr)) return;
-    var changed = false;
-    arr.forEach(function (pair) {
-      if (!pair) return;
-      if (idMap[pair.a]) { pair.a = idMap[pair.a]; changed = true; }
-      if (idMap[pair.b]) { pair.b = idMap[pair.b]; changed = true; }
-    });
-    if (changed) sheet.getRange(i + 1, 2).setValue(JSON.stringify(arr));
-    return;
+    var key = String(data[i][0]);
+    if (key === 'womenPairings' && Object.keys(idMap).length) {
+      var raw = String(data[i][1] || '');
+      if (!raw) continue;
+      try {
+        var arr = JSON.parse(raw);
+        if (!Array.isArray(arr)) continue;
+        var changed = false;
+        arr.forEach(function (pair) {
+          if (!pair) return;
+          if (idMap[pair.a]) { pair.a = idMap[pair.a]; changed = true; }
+          if (idMap[pair.b]) { pair.b = idMap[pair.b]; changed = true; }
+        });
+        if (changed) sheet.getRange(i + 1, 2).setValue(JSON.stringify(arr));
+      } catch (err) { /* 壊れたJSONは触らない */ }
+    }
+    if (key === 'schoolRunningOrder') {
+      var raw2 = String(data[i][1] || '');
+      if (!raw2) continue;
+      try {
+        var arr2 = JSON.parse(raw2);
+        if (!Array.isArray(arr2)) continue;
+        var idx = arr2.indexOf(oldName);
+        if (idx >= 0) { arr2[idx] = newName; sheet.getRange(i + 1, 2).setValue(JSON.stringify(arr2)); }
+      } catch (err) { /* 壊れたJSONは触らない */ }
+    }
   }
+}
+
+// 統合の影響件数だけを確認する（書き込み・ロックともに一切行わない）。
+// ⚠ 旧GASにはこのアクション自体が存在しないため、フロントが新しいプレビューの
+//   仕組みを前提にしていても、旧GASでは unknown_action で安全に停止する
+//   （dryRunフラグを旧GASの実処理アクションへ渡して無視される事故を防ぐため、
+//   意図的に別アクション名にしている＝P0-1対策）。
+function actionAdminPreviewUniversityMerge_(p) {
+  var e = validateAdmin_(p);
+  if (e) return e;
+  var name   = String(p.name || '').trim();
+  var target = String(p.target || '').trim();
+  if (!name || !target) return err_('missing_params');
+  if (name === target) return err_('same_university');
+
+  var uni = findMergeUniversityRows_(name, target);
+  if (!uni.found) return err_('university_not_found');
+  if (uni.dstStatus !== '確定') return err_('target_not_confirmed');
+
+  var evSheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+  if (!evSheet || evSheet.getLastRow() < 2) return ok_({ students: 0, events: 0 });
+  var evData  = evSheet.getDataRange().getValues();
+  var evIdCol = evData[0].map(String).indexOf('eventId');
+
+  var totalStudents = 0, affectedEvents = 0;
+  evData.slice(1).forEach(function (evRow) {
+    var eventId = String(evRow[evIdCol] || '').trim();
+    if (!eventId || isEventInactive_(eventId)) return; // 非アクティブは対象外(件数にも数えない・仕様)
+    var ss;
+    try { ss = eventSs_(eventId); } catch (err) { return; }
+    var idMap = buildUniMergeIdMap_(ss, name, uni.dstCode);
+    var n = Object.keys(idMap).length;
+    if (n > 0) { totalStudents += n; affectedEvents++; }
+  });
+  return ok_({ students: totalStudents, events: affectedEvents });
 }
 
 // 表記ゆれで生まれた大学を、既存の確定済み大学へ統合する。
 // ⚠ 統合先の判定は一切自動化しない。呼び出し元(管理画面)でスタッフが手動選択した
 //   name(統合元) と target(統合先) をそのまま信頼して実行する（サーバー側では
-//   target が確定済みであることのみ検証する）。
-// p.dryRun === 'true' の場合は書き込みを一切行わず、影響件数だけを返す。
+//   統合元が未確定・統合先が確定済みであることを、ロック取得後に再検証する）。
+//
+// 再開可能な設計:
+//   1. イベント単位の「旧ID→新ID対応表」を大学統合履歴シートへ先に永続化してから、
+//      実際のデータシートを書き換える。
+//   2. 途中で失敗しても、同じ統合元/統合先で再度「統合」を実行すれば、既に完了した
+//      イベントは自動でスキップし、未完了のイベントだけ保存済みの対応表で再開する
+//      （対応表は初回生成時に固定するため、再実行しても同じ新IDになる）。
+//   3. 全イベントが完了（または非アクティブとして対象外）して初めて、大学マスターから
+//      統合元を削除する。接続例外が1件でも残っていれば、統合元は消さずに残す。
+//   4. 非アクティブなイベントは意図的に対象外とする（仕様。CLAUDE.md参照）。
+//      接続できないだけの「要確認」とは区別して記録する。
 function actionAdminMergeUniversity_(p) {
   var e = validateAdmin_(p);
   if (e) return e;
-  var name   = String(p.name || '').trim();    // 統合元（表記ゆれ側・消える方）
-  var target = String(p.target || '').trim();  // 統合先（正しい大学名・残る方）
+  var name   = String(p.name || '').trim();
+  var target = String(p.target || '').trim();
   if (!name || !target) return err_('missing_params');
-  if (!p.event) return err_('missing_event');
   if (name === target) return err_('same_university');
-
-  var uniSheet = masterSs_().getSheetByName(SHEET.UNI_MASTER);
-  if (!uniSheet || uniSheet.getLastRow() < 2) return err_('university_not_found');
-  var uData    = uniSheet.getDataRange().getValues();
-  var uHeaders = uData[0].map(String);
-  var nameCol  = uHeaders.indexOf('大学名');
-  var codeCol  = uHeaders.indexOf('コード');
-  var statusCol = uHeaders.indexOf('状態');
-
-  var srcRow = -1, dstCode = '', dstStatus = '';
-  uData.slice(1).forEach(function (row, i) {
-    var rowName = String(row[nameCol] || '').trim();
-    if (rowName === name) srcRow = i + 2;
-    if (rowName === target) {
-      var raw = String(row[codeCol] || '').trim().replace(/[０-９]/g, function(c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); });
-      dstCode = raw.padStart(4, '0');
-      dstStatus = statusCol >= 0 ? String(row[statusCol] || '').trim() : '';
-    }
-  });
-  if (srcRow < 0 || !dstCode) return err_('university_not_found');
-  if (dstStatus !== '確定') return err_('target_not_confirmed'); // クライアント側の絞り込みに加えサーバー側でも検証
-
-  var dryRun = String(p.dryRun) === 'true';
 
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) return err_('locked');
   try {
+    // ロック取得後に必ず再読込する（判定とロックの間に他の操作が割り込む余地を無くす＝P0-2対策）
+    var uni = findMergeUniversityRows_(name, target);
+    if (!uni.found) return err_('university_not_found');
+    if (uni.srcStatus === '確定') return err_('source_already_confirmed'); // P2-8対策
+    if (uni.dstStatus !== '確定') return err_('target_not_confirmed');
+
+    var historySheet = getMergeHistorySheet_();
+    var operationId  = findActiveMergeOperation_(historySheet, name, target) || Utilities.getUuid();
+
     var evSheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
     if (!evSheet || evSheet.getLastRow() < 2) return err_('no_events');
     var evData  = evSheet.getDataRange().getValues();
@@ -1938,41 +2061,77 @@ function actionAdminMergeUniversity_(p) {
 
     var totalStudents  = 0;
     var affectedEvents = 0;
-    var schoolEntryDup = false; // 出場校エントリーで重複が生じたら true（要手動確認）
+    var needsReview    = false; // 接続例外が1件でもあれば true（統合元を消さず残す）
+    var schoolEntryDup = false;
 
     evData.slice(1).forEach(function (evRow) {
       var eventId = String(evRow[evIdCol] || '').trim();
       if (!eventId) return;
-      var ss;
-      try { ss = eventSs_(eventId); } catch (err) { return; }
 
-      var idMap = reassignStudentIds_(ss, name, dstCode);
+      if (isEventInactive_(eventId)) {
+        upsertMergeHistory_(historySheet, operationId, name, target, eventId, '対象外', '');
+        return;
+      }
+
+      var existingRow    = findMergeHistoryRow_(historySheet, operationId, eventId);
+      var existingStatus = existingRow > 0 ? String(historySheet.getRange(existingRow, 5).getValue()) : '';
+      if (existingStatus === '完了') return; // 再実行時は完了済みイベントをスキップ
+
+      var ss;
+      try { ss = eventSs_(eventId); } catch (err) {
+        upsertMergeHistory_(historySheet, operationId, name, target, eventId, '要確認', '');
+        needsReview = true;
+        return;
+      }
+
+      // 対応表は初回生成時に確定して保存し、再実行時は保存済みのものをそのまま使う
+      // （同じ新IDで再開するため。再計算すると人数変動時に新IDがずれる可能性がある）
+      var idMap;
+      if (existingStatus === '処理中' && existingRow > 0) {
+        var savedJson = String(historySheet.getRange(existingRow, 6).getValue() || '');
+        try { idMap = JSON.parse(savedJson) || {}; } catch (err2) { idMap = {}; }
+      } else {
+        idMap = buildUniMergeIdMap_(ss, name, uni.dstCode);
+        upsertMergeHistory_(historySheet, operationId, name, target, eventId, '処理中', JSON.stringify(idMap));
+      }
+
       var n = Object.keys(idMap).length;
       if (n > 0) affectedEvents++;
       totalStudents += n;
 
-      if (dryRun) return; // 集計のみ。書き込みはしない
-
-      applyStudentIdMap_(ss, SHEET.STUDENTS,           idMap, name, target);
-      applyStudentIdMap_(ss, SHEET.PRE_REG,            idMap, name, target);
-      applyStudentIdMap_(ss, SHEET.STAMP_LOG,          idMap, name, target);
-      applyStudentIdMap_(ss, SHEET.STAMP_PARTICIPANTS, idMap, name, target);
-      applyStudentIdMap_(ss, SHEET.PRIZE_LOG,          idMap, name, target);
+      // 学生マスターは最後に書き換える。途中で失敗しても、学生マスターに残る
+      // 旧ID・旧大学名から対応表を再現できるようにするため（ただし対応表自体は
+      // 既に大学統合履歴へ保存済みなので、実際にはそちらを使って再開する）。
+      applyUniMergeToSheet_(ss, SHEET.PRE_REG,            idMap, name, target);
+      applyUniMergeToSheet_(ss, SHEET.VIEW_LOG,           idMap, name, target);
+      applyUniMergeToSheet_(ss, SHEET.STAMP_LOG,          idMap, name, target);
+      applyUniMergeToSheet_(ss, SHEET.STAMP_PARTICIPANTS, idMap, name, target);
+      applyUniMergeToSheet_(ss, SHEET.PRIZE_LOG,          idMap, name, target);
       if (reconcileSchoolEntry_(ss, name, target)) schoolEntryDup = true;
+      applyUniMergeToConfig_(ss, idMap, name, target);
+      applyUniMergeToSheet_(ss, SHEET.STUDENTS,           idMap, name, target);
 
-      if (eventId === p.event) remapWomenPairingsConfig_(ss, idMap);
+      upsertMergeHistory_(historySheet, operationId, name, target, eventId, '完了', JSON.stringify(idMap));
     });
 
-    if (dryRun) return ok_({ dryRun: true, students: totalStudents, events: affectedEvents });
+    if (needsReview) {
+      return ok_({
+        students: totalStudents, events: affectedEvents,
+        schoolEntryDup: schoolEntryDup, needsReview: true,
+      });
+    }
 
-    // 統合元の行はマスターから削除する。
+    // 全イベントが完了（または非アクティブとして対象外）して初めて、統合元を削除する。
     // ⚠ 意図的に「統合した」という記録を残さない。記録を残して次回以降に自動解決させると、
-    //   同じ表記が再入力されたときに人の目に触れないまま同一大学として扱われてしまう
-    //   （大学名テキストは学生の入力値のまま保存されるため、一覧では再び分裂する）。
+    //   同じ表記が再入力されたときに人の目に触れないまま同一大学として扱われてしまう。
     //   同じ表記が再入力されたら、また承認待ちに上がって毎回ゼロから人が判断する。
-    uniSheet.deleteRow(srcRow);
+    var fresh = findMergeUniversityRows_(name, target); // 削除直前に行番号を再取得（P0-2対策）
+    if (fresh.found) fresh.sheet.deleteRow(fresh.srcRow);
 
-    return ok_({ students: totalStudents, events: affectedEvents, schoolEntryDup: schoolEntryDup });
+    return ok_({
+      students: totalStudents, events: affectedEvents,
+      schoolEntryDup: schoolEntryDup, needsReview: false,
+    });
   } finally {
     lock.releaseLock();
   }
