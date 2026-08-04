@@ -522,7 +522,7 @@ async function loadPrizeLog_(gen, ev) {
 
 // ── Config ────────────────────────────────────────
 async function loadConfig_(gen, ev) {
-  const res = await adminCall_('adminGetConfig', { event: ev });
+  const res = await adminGetConfigDeduped_(ev);
   if (gen !== loadGen_) return;
   if (!res.ok) return;
   const cfg = res.data.config || {};
@@ -1331,7 +1331,7 @@ async function loadEventInfo_() {
   if (sel) sel.value = (ev.status === '公開停止' || ev.status === '完了') ? '公開停止' : '公開中';
 
   // CONFIGからstampStartAt/stampEndAt/exchangeDeadlineを取得して datetime 入力を埋める
-  const cfgRes = await adminCall_('adminGetConfig', { event: curEvent_ });
+  const cfgRes = await adminGetConfigDeduped_(curEvent_);
   const cfg = cfgRes.ok ? (cfgRes.data.config || {}) : {};
   setVal_('edit-start-datetime',    toDtLocal_(cfg.stampStartAt)    || dateToDtLocal_(ev.startDate));
   setVal_('edit-end-datetime',      toDtLocal_(cfg.stampEndAt)      || dateToDtLocal_(ev.endDate));
@@ -1488,6 +1488,20 @@ async function adminCall_(action, params) {
     if (e.name === 'AbortError') return { ok: false, error: 'timeout', message: 'タイムアウト' };
     return { ok: false, error: 'network_error', message: '通信エラー' };
   }
+}
+
+// adminGetConfig専用の重複排除。ダッシュボード表示時、loadEventInfo_とloadAll_(→loadConfig_)が
+// ほぼ同時に同じイベントのCONFIGを取得しているため、直近の通信を短時間だけ使い回す。
+// 呼び出し側の処理内容・世代管理(loadGen_)には一切手を入れず、通信そのものだけを共有する。
+let _configCall_ = null; // { event, promise, ts }
+function adminGetConfigDeduped_(event) {
+  const now = Date.now();
+  if (_configCall_ && _configCall_.event === event && (now - _configCall_.ts) < 2000) {
+    return _configCall_.promise;
+  }
+  const promise = adminCall_('adminGetConfig', { event });
+  _configCall_ = { event, promise, ts: now };
+  return promise;
 }
 
 // ── UI helpers ────────────────────────────────────
@@ -2124,7 +2138,7 @@ async function loadEntryList_() {
 
   const [preRes, cfgRes] = await Promise.all([
     adminCall_('adminGetPreRegistrations', { event: curEvent_ }),
-    adminCall_('adminGetConfig',           { event: curEvent_ }),
+    adminGetConfigDeduped_(curEvent_),
   ]);
   entryListLoading_ = false;
   if (gen !== loadGen_) return;
@@ -2163,7 +2177,7 @@ async function loadReceptionList_() {
 
   const [preRes, cfgRes] = await Promise.all([
     adminCall_('adminGetPreRegistrations', { event: curEvent_ }),
-    adminCall_('adminGetConfig',           { event: curEvent_ }),
+    adminGetConfigDeduped_(curEvent_),
   ]);
   if (gen !== loadGen_) return;
   if (!preRes.ok) { showListErr_('reception-list-wrap', preRes); return; }
