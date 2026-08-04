@@ -164,15 +164,21 @@
                 <option>大学学部1年生</option><option>大学学部2年生</option>
                 <option>大学学部3年生</option><option>大学学部4年生</option>
               </optgroup>
-              <optgroup label="短期大学">
-                <option>短期大学1年生</option><option>短期大学2年生</option><option>短期大学3年生</option>
+              <optgroup label="短期大学/専門学校">
+                <option>短期大学/専門学校1年生</option><option>短期大学/専門学校2年生</option>
+                <option>短期大学/専門学校3年生</option><option>短期大学/専門学校4年生</option>
               </optgroup>
               <optgroup label="自動車大学校">
                 <option>自動車大学校1年生</option><option>自動車大学校2年生</option>
                 <option>自動車大学校3年生</option><option>自動車大学校4年生</option>
               </optgroup>
+              <option>その他</option>
             </select>
             <p class="field-err" id="err-year">選択してください</p>
+            <div id="row-year-other" style="display:none;margin-top:6px">
+              <input type="text" id="f-year-other" placeholder="例：高等専門学校専攻科2年" maxlength="30">
+              <p class="field-err" id="err-year-other">学年を入力してください</p>
+            </div>
           </div>
         </div>
         <div class="form-row">
@@ -602,6 +608,6 @@
 
   <script src="../js/config.js?v=20260728a"></script>
   <script src="../js/api.js?v=20260728a"></script>
-  <script src="../js/register-pre.js?v=20260728d"></script>
+  <script src="../js/register-pre.js?v=20260803a"></script>
 </body>
 </html>
