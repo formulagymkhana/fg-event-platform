@@ -1071,6 +1071,8 @@ function err_(code) {
     invalid_reading:          '読みの頭文字が判定できません',
     university_not_found:      '対象の大学が見つかりません',
     same_university:           '統合元と統合先が同じ大学です',
+    target_not_confirmed:      '統合先が確定済みの大学ではありません',
+    locked:                    '他の処理が進行中です。しばらくしてから再度お試しください',
     no_events:             'イベントが1件も登録されていません',
     // 管理者パスワード復旧
     reset_not_requested:   '再設定コードが発行されていません。先にコードを送信してください',
@@ -1778,94 +1780,202 @@ function rewriteStudentUniCode_(oldCode, newCode) {
   return updated;
 }
 
-// 大学名テキストを全シート横断で書き換える（表記ゆれの統合用）。
-// 一覧画面(出走大学リスト等)は studentId ではなく大学名テキストでグルーピングするため、
-// コード書き換え(rewriteStudentUniCode_)だけでは統合が完了しない。
-// 出場校エントリーは studentId を持たないため、ここで学校名列も対象にする。
-function rewriteUniversityName_(oldName, newName) {
-  oldName = String(oldName).trim();
-  newName = String(newName).trim();
-  if (!oldName || !newName || oldName === newName) return 0;
+// 指定イベント内で、統合元大学(oldName)に属する学生に、統合先大学コード(newCode)配下の
+// 新しいstudentIdを割り当てる。西暦・クラス文字は維持し、連番だけ振り直す
+// （統合先に既存の学生がいても衝突しない。統合対象が複数人いる場合の内部衝突も避ける）。
+// 戻り値: { 旧studentId: 新studentId, ... }
+function reassignStudentIds_(ss, oldName, newCode) {
+  var map = {};
+  var sheet = ss.getSheetByName(SHEET.STUDENTS);
+  if (!sheet || sheet.getLastRow() < 2) return map;
+  var data    = sheet.getDataRange().getValues();
+  var headers = data[0].map(String);
+  var sidCol  = headers.indexOf('studentId');
+  var nameCol = headers.indexOf('大学名');
+  if (sidCol < 0 || nameCol < 0) return map;
 
-  // シート名 → 大学名を保持する列名
-  var NAME_COLS = {};
-  NAME_COLS[SHEET.STUDENTS]       = '大学名';
-  NAME_COLS[SHEET.PRE_REG]        = '大学名';
-  NAME_COLS[SHEET.SCHOOL_ENTRIES] = '学校名';
+  // 統合先コード配下、プレフィクス(西暦1+コード4+クラス1)ごとの現在の最大連番を把握
+  var maxSeq = {};
+  for (var i = 1; i < data.length; i++) {
+    var sid = String(data[i][sidCol] || '');
+    if (sid.length < 8 || sid.substring(1, 5) !== newCode) continue;
+    var prefix = sid.substring(0, 6);
+    var seq    = Number(sid.substring(6)) || 0;
+    if (!maxSeq[prefix] || seq > maxSeq[prefix]) maxSeq[prefix] = seq;
+  }
 
-  var evSheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
-  if (!evSheet || evSheet.getLastRow() < 2) return 0;
-  var evData  = evSheet.getDataRange().getValues();
-  var evIdCol = evData[0].map(String).indexOf('eventId');
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][nameCol] || '').trim() !== oldName) continue;
+    var oldSid = String(data[i][sidCol] || '');
+    if (oldSid.length < 8) continue; // 想定外の形式は触らない
+    var prefix = oldSid.charAt(0) + newCode + oldSid.charAt(5); // 西暦+統合先コード+クラス文字は維持
+    var nextSeq = (maxSeq[prefix] || 0) + 1;
+    maxSeq[prefix] = nextSeq;
+    map[oldSid] = prefix + String(nextSeq).padStart(2, '0');
+  }
+  return map;
+}
+
+// 指定シートに対し、studentId をマップに従って書き換え、大学名テキストも統合先へ書き換える。
+// (大学名列を持たないシート＝スタンプ参加者/景品交換ログでは studentId のみ書き換える)
+function applyStudentIdMap_(ss, sheetName, idMap, oldName, newName) {
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+  var data    = sheet.getDataRange().getValues();
+  var headers = data[0].map(String);
+  var sidCol  = headers.indexOf('studentId');
+  var nameCol = headers.indexOf('大学名');
   var updated = 0;
-
-  evData.slice(1).forEach(function (evRow) {
-    var eventId = String(evRow[evIdCol] || '').trim();
-    if (!eventId) return;
-    var ss;
-    try { ss = eventSs_(eventId); } catch (e) { return; }
-
-    Object.keys(NAME_COLS).forEach(function (sheetName) {
-      var sheet = ss.getSheetByName(sheetName);
-      if (!sheet || sheet.getLastRow() < 2) return;
-      var data = sheet.getDataRange().getValues();
-      var col  = data[0].map(String).indexOf(NAME_COLS[sheetName]);
-      if (col < 0) return;
-      for (var i = 1; i < data.length; i++) {
-        if (String(data[i][col] || '').trim() === oldName) {
-          sheet.getRange(i + 1, col + 1).setValue(newName);
-          updated++;
-        }
-      }
-    });
-  });
+  for (var i = 1; i < data.length; i++) {
+    var changed = false;
+    if (sidCol >= 0) {
+      var newSid = idMap[String(data[i][sidCol] || '')];
+      if (newSid) { sheet.getRange(i + 1, sidCol + 1).setValue("'" + newSid); changed = true; }
+    }
+    if (nameCol >= 0 && String(data[i][nameCol] || '').trim() === oldName) {
+      sheet.getRange(i + 1, nameCol + 1).setValue(newName);
+      changed = true;
+    }
+    if (changed) updated++;
+  }
   return updated;
+}
+
+// 出場校エントリーの学校名を統合先へ書き換える。
+// 統合元・統合先の両方が既に提出済みの場合、どちらが正しいかは自動判定しない
+// （日付だけで機械的に決めると、古い方に正しい情報が残っている可能性を潰しかねない）。
+// 単純にテキストを置換し、重複が生じたことだけを呼び出し元へ伝える。
+// 実際にどちらを残すかは、内容を見た上でスタッフが手動で判断・削除する。
+function reconcileSchoolEntry_(ss, oldName, newName) {
+  var sheet = ss.getSheetByName(SHEET.SCHOOL_ENTRIES);
+  if (!sheet || sheet.getLastRow() < 2) return false;
+  var data    = sheet.getDataRange().getValues();
+  var headers = data[0].map(String);
+  var nameCol = headers.indexOf('学校名');
+  if (nameCol < 0) return false;
+
+  var oldRow = -1, alreadyHasTarget = false;
+  for (var i = 1; i < data.length; i++) {
+    var n = String(data[i][nameCol] || '').trim();
+    if (n === oldName) oldRow = i + 1;
+    if (n === newName) alreadyHasTarget = true;
+  }
+  if (oldRow < 0) return false; // 統合元の提出が無ければ何もしない
+
+  sheet.getRange(oldRow, nameCol + 1).setValue(newName);
+  return alreadyHasTarget; // true = 重複が発生した(要手動確認)
+}
+
+// アクティブイベントの女子ペアリング設定(CONFIG.womenPairings, JSON)を、
+// studentId変更に追従させる。過去イベントのCONFIGは対象外（運用上編集されないため）。
+function remapWomenPairingsConfig_(ss, idMap) {
+  if (!Object.keys(idMap).length) return;
+  var sheet = ss.getSheetByName(SHEET.CONFIG);
+  if (!sheet || sheet.getLastRow() < 1) return;
+  var data = sheet.getDataRange().getValues();
+  for (var i = 0; i < data.length; i++) {
+    if (String(data[i][0]) !== 'womenPairings') continue;
+    var raw = String(data[i][1] || '');
+    if (!raw) return;
+    var arr;
+    try { arr = JSON.parse(raw); } catch (err) { return; }
+    if (!Array.isArray(arr)) return;
+    var changed = false;
+    arr.forEach(function (pair) {
+      if (!pair) return;
+      if (idMap[pair.a]) { pair.a = idMap[pair.a]; changed = true; }
+      if (idMap[pair.b]) { pair.b = idMap[pair.b]; changed = true; }
+    });
+    if (changed) sheet.getRange(i + 1, 2).setValue(JSON.stringify(arr));
+    return;
+  }
 }
 
 // 表記ゆれで生まれた大学を、既存の確定済み大学へ統合する。
 // ⚠ 統合先の判定は一切自動化しない。呼び出し元(管理画面)でスタッフが手動選択した
-//   name(統合元) と target(統合先) をそのまま信頼して実行する。
+//   name(統合元) と target(統合先) をそのまま信頼して実行する（サーバー側では
+//   target が確定済みであることのみ検証する）。
+// p.dryRun === 'true' の場合は書き込みを一切行わず、影響件数だけを返す。
 function actionAdminMergeUniversity_(p) {
   var e = validateAdmin_(p);
   if (e) return e;
   var name   = String(p.name || '').trim();    // 統合元（表記ゆれ側・消える方）
   var target = String(p.target || '').trim();  // 統合先（正しい大学名・残る方）
   if (!name || !target) return err_('missing_params');
+  if (!p.event) return err_('missing_event');
   if (name === target) return err_('same_university');
 
-  var sheet = masterSs_().getSheetByName(SHEET.UNI_MASTER);
-  if (!sheet || sheet.getLastRow() < 2) return err_('university_not_found');
-  var data      = sheet.getDataRange().getValues();
-  var headers   = data[0].map(String);
-  var nameCol   = headers.indexOf('大学名');
-  var codeCol   = headers.indexOf('コード');
+  var uniSheet = masterSs_().getSheetByName(SHEET.UNI_MASTER);
+  if (!uniSheet || uniSheet.getLastRow() < 2) return err_('university_not_found');
+  var uData    = uniSheet.getDataRange().getValues();
+  var uHeaders = uData[0].map(String);
+  var nameCol  = uHeaders.indexOf('大学名');
+  var codeCol  = uHeaders.indexOf('コード');
+  var statusCol = uHeaders.indexOf('状態');
 
-  var srcRow = -1, srcCode = '';
-  var dstCode = '';
-  data.slice(1).forEach(function (row, i) {
+  var srcRow = -1, dstCode = '', dstStatus = '';
+  uData.slice(1).forEach(function (row, i) {
     var rowName = String(row[nameCol] || '').trim();
-    var raw  = String(row[codeCol] || '').trim().replace(/[０-９]/g, function(c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); });
-    var code = raw.padStart(4, '0');
-    if (rowName === name)   { srcRow = i + 2; srcCode = code; }
-    if (rowName === target) { dstCode = code; }
+    if (rowName === name) srcRow = i + 2;
+    if (rowName === target) {
+      var raw = String(row[codeCol] || '').trim().replace(/[０-９]/g, function(c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); });
+      dstCode = raw.padStart(4, '0');
+      dstStatus = statusCol >= 0 ? String(row[statusCol] || '').trim() : '';
+    }
   });
   if (srcRow < 0 || !dstCode) return err_('university_not_found');
+  if (dstStatus !== '確定') return err_('target_not_confirmed'); // クライアント側の絞り込みに加えサーバー側でも検証
 
-  // 学生ID内の大学コード部を統合先コードへ + 大学名テキストを統合先名へ
-  var rewrittenIds   = (srcCode && srcCode !== dstCode) ? rewriteStudentUniCode_(srcCode, dstCode) : 0;
-  var rewrittenNames = rewriteUniversityName_(name, target);
+  var dryRun = String(p.dryRun) === 'true';
 
-  // 統合元の行はマスターから削除する。
-  // ⚠ 意図的に「統合した」という記録を残さない。記録を残して次回以降に自動解決させると、
-  //   同じ表記が再入力されたときに人の目に触れないまま同一大学として扱われてしまう
-  //   （大学名テキストは学生の入力値のまま保存されるため、一覧では再び分裂する）。
-  //   記録をヒント表示するだけでも次の判断を引きずるため、痕跡ごと残さない。
-  //   同じ表記が再入力されたら、また承認待ちに上がって毎回ゼロから人が判断する。
-  // 旧仮コードは rewriteStudentUniCode_ で全データから消えているため、
-  // 将来この番号が自動採番で再利用されても衝突しない。
-  sheet.deleteRow(srcRow);
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) return err_('locked');
+  try {
+    var evSheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+    if (!evSheet || evSheet.getLastRow() < 2) return err_('no_events');
+    var evData  = evSheet.getDataRange().getValues();
+    var evIdCol = evData[0].map(String).indexOf('eventId');
 
-  return ok_({ code: dstCode, rewrittenIds: rewrittenIds, rewrittenNames: rewrittenNames });
+    var totalStudents  = 0;
+    var affectedEvents = 0;
+    var schoolEntryDup = false; // 出場校エントリーで重複が生じたら true（要手動確認）
+
+    evData.slice(1).forEach(function (evRow) {
+      var eventId = String(evRow[evIdCol] || '').trim();
+      if (!eventId) return;
+      var ss;
+      try { ss = eventSs_(eventId); } catch (err) { return; }
+
+      var idMap = reassignStudentIds_(ss, name, dstCode);
+      var n = Object.keys(idMap).length;
+      if (n > 0) affectedEvents++;
+      totalStudents += n;
+
+      if (dryRun) return; // 集計のみ。書き込みはしない
+
+      applyStudentIdMap_(ss, SHEET.STUDENTS,           idMap, name, target);
+      applyStudentIdMap_(ss, SHEET.PRE_REG,            idMap, name, target);
+      applyStudentIdMap_(ss, SHEET.STAMP_LOG,          idMap, name, target);
+      applyStudentIdMap_(ss, SHEET.STAMP_PARTICIPANTS, idMap, name, target);
+      applyStudentIdMap_(ss, SHEET.PRIZE_LOG,          idMap, name, target);
+      if (reconcileSchoolEntry_(ss, name, target)) schoolEntryDup = true;
+
+      if (eventId === p.event) remapWomenPairingsConfig_(ss, idMap);
+    });
+
+    if (dryRun) return ok_({ dryRun: true, students: totalStudents, events: affectedEvents });
+
+    // 統合元の行はマスターから削除する。
+    // ⚠ 意図的に「統合した」という記録を残さない。記録を残して次回以降に自動解決させると、
+    //   同じ表記が再入力されたときに人の目に触れないまま同一大学として扱われてしまう
+    //   （大学名テキストは学生の入力値のまま保存されるため、一覧では再び分裂する）。
+    //   同じ表記が再入力されたら、また承認待ちに上がって毎回ゼロから人が判断する。
+    uniSheet.deleteRow(srcRow);
+
+    return ok_({ students: totalStudents, events: affectedEvents, schoolEntryDup: schoolEntryDup });
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // 学生情報を全シート横断で一括修正（氏名/ふりがな/大学名/属性/メールアドレス）
