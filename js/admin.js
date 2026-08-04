@@ -197,10 +197,13 @@ function route_() {
     loadCompanies_();
   } else if (section === 'students') {
     showPage_('students');
-    const n = id_('stat-students')?.textContent;
-    setText_('student-count-step3', (n && n !== '—') ? n : '—');
-    if (!n || n === '—') loadStats_(++loadGen_, curEvent_);
+    // ⚠ 以前は存在しない要素(stat-students)を参照して再取得をスキップしようとしていたが、
+    //   常にundefinedになるため実質常に再取得していた。その上さらにloadGen_を2回進めて
+    //   いたため、loadStats_の応答到達時には世代不一致で必ず結果が破棄され、
+    //   学生管理へ直接遷移した場合に食券集計等が更新されない不具合があった。
+    //   1つの世代番号を共有する、他ページと同じ形に統一する。
     const gen = ++loadGen_;
+    loadStats_(gen, curEvent_);
     loadStudents_(gen, curEvent_);
     loadPreRegistrations_(gen, curEvent_);
   } else if (section === 'forms') {
