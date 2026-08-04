@@ -1592,10 +1592,14 @@ function loadUniversities_() {
     if (gen !== loadGen_) return;
     renderUniList_(res);
   })();
-  // 承認待ち
+  // 承認待ち（統合先の選択肢に使うため、大学マスターの全名称も併せて取得）
   (async () => {
-    const res = await adminCall_('adminGetPendingUniversities', { event: curEvent_ });
+    const [res, listRes] = await Promise.all([
+      adminCall_('adminGetPendingUniversities', { event: curEvent_ }),
+      FG_API.getSchoolList(),
+    ]);
     if (gen !== loadGen_) return;
+    allSchoolNames_ = (listRes && listRes.ok && listRes.data) ? (listRes.data.schools || []) : [];
     renderUniPending_(res);
   })();
   // 出場大学（出場校エントリー提出済み）
@@ -1606,7 +1610,8 @@ function loadUniversities_() {
   })();
 }
 
-let schoolEntries_ = [];
+let schoolEntries_  = [];
+let allSchoolNames_ = [];   // 大学マスターの全大学名（統合先プルダウン用）
 
 function renderSchoolEntries_(res) {
   const wrap = id_('school-entries-wrap');
@@ -1751,6 +1756,10 @@ function renderUniPending_(res) {
     wrap.innerHTML = '<p style="font-size:12px;color:var(--gray);text-align:center;padding:16px 0">承認待ちの大学はありません</p>';
     return;
   }
+  // 統合先の候補＝大学マスターのうち、承認待ちでない（＝確定済みの）大学のみ
+  const pendingNames = new Set(list.map(u => u.name));
+  const mergeTargets = allSchoolNames_.filter(n => !pendingNames.has(n));
+
   wrap.innerHTML = list.map(u => `
     <div class="uni-row" data-name="${esc_(u.name)}">
       <div class="uni-name">${esc_(u.name)}<span class="uni-tmp">仮 ${esc_(u.code)}</span></div>
@@ -1758,6 +1767,14 @@ function renderUniPending_(res) {
         <input class="uni-reading" maxlength="2" placeholder="読み" autocomplete="off">
         <span class="uni-prev">—</span>
         <button class="sm-btn uni-confirm">確定</button>
+      </div>
+      <div class="uni-merge">
+        <span class="uni-merge-lbl">既存の大学に統合</span>
+        <select class="uni-merge-sel">
+          <option value="">統合先を選択</option>
+          ${mergeTargets.map(n => `<option value="${esc_(n)}">${esc_(n)}</option>`).join('')}
+        </select>
+        <button class="sm-btn uni-merge-btn">統合</button>
       </div>
     </div>`).join('');
   wrap.querySelectorAll('.uni-row').forEach(row => {
@@ -1768,7 +1785,32 @@ function renderUniPending_(res) {
       prev.textContent = p ? `${p}xx` : '—';
     });
     row.querySelector('.uni-confirm').addEventListener('click', () => confirmUniversity_(row));
+    row.querySelector('.uni-merge-btn').addEventListener('click', () => mergeUniversity_(row));
   });
+}
+
+/** 表記ゆれの大学を既存の確定済み大学へ統合（統合先はスタッフが手動選択） */
+async function mergeUniversity_(row) {
+  const name   = row.dataset.name;
+  const target = row.querySelector('.uni-merge-sel').value;
+  if (!target) { showToast_('統合先の大学を選択してください'); return; }
+  if (!window.confirm(`「${name}」を「${target}」に統合します。\n\n` +
+    '・所属学生の大学名と学生IDが統合先のものに書き換わります\n' +
+    '・全イベントが対象です\n' +
+    '・この操作は元に戻せません\n\n実行しますか？')) return;
+
+  const btn = row.querySelector('.uni-merge-btn');
+  btn.disabled = true; btn.textContent = '…';
+  const res = await adminCall_('adminMergeUniversity', { event: curEvent_, name, target });
+  if (!res.ok) {
+    btn.disabled = false; btn.textContent = '統合';
+    showToast_(res.message || '統合に失敗しました');
+    return;
+  }
+  const d = res.data || {};
+  showToast_(`✓ ${name} → ${target}（学生ID ${d.rewrittenIds || 0}件 / 大学名 ${d.rewrittenNames || 0}件を更新）`);
+  loadUniversities_();
+  updateUniBadge_(loadGen_);
 }
 
 /** 読みを送ってコードを確定（連番採番はGAS側） */
