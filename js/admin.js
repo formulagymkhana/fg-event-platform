@@ -1057,7 +1057,11 @@ async function handleSaveStudentEdit_(btn, wrap) {
   btn.disabled = false; btn.textContent = '保存';
   if (!res.ok) { showToast_(res.message || '保存に失敗しました'); return; }
   const u = res.data.updated;
-  showToast_(`✓ 更新完了（学生マスター:${u.students} 事前登録:${u.preReg} スタンプログ:${u.stampLog} 景品:${u.prizeLog}）`);
+  // 大学・属性を変えた場合は studentId が振り直される（名札QRは再発行不要＝そのまま使える）
+  const renote = res.data.renumbered
+    ? `\n学生IDを ${sid} → ${res.data.studentId} に振り直しました（名札QRはそのまま使えます）`
+    : '';
+  showToast_(`✓ 更新完了（学生マスター:${u.students} 事前登録:${u.preReg} スタンプログ:${u.stampLog} 景品:${u.prizeLog}）${renote}`);
   form.style.display = 'none';
   loadStudents_(++loadGen_, curEvent_);
 }

@@ -127,7 +127,8 @@ const FG_API = (() => {
   /**
    * cardToken → stampToken を発行(スタンプラリー開始時)
    * 学生が自分のQRをスキャンして呼ぶ。
-   * 返り値: { stampToken, stampCount, prizeCriteria, cleared }
+   * 返り値: { stampToken, stampCount, prizeUnitSize, maxPrizes,
+   *          eligibleTotal, exchangedCount, claimableNow, nextThreshold, cleared, exchanged }
    */
   function activateStamp(cardToken, event) {
     const p = { token: cardToken };
