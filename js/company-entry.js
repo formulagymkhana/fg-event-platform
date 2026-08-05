@@ -187,6 +187,7 @@ async function handleSubmit_() {
     zip:          val_('f-zip'),
     prefecture:   val_('f-pref'),
     address:      val_('f-address'),
+    department:   val_('f-department'),
     content:      val_('f-content'),
     booth:        checkedRadio_('booth'),
     carCount:     num_('f-car-count'),

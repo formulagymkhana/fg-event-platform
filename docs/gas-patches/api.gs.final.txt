@@ -3551,7 +3551,7 @@ function actionSubmitCompanyEntry_(p) {
     sheet.appendRow([
       '申込日時','eventId',
       '企業名正式','社名略称','代表者名','担当者名','電話番号','担当者電話','メールアドレス',
-      '郵便番号','都道府県','住所',
+      '郵便番号','都道府県','住所','部署名',
       '出展内容','ブース区画','展示車両数','デモ走行','デモ走行詳細',
       '人パス','車両パス','昼食土','昼食日',
       '備考','状態',
@@ -3573,6 +3573,7 @@ function actionSubmitCompanyEntry_(p) {
     '代表者名': p.director, '担当者名': p.contact,
     '電話番号': p.tel, '担当者電話': p.contactTel, 'メールアドレス': p.email,
     '郵便番号': p.zip, '都道府県': p.prefecture || '', '住所': p.address,
+    '部署名': p.department || '',
     '出展内容': p.content, 'ブース区画': p.booth, '展示車両数': toInt(p.carCount),
     'デモ走行': p.demo, 'デモ走行詳細': p.demoDetail || '',
     '人パス': toInt(p.personPass), '車両パス': toInt(p.carPass),
@@ -3588,6 +3589,13 @@ function actionSubmitCompanyEntry_(p) {
     const headers = data[0].map(String);
     const nameCol = headers.indexOf('企業名正式');
     const mailCol = headers.indexOf('メールアドレス');
+
+    // 部署名列は途中で追加したフィールドのため、この機能追加より前に作られたシートには
+    // まだ存在しない。無ければ末尾に自動追加する（手動でのシート編集を不要にする）。
+    if (headers.indexOf('部署名') < 0) {
+      sheet.getRange(1, headers.length + 1).setValue('部署名');
+      headers.push('部署名');
+    }
 
     // 同一企業の判定: 企業名正式 または メールアドレス のどちらかが一致したら上書き
     // （通信再送・二重申込で別行が増え、食券や人パスが二重計上されるのを防ぐ）
@@ -3975,7 +3983,7 @@ function actionAdminUpdateEntry_(p) {
   }
   if (rowIdx < 0) return err_('not_found');
 
-  var allowed = ['展示車両数','人パス','車両パス','昼食土','昼食日','デモ走行'];
+  var allowed = ['展示車両数','人パス','車両パス','昼食土','昼食日','デモ走行','部署名'];
   var changes = [];
   for (var key in p.updates) {
     if (allowed.indexOf(key) < 0) continue;

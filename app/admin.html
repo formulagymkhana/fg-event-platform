@@ -631,7 +631,7 @@
     <div class="app-body" style="padding-top:16px;padding-bottom:0">
       <div class="co-tab-bar">
         <button class="co-tab-btn active" data-co-tab="register">企業登録</button>
-        <button class="co-tab-btn" data-co-tab="entries">出展申込<span class="co-tab-count" id="co-tab-entry-count"></span></button>
+        <button class="co-tab-btn" data-co-tab="entries">ブース出展/パス申込<span class="co-tab-count" id="co-tab-entry-count"></span></button>
       </div>
     </div>
     <div class="co-tab-content active" id="co-tab-register">
@@ -685,7 +685,12 @@
         <div class="action-row" style="margin-bottom:10px">
           <button class="act-btn act-btn-ghost" id="btn-entry-reload">↻ 再読み込み</button>
           <button class="act-btn act-btn-ghost" id="btn-entry-csv">CSV ダウンロード</button>
+          <button class="act-btn act-btn-ghost" id="btn-entry-shipping-csv">パス発送CSV（西濃運輸）</button>
         </div>
+        <p style="font-size:11px;color:var(--gray);margin:-4px 0 14px">
+          パス発送CSVは、人パスまたは車両パスが1枚以上の申込のみを対象に出力します。
+          出力前に内容をご確認ください。
+        </p>
         <div class="cfg-row" style="margin-bottom:14px">
           <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">申込フォームURL</label>
           <div class="url-box">
@@ -1292,6 +1297,6 @@
 <div class="toast" id="toast"></div>
 <script src="../js/vendor/qrcode.min.js?v=20260724h"></script>
 <script src="../js/config.js?v=20260724h"></script>
-<script src="../js/admin.js?v=20260805d"></script>
+<script src="../js/admin.js?v=20260805e"></script>
 </body>
 </html>
