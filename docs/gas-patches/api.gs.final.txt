@@ -3560,20 +3560,99 @@ function actionSubmitCompanyEntry_(p) {
   }
 
   const toInt = v => { const n = parseInt(v, 10); return isNaN(n) ? 0 : n; };
-  const rowData = [
-    new Date(), eventId,
-    p.companyName, p.companyShort || '', p.director, p.contact, p.tel, p.contactTel, p.email,
-    p.zip, p.prefecture || '', p.address,
-    p.content, p.booth, toInt(p.carCount), p.demo, p.demoDetail || '',
-    toInt(p.personPass), toInt(p.carPass), toInt(p.lunchSat), toInt(p.lunchSun),
-    p.note || '', '受付済',
-  ];
-  const newRow = sheet.getLastRow() + 1;
-  // 電話番号(7列目), 担当者電話(8列目), 郵便番号(10列目) をテキスト書式に（書き込み前）
-  [7, 8, 10].forEach(c => sheet.getRange(newRow, c).setNumberFormat('@'));
-  sheet.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
+  // 負数はフォームの min=0 では防げない（直接POSTで素通りする）。集計が壊れるので弾く。
+  // 上限は「大口の申込を誤って拒否しない」ため意図的に見ない（運用判断）。
+  const NUM_FIELDS = { carCount:'展示車両数', personPass:'人パス', carPass:'車両パス',
+                       lunchSat:'昼食土', lunchSun:'昼食日' };
+  for (const k in NUM_FIELDS) {
+    if (toInt(p[k]) < 0) return err_('negative_' + k);
+  }
 
-  return ok_({ message: '受付しました' });
+  const rowValues = {
+    '企業名正式': p.companyName, '社名略称': p.companyShort || '',
+    '代表者名': p.director, '担当者名': p.contact,
+    '電話番号': p.tel, '担当者電話': p.contactTel, 'メールアドレス': p.email,
+    '郵便番号': p.zip, '都道府県': p.prefecture || '', '住所': p.address,
+    '出展内容': p.content, 'ブース区画': p.booth, '展示車両数': toInt(p.carCount),
+    'デモ走行': p.demo, 'デモ走行詳細': p.demoDetail || '',
+    '人パス': toInt(p.personPass), '車両パス': toInt(p.carPass),
+    '昼食土': toInt(p.lunchSat), '昼食日': toInt(p.lunchSun),
+    '備考': p.note || '', '状態': '受付済',
+  };
+
+  // 同時申込での二重行を防ぐため、既存行の探索〜書き込みをロック内で完結させる
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch (e2) { return err_('lock_timeout'); }
+  try {
+    const data    = sheet.getDataRange().getValues();
+    const headers = data[0].map(String);
+    const nameCol = headers.indexOf('企業名正式');
+    const mailCol = headers.indexOf('メールアドレス');
+
+    // 同一企業の判定: 企業名正式 または メールアドレス のどちらかが一致したら上書き
+    // （通信再送・二重申込で別行が増え、食券や人パスが二重計上されるのを防ぐ）
+    const normName = String(p.companyName || '').trim();
+    const normMail = String(p.email || '').trim().toLowerCase();
+    let rowIdx = -1;
+    for (let r = 1; r < data.length; r++) {
+      const rn = nameCol >= 0 ? String(data[r][nameCol] || '').trim() : '';
+      const rm = mailCol >= 0 ? String(data[r][mailCol] || '').trim().toLowerCase() : '';
+      if ((normName && rn === normName) || (normMail && rm === normMail)) { rowIdx = r; break; }
+    }
+
+    if (rowIdx < 0) {
+      // 新規受付（従来どおり末尾へ追加）
+      const rowData = headers.map(h => {
+        if (h === '申込日時') return new Date();
+        if (h === 'eventId')  return eventId;
+        return rowValues[h] !== undefined ? rowValues[h] : '';
+      });
+      const newRow = sheet.getLastRow() + 1;
+      // 電話番号・担当者電話・郵便番号はテキスト書式に（先頭ゼロ保持。書き込み前に設定）
+      ['電話番号', '担当者電話', '郵便番号'].forEach(h => {
+        const c = headers.indexOf(h);
+        if (c >= 0) sheet.getRange(newRow, c + 1).setNumberFormat('@');
+      });
+      sheet.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
+      return ok_({ message: '受付しました', updated: false });
+    }
+
+    // 既存企業の再申込 → 上書きし、変わった項目だけを変更履歴へ残す
+    const changes = [];
+    Object.keys(rowValues).forEach(h => {
+      const c = headers.indexOf(h);
+      if (c < 0) return;
+      const oldVal = data[rowIdx][c];
+      const newVal = rowValues[h];
+      if (String(oldVal) === String(newVal)) return;
+      if (h !== '状態') changes.push(h + ': ' + oldVal + ' → ' + newVal);
+      sheet.getRange(rowIdx + 1, c + 1).setValue(newVal);
+    });
+    const tsCol = headers.indexOf('申込日時');
+    if (tsCol >= 0) sheet.getRange(rowIdx + 1, tsCol + 1).setValue(new Date());
+
+    appendEntryChangeLog_(sheet, headers, rowIdx, '企業からの再申込', changes);
+    return ok_({ message: '受付しました（既存の申込を更新しました）', updated: true });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// 出展申込の「変更履歴」列へ1行追記する。列が無ければ末尾に作る。
+// 企業からの再申込と事務局の手直しを同じ欄に、区別できる形で残す。
+// 表示は管理画面の申込詳細モーダル最下部（js/admin.js の '変更履歴' グループ）。
+function appendEntryChangeLog_(sheet, headers, rowIdx, source, changes) {
+  if (!changes || !changes.length) return;
+  let logCol = headers.indexOf('変更履歴');
+  if (logCol < 0) {
+    logCol = headers.length;
+    sheet.getRange(1, logCol + 1).setValue('変更履歴');
+  }
+  const tz = Session.getScriptTimeZone();
+  const ts = Utilities.formatDate(new Date(), tz, 'MM/dd HH:mm');
+  const prev  = String(sheet.getRange(rowIdx + 1, logCol + 1).getValue() || '');
+  const entry = '[' + ts + '] ' + source + ' — ' + changes.join(', ');
+  sheet.getRange(rowIdx + 1, logCol + 1).setValue(prev ? prev + '\n' + entry : entry);
 }
 
 // ============================================================
@@ -3910,17 +3989,7 @@ function actionAdminUpdateEntry_(p) {
     }
   }
 
-  if (changes.length) {
-    var logCol = headers.indexOf('変更履歴');
-    if (logCol < 0) {
-      logCol = headers.length;
-      sheet.getRange(1, logCol + 1).setValue('変更履歴');
-    }
-    var tz = Session.getScriptTimeZone();
-    var ts = Utilities.formatDate(new Date(), tz, 'MM/dd HH:mm');
-    var prev = String(sheet.getRange(rowIdx + 1, logCol + 1).getValue() || '');
-    var entry = '[' + ts + '] ' + changes.join(', ');
-    sheet.getRange(rowIdx + 1, logCol + 1).setValue(prev ? prev + '\n' + entry : entry);
-  }
+  // 企業からの再申込と同じ欄へ、どちらが変えたのか分かる形で残す
+  appendEntryChangeLog_(sheet, headers, rowIdx, '事務局の修正', changes);
   return ok_({ updated: true });
 }
