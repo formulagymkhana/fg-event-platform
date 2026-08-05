@@ -2015,6 +2015,7 @@ function applyUniMergeToConfig_(ss, idMap, oldName, newName) {
           if (!pair) return;
           if (idMap[pair.a]) { pair.a = idMap[pair.a]; changed = true; }
           if (idMap[pair.b]) { pair.b = idMap[pair.b]; changed = true; }
+          if (idMap[pair.c]) { pair.c = idMap[pair.c]; changed = true; }
         });
         if (changed) sheet.getRange(i + 1, 2).setValue(JSON.stringify(arr));
       } catch (err) { /* 壊れたJSONは触らない */ }

@@ -31,6 +31,17 @@ GAS はリポジトリ管理外のため、push しても自動反映されま�
 
 ---
 
+## 2026-08-04 女子ペアリングの重複除去・大学統合のCヒート追従・走行順M算出の統一
+
+- 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `js/admin.js`, `app/admin.html`
+- 変更内容:
+  - `applyUniMergeToConfig_`（大学統合機能）のwomenPairings書換で`pair.c`が対象外だった不具合を修正（`pair.a`/`pair.b`のみ書き換えていた）
+  - 女子ペアリングの自己修復処理を`normalizeWomenPairings_()`に共通化し、保存済みJSON内の全ペア横断の重複（同一学生が複数ヒートに残る）も検出・除去するよう拡張。従来`loadEntryList_`にしかなかった自己修復を`loadReceptionList_`にも適用（受付リスト・出走順リストが自己修復されていなかった欠落を解消）
+  - 走行順計算のM（女子登録ペア数）が、a/b/cが全て空の未入力ペアも含めて算出していたため、空ペアを保存すると男子B以降の走行順が不要にずれる不具合を修正。`activeWomenPairings_()`を新設し、`computeRunningOrder_`と`renderOrderList_`（独自にMを再計算していた箇所）の両方をこれに統一
+- 理由/背景: 表記ゆれ大学の統合・確定フロー堅牢化の外部レビュー過程で、女子ペアリング関連の既存不具合が複数発見されたため、確定フロー本体（PR2予定）より先にこちらを独立して修正
+- GAS: **再デプロイ必須**
+- 申し送り/注意点: 大学統合の確定フロー再開可能化（大学確定履歴シート新設・ロック方針等）は別PRで対応予定。詳細は`docs/NOTES.md`参照
+
 ## 2026-08-04 企業画面のN+1解消・adminGetConfig重複排除
 
 - 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `js/admin.js`
