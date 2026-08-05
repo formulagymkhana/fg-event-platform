@@ -350,6 +350,9 @@ function actionSaveStamp_(p) {
 
   const company = findCompanyByStampKey_(p.ct, p.event);
   if (!company) return err_('invalid_company_key');
+  // スタンプ帳の表示からは除外していても、既設のNFCタグからは加算できてしまっていた。
+  // 非表示のブースのスタンプが景品獲得数に効いてしまうため、ここでも弾く。
+  if (!company.stampRally) return err_('company_not_in_rally');
 
   const lock = LockService.getScriptLock();
   try { lock.waitLock(6000); } catch (e) { return err_('lock_timeout'); }
@@ -1061,7 +1064,12 @@ function findCompany_(keyCol, value, eventId) {
   if (!row) return null;
 
   const g = name => { const i = headers.indexOf(name); return i >= 0 ? row[i] : ''; };
-  return { companyId: String(g('companyId')), companyName: g('企業名') };
+  // stampRally 列が無い/空なら参加扱い（既存イベントとの後方互換）。'FALSE' のときだけ対象外。
+  return {
+    companyId:   String(g('companyId')),
+    companyName: g('企業名'),
+    stampRally:  String(g('stampRally')).toUpperCase() !== 'FALSE',
+  };
 }
 
 // ============================================================
@@ -1502,13 +1510,22 @@ function nextStudentSeq_(sData, sidCol, idPrefix) {
 }
 
 // 参加区分(＋ドライバー登録区分) → 属性
+// ⚠ serviceClass に入るのはフォームのサービス作業クラスの選択値であり、'メカニック' という
+//   文字列は送られてこない。実際の値は次のいずれか:
+//     見学・応援: 'FGクラス' / '女子クラス' / 'FGクラス/女子クラス' / '実施しない'
+//     補欠:       'FGクラス' / '女子クラス' / 'FG/女子クラス' / 'サービス作業は実施しない/来場予定はない'
+//   以前は serviceClass === 'メカニック' で判定していたため常に偽になり、
+//   サービス作業を行う学生も全員「応援学生」として保存されていた。
+//   「実施しない」を含むかどうかで判定する（受付リスト側と同じ規則に揃える）。
 function preAttr_(category, driverClass, serviceClass) {
+  const svc = String(serviceClass || '');
+  const doesService = !!svc && svc.indexOf('実施しない') < 0;
   switch (String(category || '')) {
     case '出場選手(FGクラスドライバー)': return String(driverClass || 'Aドライバー');
     case '出場選手(女子クラスドライバー)': return '女子クラスドライバー';
     case '補欠ドライバー':                 return '補欠ドライバー';
     case '見学・応援学生(メカニック登録含む)':
-      return String(serviceClass || '') === 'メカニック' ? 'メカニック' : '応援学生';
+      return doesService ? 'メカニック' : '応援学生';
     default: return '応援学生';
   }
 }
@@ -2234,30 +2251,45 @@ function buildOrExtendUniMergeIdMap_(ss, oldName, newCode, existingMap) {
 // シート単位で一括読み込み・一括書き込みする（セル単位のAPI呼び出しを避けてロック保持時間を縮める）。
 // マップに無い(既に書き換え済みの)行は自然にスキップされるため、この関数自体が
 // 再実行しても安全＝冪等になっている。
+// ⚠ 以前は getDataRange() でシート全列を読み、setValues() で全列を書き戻していた。
+//   getValues() は数式ではなく計算結果を返すため、事務局が手作業で追加した数式列が
+//   あると、統合の実行で静的な値に置き換わって失われる恐れがあった。
+//   実際に書き換える studentId 列・大学名 列だけを個別に読み書きする。
 function applyUniMergeToSheet_(ss, sheetName, idMap, oldName, newName) {
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet || sheet.getLastRow() < 2) return 0;
-  var range   = sheet.getDataRange();
-  var data    = range.getValues();
-  var headers = data[0].map(String);
+  var lastRow = sheet.getLastRow();
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
   var sidCol  = headers.indexOf('studentId');
   var nameCol = headers.indexOf('大学名');
   if (sidCol < 0 && nameCol < 0) return 0;
-  var updated = 0;
-  for (var i = 1; i < data.length; i++) {
-    var changed = false;
-    if (sidCol >= 0) {
-      var newSid = idMap[String(data[i][sidCol] || '')];
-      if (newSid) { data[i][sidCol] = "'" + newSid; changed = true; }
+
+  var touched = {}; // 影響を受けた行（0始まり）。戻り値の件数を従来と揃えるため
+
+  if (sidCol >= 0) {
+    var sidRange = sheet.getRange(2, sidCol + 1, lastRow - 1, 1);
+    var sids = sidRange.getValues();
+    var changedSid = 0;
+    for (var i = 0; i < sids.length; i++) {
+      var newSid = idMap[String(sids[i][0] || '')];
+      if (newSid) { sids[i][0] = "'" + newSid; touched[i] = true; changedSid++; }
     }
-    if (nameCol >= 0 && String(data[i][nameCol] || '').trim() === oldName) {
-      data[i][nameCol] = newName;
-      changed = true;
-    }
-    if (changed) updated++;
+    if (changedSid > 0) sidRange.setValues(sids);
   }
-  if (updated > 0) range.setValues(data);
-  return updated;
+
+  if (nameCol >= 0) {
+    var nameRange = sheet.getRange(2, nameCol + 1, lastRow - 1, 1);
+    var names = nameRange.getValues();
+    var changedName = 0;
+    for (var j = 0; j < names.length; j++) {
+      if (String(names[j][0] || '').trim() === oldName) {
+        names[j][0] = newName; touched[j] = true; changedName++;
+      }
+    }
+    if (changedName > 0) nameRange.setValues(names);
+  }
+
+  return Object.keys(touched).length;
 }
 
 // 出場校エントリーの学校名を統合先へ書き換える。
@@ -3214,9 +3246,18 @@ function actionAdminUploadCompanyLogo_(p) {
   }
 
   // Step2: 既存ファイル削除
+  // ⚠ 保存時のファイル名は「companyId.拡張子」なので、companyId そのものでは一致しない。
+  //   以前は getFilesByName(companyId) で探していたため一度も削除されず、
+  //   再アップロードのたびに公開設定のファイルがDriveへ蓄積していた。
+  //   拡張子が変わる場合（png→jpg 等）もあるため、フォルダ内を走査して前方一致で消す。
   try {
-    const existing = folder.getFilesByName(String(p.companyId));
-    while (existing.hasNext()) existing.next().setTrashed(true);
+    const prefix = String(p.companyId) + '.';
+    const it = folder.getFiles();
+    while (it.hasNext()) {
+      const f = it.next();
+      const nm = f.getName();
+      if (nm === String(p.companyId) || nm.indexOf(prefix) === 0) f.setTrashed(true);
+    }
   } catch (er) {
     console.error('logo_step2_trash:', er);
     // 削除失敗は致命的でないので続行

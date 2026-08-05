@@ -2,14 +2,15 @@
  * FG Event Platform — 管理用スクリプト(スタンドアローン版)
  *
  * 初回セットアップ手順:
- *   1. initializeMaster("INIT_MASTER") → マスタースプレッドシートを作成
- *   2. initializeUniversityMaster()    → 大学コードを投入
+ *   1. initializeMaster("INIT_MASTER")             → マスタースプレッドシートを作成
+ *   2. initializeUniversityMaster("INIT_UNIVERSITY") → 大学コードを投入
  *   3. 管理画面からイベントを作成
- *   4. importStudents(eventId)         → 学生マスターを生成（Googleフォームから）
+ *   学生は事前登録フォーム(register-pre.html)から登録される。
  *
- * ⚠ 注意: initializeMaster は MASTER_SPREADSHEET_ID を上書きするため
- *          既存運用中に誤実行すると管理画面からイベントが消える。
- *          必ず確認引数 "INIT_MASTER" を渡すこと。
+ * ⚠ 注意: シートを全消去する関数には確認引数を必須にしている。
+ *          引数なしで実行すると警告を出すだけで何もしない。
+ *          - initializeMaster("INIT_MASTER")               … MASTER_SPREADSHEET_ID を上書き
+ *          - initializeUniversityMaster("INIT_UNIVERSITY") … 大学マスターを全消去して再投入
  */
 
 const STUDENT_COLS = [
@@ -19,11 +20,10 @@ const STUDENT_COLS = [
   '所属校出場', '規則誓約同意', 'SNS同意', '個人情報同意', '登録種別', // 規則誓約同意を追加
 ];
 
-const CLASS_CODES = {
-  'Aドライバー':'A','Bドライバー':'B','Cドライバー':'C',
-  '女子クラスドライバー':'W','ドライバー登録メカニック':'R',
-  'メカニック':'M','応援学生':'S','一般参加学生':'V',
-};
+// 区分コードの定義は api.gs の PRE_CLASS_CODES に一本化した。
+// かつてここに CLASS_CODES があり 'R'(ドライバー登録メカニック) / 'M'(メカニック) を
+// 発行していたが、管理画面の classOf_ は 'ABCWSV' しか解釈できず誤分類になっていた。
+// 唯一の利用者だった importStudents ごと撤去済み。
 
 // ============================================================
 // initializeMaster
@@ -163,119 +163,20 @@ function setupPrizeConfig(eventId, threshold, count) {
 }
 
 // ============================================================
-// importStudents
-// ============================================================
-
-function importStudents(eventId) {
-  if (!eventId) {
-    const sheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
-    const last  = sheet.getLastRow();
-    if (last < 2) { notifyUser_('イベントが登録されていません。'); return; }
-    eventId = String(sheet.getRange(last, 1).getValue());
-  }
-
-  const FORM_SPREADSHEET_ID = PropertiesService.getScriptProperties()
-    .getProperty('FORM_SPREADSHEET_ID');
-  if (!FORM_SPREADSHEET_ID) throw new Error('FORM_SPREADSHEET_IDが未設定です。');
-  const formSs = SpreadsheetApp.openById(FORM_SPREADSHEET_ID);
-  const targetSs = eventSs_(eventId);
-
-  const yearMatch  = String(eventId || '').match(/(\d{4})/);
-  const yearSuffix = yearMatch ? yearMatch[1].slice(-1) : String(new Date().getFullYear()).slice(-1);
-
-  const { uniMap, maxAutoCode } = loadUniversityMaster_();
-  let autoCodeCounter = maxAutoCode;
-  const newUniversities = [];
-
-  const existingSheet  = targetSs.getSheetByName(SHEET.STUDENTS);
-  const existingTokens = new Map();
-  if (existingSheet && existingSheet.getLastRow() > 1) {
-    const existing = existingSheet.getRange(2, 1, existingSheet.getLastRow() - 1, STUDENT_COLS.length).getValues();
-    existing.forEach(row => {
-      const n = row[STUDENT_COLS.indexOf('氏名')];
-      const s = row[STUDENT_COLS.indexOf('大学名')];
-      const t = row[STUDENT_COLS.indexOf('cardToken')]; // T11修正: token→cardToken（再生成防止）
-      if (n && s && t) existingTokens.set(n + '|' + s, t);
-    });
-  }
-
-  const masterSheet = targetSs.getSheetByName(SHEET.STUDENTS);
-  masterSheet.clear();
-  masterSheet.getRange(1,1,1,STUDENT_COLS.length).setValues([STUDENT_COLS]);
-  formatHeaderRow_(masterSheet);
-
-  const sources = [
-    { sheetName: '出場選手一覧', attrFn: (headers, row) => { const i = headers.findIndex(h => h === 'ドライバー登録区分'); return i >= 0 ? String(row[i] || '') : 'Aドライバー'; } },
-    { sheetName: '女子ドライバー一覧',  attrFn: () => '女子クラスドライバー' },
-    { sheetName: '補欠ドライバー一覧',  attrFn: () => 'ドライバー登録メカニック' },
-    { sheetName: 'メカ・応援学生一覧',  attrFn: (headers, row) => { const i = headers.findIndex(h => h && h.includes('サービス作業は実施')); return (i >= 0 && String(row[i] || '') === 'はい') ? 'メカニック' : '応援学生'; } },
-  ];
-
-  const outputRows = [];
-  const seqMap     = new Map();
-
-  sources.forEach(src => {
-    const sheet = formSs.getSheetByName(src.sheetName);
-    if (!sheet || sheet.getLastRow() < 2) return;
-    const data    = sheet.getDataRange().getValues();
-    const headers = data[0].map(h => String(h || '').trim());
-    const get     = (row, name) => { const i = headers.findIndex(h => h === name); return i >= 0 ? row[i] : ''; };
-
-    data.slice(1).forEach(row => {
-      const name = get(row, '氏名');
-      if (!name) return;
-      const school   = String(get(row, '大学名') || '').trim();
-      const category = src.attrFn(headers, row);
-      const birthday = get(row, '生年月日');
-      let uniCode = uniMap.get(school);
-      if (!uniCode) {
-        autoCodeCounter += 1;
-        uniCode = String(autoCodeCounter).padStart(4, '0');
-        uniMap.set(school, uniCode);
-        newUniversities.push([school, uniCode, '自動割当(要確認)']);
-      }
-      const classCode = CLASS_CODES[category] || 'S';
-      const seqKey    = uniCode + classCode;
-      const seq       = (seqMap.get(seqKey) || 0) + 1;
-      seqMap.set(seqKey, seq);
-      const studentId = yearSuffix + uniCode + classCode + String(seq).padStart(2, '0');
-      outputRows.push([
-        studentId,
-        existingTokens.get(name + '|' + school) || Utilities.getUuid(),
-        name,
-        String(get(row, '氏名(ふりがな)') || '').replace(/　/g, ' ').trim(),
-        school, get(row, '学部学科'), get(row, '学年'), category,
-        get(row, '自動車部所属何年目ですか？'), get(row, '住所(都道府県)'),
-        birthday instanceof Date ? Utilities.formatDate(birthday, Session.getScriptTimeZone(), 'yyyy/MM/dd') : String(birthday || ''),
-        get(row, '性別'),            // 性別（事前申込フォームから取得）
-        get(row, 'メールアドレス'),
-        get(row, '電話番号') || '',  // 電話番号（事前申込フォームにあれば取得）
-        '',                          // 所属校出場（事前ドライバーは対象外のため空）
-        'true',                      // 規則誓約同意（事前申込フォーム送信時に同意済み）
-        'true', 'true',              // SNS同意 / 個人情報同意（事前申込フォーム送信時に同意済み）
-        '事前',                      // 登録種別
-      ]); // ↑ STUDENT_COLS(19列)と完全一致させ列ズレ/列数不一致を防止
-    });
-  });
-
-  if (outputRows.length > 0) masterSheet.getRange(2, 1, outputRows.length, STUDENT_COLS.length).setValues(outputRows);
-  if (newUniversities.length > 0) saveNewUniversities_(newUniversities);
-  CacheService.getScriptCache().remove('cfg_' + eventId);
-
-  const lines = [`学生マスターを更新しました。${outputRows.length}名を登録しました。`];
-  if (newUniversities.length > 0) {
-    lines.push('', `⚠ 新規大学 ${newUniversities.length}校を自動採番:`);
-    newUniversities.forEach(([n, c]) => lines.push(`  ${n} → ${c}`));
-    lines.push('', '大学マスターで正式コードに更新してください。');
-  }
-  notifyUser_(lines.join('\n'));
-}
-
-// ============================================================
 // initializeUniversityMaster
+// ⚠ 大学マスターを全消去して初期リストで作り直す。
+//    運用中に実行すると、事務局が確定させた正式コードと、
+//    自動割当(要確認)の仮コードが両方消える。
+//    実行するには引数 "INIT_UNIVERSITY" が必要。
 // ============================================================
 
-function initializeUniversityMaster() {
+function initializeUniversityMaster(confirm) {
+  if (confirm !== 'INIT_UNIVERSITY') {
+    notifyUser_('⚠ 危険な操作です。\nこの関数は大学マスターを全消去して初期リストで作り直します。\n' +
+                '確定済みの大学コードも、承認待ちの仮コードも失われます。\n\n' +
+                '実行するには引数を付けて呼び出してください:\n  initializeUniversityMaster("INIT_UNIVERSITY")');
+    return;
+  }
   const UNIVERSITIES = [
     ['早稲田大学','0101','確定'],['青山学院大学','1101','確定'],
     ['茨城大学','1201','確定'],['大分大学','1501','確定'],
