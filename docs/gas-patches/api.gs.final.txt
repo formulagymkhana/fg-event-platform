@@ -27,6 +27,7 @@ const SHEET = {
   COMPANY_ENTRIES:    '出展申込',
   SCHOOL_ENTRIES:     '出場校エントリー',
   MERGE_HISTORY:      '大学統合履歴',
+  CONFIRM_HISTORY:    '大学確定履歴',
 };
 
 // 出場校エントリーの列（重複時は同名の学校を上書き。承諾書履歴は改行区切りで蓄積）
@@ -1696,7 +1697,10 @@ function pokebellPrefix_(reading) {
   return POKEBELL_TABLE_[c] || '';
 }
 
-// 状態が「確定」でない大学（自動割当(要確認) など）を返す
+// 状態が「確定」でない大学（自動割当(要確認) など）に加え、既に「確定」済みでも
+// 確定処理（コード確定後の学生ID一括反映）が未完了の大学を resuming:true で返す。
+// ⚠ resumingの大学は codeCol の値ではなく、確定履歴の親行に記録された newCode を返す
+//   （マスターへの書込が完了していない再開直後の一瞬だけ、両者が一致しないタイミングがあるため）。
 function actionAdminGetPendingUniversities_(p) {
   var e = validateAdmin_(p);
   if (e) return e;
@@ -1707,107 +1711,295 @@ function actionAdminGetPendingUniversities_(p) {
   var nameCol   = headers.indexOf('大学名');
   var codeCol   = headers.indexOf('コード');
   var statusCol = headers.indexOf('状態');
+  var historySheet = masterSs_().getSheetByName(SHEET.CONFIRM_HISTORY); // 未作成なら未完了操作は無い(新規作成はしない)
   var out = [];
   data.slice(1).forEach(function (row) {
     var name   = String(row[nameCol] || '').trim();
     var status = statusCol >= 0 ? String(row[statusCol] || '').trim() : '';
-    if (name && status && status !== '確定') {
-      out.push({ name: name, code: String(row[codeCol] || '').trim(), status: status });
+    if (!name) return;
+    if (status !== '確定') {
+      out.push({ name: name, code: String(row[codeCol] || '').trim(), status: status, resuming: false });
+      return;
+    }
+    if (!historySheet) return;
+    var active = findActiveConfirmOperation_(historySheet, name);
+    if (active) {
+      out.push({ name: name, code: active.newCode, status: status, resuming: true });
     }
   });
   return ok_({ universities: out });
 }
 
-// 読みの頭文字からポケベルコードを生成し、既存コードを見て連番採番して確定する
-function actionAdminConfirmUniversity_(p) {
-  var e = validateAdmin_(p);
-  if (e) return e;
-  var name    = String(p.name || '').trim();
-  var prefix  = pokebellPrefix_(p.reading);
-  if (!name) return err_('missing_params');
-  if (!prefix) return err_('invalid_reading');
+// ============================================================
+// 大学確定履歴（未登録大学の「確定」処理を再開可能にするための永続化）
+// 大学統合履歴と同型だが、確定フローは対応表(idMap)を持たない単純な
+// コード置換（oldCode→newCode）のため、対応表JSON列の代わりに
+// oldCode/newCodeの2列を持つ。親行(eventId='__operation__')が操作全体の
+// 状態、子行(実イベントID)がイベント単位の進捗を表す（P1-3対策：
+// 「今その時点のアクティブイベント一覧」に完了判定を依存させないことで、
+// 後日イベントが増えても完了済み操作が未完了扱いに戻らないようにする）。
+// ============================================================
 
+function getConfirmHistorySheet_() {
+  var sheet = masterSs_().getSheetByName(SHEET.CONFIRM_HISTORY);
+  if (!sheet) {
+    sheet = masterSs_().insertSheet(SHEET.CONFIRM_HISTORY);
+    sheet.getRange(1, 1, 1, 7).setValues([['operationId', '大学名', 'oldCode', 'newCode', 'eventId', '状態', '更新時刻']]);
+    formatHeaderRow_(sheet);
+  }
+  return sheet;
+}
+
+function findConfirmHistoryRow_(sheet, operationId, eventId) {
+  if (sheet.getLastRow() < 2) return -1;
+  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+  for (var i = 0; i < data.length; i++) {
+    if (String(data[i][0]) === operationId && String(data[i][4]) === eventId) return i + 2;
+  }
+  return -1;
+}
+
+function upsertConfirmHistory_(sheet, operationId, name, oldCode, newCode, eventId, status) {
+  var row = findConfirmHistoryRow_(sheet, operationId, eventId);
+  var values = [[operationId, name, oldCode, newCode, eventId, status, new Date()]];
+  if (row < 0) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, 1, 7).setValues(values);
+  } else {
+    sheet.getRange(row, 1, 1, 7).setValues(values);
+  }
+}
+
+// 大学名から、未完了(親行が処理中／要確認)の確定操作を検索する。
+// ⚠ 大学マスターの現在の状態(確定/未確定)を一切見ない。履歴保存後・マスター更新前に
+//   失敗した場合でも、この検索結果だけを根拠に再開できるようにするため（P0-1対策）。
+function findActiveConfirmOperation_(historySheet, name) {
+  if (historySheet.getLastRow() < 2) return null;
+  var data = historySheet.getRange(2, 1, historySheet.getLastRow() - 1, 6).getValues();
+  for (var i = data.length - 1; i >= 0; i--) {
+    if (String(data[i][1]) === name && String(data[i][4]) === '__operation__' &&
+        (String(data[i][5]) === '処理中' || String(data[i][5]) === '要確認')) {
+      return { operationId: String(data[i][0]), oldCode: String(data[i][2]), newCode: String(data[i][3]) };
+    }
+  }
+  return null;
+}
+
+// 他大学分も含め、未完了の確定操作が予約済みのnewCodeを全て集める。
+// ⚠ 大学マスターへの書込前に履歴だけ保存された状態でクラッシュすると、ロックは
+//   スクリプト終了時に自動解放されるが予約は履歴に残る。次の確定処理がusedCodesを
+//   大学マスターの現在値だけから計算すると、この孤立予約と同じコードを
+//   再度採番しうる（P0-4対策）。
+function collectReservedCodes_(historySheet) {
+  var reserved = new Set();
+  if (historySheet.getLastRow() < 2) return reserved;
+  var data = historySheet.getRange(2, 1, historySheet.getLastRow() - 1, 6).getValues();
+  data.forEach(function (row) {
+    if (String(row[4]) !== '__operation__') return;
+    var status = String(row[5]);
+    if (status === '処理中' || status === '要確認') reserved.add(String(row[3]).padStart(4, '0'));
+  });
+  return reserved;
+}
+
+// 大学マスターから大学名で1行を探す（確定フロー用。統合の findMergeUniversityRows_ と
+// 違い対象は1件のみで、統合先を持たない）。
+function findUniversityRowByName_(name) {
   var sheet = masterSs_().getSheetByName(SHEET.UNI_MASTER);
-  if (!sheet || sheet.getLastRow() < 2) return err_('university_not_found');
+  if (!sheet || sheet.getLastRow() < 2) return { found: false };
   var data      = sheet.getDataRange().getValues();
   var headers   = data[0].map(String);
   var nameCol   = headers.indexOf('大学名');
   var codeCol   = headers.indexOf('コード');
   var statusCol = headers.indexOf('状態');
-
-  // 同じ上2桁を持つ既存コードの最大連番 +1 で採番
-  var maxSeq = 0;
-  var targetRow = -1;
-  var oldCode = '';
-  var usedCodes = new Set();
-  data.slice(1).forEach(function (row, i) {
-    // 全角数字を半角に正規化してから比較
-    var raw  = String(row[codeCol] || '').trim().replace(/[０-９]/g, function(c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); });
-    var code = raw.padStart(4, '0');
-    usedCodes.add(code);
-    if (code.substring(0, 2) === prefix) {
-      var seq = Number(code.substring(2));
-      if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][nameCol] || '').trim() === name) {
+      var raw = String(data[i][codeCol] || '').trim().replace(/[０-９]/g, function(c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); });
+      return {
+        found: true, sheet: sheet, row: i + 1,
+        code: raw.padStart(4, '0'),
+        status: statusCol >= 0 ? String(data[i][statusCol] || '').trim() : '',
+        codeCol: codeCol, statusCol: statusCol,
+      };
     }
-    if (String(row[nameCol] || '').trim() === name) {
-      targetRow = i + 2;           // 1始まり+ヘッダ
-      oldCode   = code;            // 書き換え対象の旧（仮）コード
-    }
-  });
-  if (targetRow < 0) return err_('university_not_found');
-
-  // 重複しないコードが見つかるまで連番を進める
-  var nextSeq = maxSeq + 1;
-  while (usedCodes.has(prefix + String(nextSeq).padStart(2, '0'))) { nextSeq++; }
-  var newCode = prefix + String(nextSeq).padStart(2, '0');
-  sheet.getRange(targetRow, codeCol + 1).setValue("'" + newCode); // 先頭0保持のため文字列化
-  if (statusCol >= 0) sheet.getRange(targetRow, statusCol + 1).setValue('確定');
-
-  // 仮コードで発行済みの学生IDを確定コードへ全シート横断で書き換える
-  var rewritten = (oldCode && oldCode !== newCode) ? rewriteStudentUniCode_(oldCode, newCode) : 0;
-
-  return ok_({ code: newCode, rewritten: rewritten });
+  }
+  return { found: false };
 }
 
-// 大学コード確定時、旧（仮）コードで発行済みの学生IDを確定コードへ全シート横断で書き換える。
-// studentId = 西暦(1) + 大学コード(4) + 区分(1) + 連番(2)。大学コード部のみ差し替える。
-// studentId を持つ全シート（学生マスター/スタンプログ/参加者/景品/事前登録）を全イベント分走査。
-// 確定コードは新規採番なので未使用 → 連番衝突は起きない。
-function rewriteStudentUniCode_(oldCode, newCode) {
-  oldCode = String(oldCode).padStart(4, '0');
-  newCode = String(newCode).padStart(4, '0');
-  if (oldCode === newCode) return 0;
-
-  var SHEETS_WITH_SID = [SHEET.STUDENTS, SHEET.STAMP_LOG, SHEET.STAMP_PARTICIPANTS, SHEET.PRIZE_LOG, SHEET.PRE_REG];
-  var evSheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
-  if (!evSheet || evSheet.getLastRow() < 2) return 0;
-  var evData    = evSheet.getDataRange().getValues();
-  var evIdCol   = evData[0].map(String).indexOf('eventId');
-  var updated   = 0;
-
-  evData.slice(1).forEach(function (evRow) {
-    var eventId = String(evRow[evIdCol] || '').trim();
-    if (!eventId) return;
-    var ss;
-    try { ss = eventSs_(eventId); } catch (e) { return; }
-
-    SHEETS_WITH_SID.forEach(function (sheetName) {
-      var sheet = ss.getSheetByName(sheetName);
-      if (!sheet || sheet.getLastRow() < 2) return;
-      var data   = sheet.getDataRange().getValues();
-      var sidCol = data[0].map(String).indexOf('studentId');
-      if (sidCol < 0) return;
-      for (var i = 1; i < data.length; i++) {
-        var s = String(data[i][sidCol] || '');
-        if (s.length >= 5 && s.substring(1, 5) === oldCode) {
-          var nid = s[0] + newCode + s.substring(5);
-          sheet.getRange(i + 1, sidCol + 1).setValue("'" + nid); // 文字列保持
-          updated++;
-        }
-      }
-    });
-  });
+// シート全体ではなく studentId 列のデータ範囲だけを対象に一括読み書きする。
+// ⚠ getDataRange()で全列を対象にすると、事務局が手動追加した数式列があった場合に
+//   静的な値へ上書きしてしまうリスクがある（大学統合機能のapplyUniMergeToSheet_に
+//   同種のリスクが残っている。docs/NOTES.md参照）。新規実装ではこれを避ける。
+function rewriteStudentUniCodeInSheet_(ss, sheetName, oldCode, newCode) {
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+  var sidCol  = headers.indexOf('studentId');
+  if (sidCol < 0) return 0;
+  var range = sheet.getRange(2, sidCol + 1, sheet.getLastRow() - 1, 1);
+  var vals  = range.getValues();
+  var updated = 0;
+  for (var i = 0; i < vals.length; i++) {
+    var s = String(vals[i][0] || '');
+    if (s.length >= 5 && s.substring(1, 5) === oldCode) {
+      vals[i][0] = "'" + s.charAt(0) + newCode + s.substring(5); // 先頭0保持のため文字列化
+      updated++;
+    }
+  }
+  if (updated > 0) range.setValues(vals);
   return updated;
+}
+
+// CONFIGのwomenPairings内、a/b/cのstudentIdコード部を置換する（確定フロー用。
+// 統合機能のapplyUniMergeToConfig_と違い対応表(idMap)ではなくoldCode/newCodeの
+// 単純な部分置換）。
+function rewriteWomenPairingsCode_(ss, oldCode, newCode) {
+  var sheet = ss.getSheetByName(SHEET.CONFIG);
+  if (!sheet || sheet.getLastRow() < 1) return;
+  var data = sheet.getDataRange().getValues();
+  for (var i = 0; i < data.length; i++) {
+    if (String(data[i][0]) !== 'womenPairings') continue;
+    var raw = String(data[i][1] || '');
+    if (!raw) return;
+    try {
+      var arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) return;
+      var changed = false;
+      var fix = function (sid) {
+        if (sid && sid.length >= 5 && sid.substring(1, 5) === oldCode) {
+          changed = true;
+          return sid.charAt(0) + newCode + sid.substring(5);
+        }
+        return sid;
+      };
+      arr.forEach(function (pair) {
+        if (!pair) return;
+        pair.a = fix(String(pair.a || ''));
+        pair.b = fix(String(pair.b || ''));
+        pair.c = fix(String(pair.c || ''));
+      });
+      if (changed) sheet.getRange(i + 1, 2).setValue(JSON.stringify(arr));
+    } catch (err) { /* 壊れたJSONは触らない */ }
+    return;
+  }
+}
+
+// 読みの頭文字からポケベルコードを生成し、既存コードを見て連番採番して確定する。
+// 再開可能な設計:
+//   1. 大学名から未完了の確定操作を状態に関係なく必ず先に検索する。見つかればその
+//      oldCode/newCodeを再利用し、新規採番は絶対に行わない（履歴保存後・マスター
+//      更新前の失敗からも安全に再開できる＝P0-1対策）。
+//   2. 見つからない場合のみ新規採番する。他大学の未完了操作が予約済みのnewCodeも
+//      使用済み扱いにする（P0-4対策）。
+//   3. 対応表(oldCode/newCode)は大学マスターへの書込より先に履歴の親行へ永続化する。
+//   4. ロックはスイープ完了までスクリプト全体で保持する。学生登録
+//      (actionRegisterPreStudent_)も同じLockService.getScriptLock()を使うため、
+//      スイープ中の新規登録は自然にブロックされ、途中登録によるID衝突を防げる
+//      （大学統合機能で既に受容済みのトレードオフを踏襲。登録側は変更しない＝P0-2対策）。
+//   5. 非アクティブなイベントは対象外（統合機能と仕様を一致）。
+//   6. 親行(eventId='__operation__')は全子行が完了/対象外で揃って初めて「完了」にする。
+//      対象イベント0件でも完了扱いにできる（P1-3対策）。
+function actionAdminConfirmUniversity_(p) {
+  var e = validateAdmin_(p);
+  if (e) return e;
+  var name = String(p.name || '').trim();
+  if (!name) return err_('missing_params');
+
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) return err_('locked');
+  try {
+    var historySheet = getConfirmHistorySheet_();
+    var active = findActiveConfirmOperation_(historySheet, name); // 状態に関係なく必ず先に検索(P0-1対策)
+
+    var uni = findUniversityRowByName_(name);
+    if (!uni.found) return err_('university_not_found');
+
+    var operationId, oldCode, newCode;
+
+    if (active) {
+      operationId = active.operationId;
+      oldCode     = active.oldCode;
+      newCode     = active.newCode;
+      // マスターがまだ新コード・確定になっていなければここで書く（前回はここで落ちた可能性がある）
+      if (uni.code !== newCode || uni.status !== '確定') {
+        uni.sheet.getRange(uni.row, uni.codeCol + 1).setValue("'" + newCode);
+        if (uni.statusCol >= 0) uni.sheet.getRange(uni.row, uni.statusCol + 1).setValue('確定');
+      }
+    } else {
+      if (uni.status === '確定') return err_('already_confirmed_no_history'); // 履歴の無い確定済み(旧データ)は安全側で停止
+      var prefix = pokebellPrefix_(p.reading);
+      if (!prefix) return err_('invalid_reading');
+
+      oldCode = uni.code;
+      var reserved = collectReservedCodes_(historySheet); // P0-4対策
+      var maxSeq = 0;
+      var uniData = uni.sheet.getDataRange().getValues();
+      uniData.slice(1).forEach(function (row) {
+        var raw = String(row[uni.codeCol] || '').trim().replace(/[０-９]/g, function(c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); });
+        var code = raw.padStart(4, '0');
+        reserved.add(code);
+        if (code.substring(0, 2) === prefix) {
+          var seq = Number(code.substring(2));
+          if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+        }
+      });
+      var nextSeq = maxSeq + 1;
+      while (reserved.has(prefix + String(nextSeq).padStart(2, '0'))) { nextSeq++; }
+      newCode = prefix + String(nextSeq).padStart(2, '0');
+
+      operationId = Utilities.getUuid();
+      upsertConfirmHistory_(historySheet, operationId, name, oldCode, newCode, '__operation__', '処理中'); // 先に履歴保存(P0-1対策)
+      uni.sheet.getRange(uni.row, uni.codeCol + 1).setValue("'" + newCode);
+      if (uni.statusCol >= 0) uni.sheet.getRange(uni.row, uni.statusCol + 1).setValue('確定');
+    }
+
+    var rewritten = 0;
+    var needsReview = false;
+    if (oldCode !== newCode) {
+      var evSheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+      var evData  = (evSheet && evSheet.getLastRow() >= 2) ? evSheet.getDataRange().getValues() : [];
+      var evIdCol = evData.length ? evData[0].map(String).indexOf('eventId') : -1;
+
+      evData.slice(1).forEach(function (evRow) {
+        var eventId = String(evRow[evIdCol] || '').trim();
+        if (!eventId) return;
+
+        if (isEventInactive_(eventId)) {
+          upsertConfirmHistory_(historySheet, operationId, name, oldCode, newCode, eventId, '対象外');
+          return;
+        }
+        var existingRow    = findConfirmHistoryRow_(historySheet, operationId, eventId);
+        var existingStatus = existingRow > 0 ? String(historySheet.getRange(existingRow, 6).getValue()) : '';
+        if (existingStatus === '完了') return; // 冪等スキップ
+
+        try {
+          var ss = eventSs_(eventId);
+          var n = 0;
+          [SHEET.STUDENTS, SHEET.STAMP_LOG, SHEET.STAMP_PARTICIPANTS, SHEET.PRIZE_LOG, SHEET.PRE_REG, SHEET.VIEW_LOG].forEach(function (sheetName) {
+            n += rewriteStudentUniCodeInSheet_(ss, sheetName, oldCode, newCode);
+          });
+          rewriteWomenPairingsCode_(ss, oldCode, newCode);
+          upsertConfirmHistory_(historySheet, operationId, name, oldCode, newCode, eventId, '完了');
+          rewritten += n;
+        } catch (err) {
+          upsertConfirmHistory_(historySheet, operationId, name, oldCode, newCode, eventId, '要確認');
+          needsReview = true;
+        }
+      });
+    }
+
+    // 親行の完了判定: この操作の全子行が 完了/対象外 で揃っていれば完了、要確認が1つでもあれば要確認
+    var allChildren = historySheet.getLastRow() >= 2
+      ? historySheet.getRange(2, 1, historySheet.getLastRow() - 1, 6).getValues()
+          .filter(function (r) { return String(r[0]) === operationId && String(r[4]) !== '__operation__'; })
+      : [];
+    var anyReview = needsReview || allChildren.some(function (r) { return String(r[5]) === '要確認'; });
+    var allDone   = allChildren.length === 0 || allChildren.every(function (r) { return String(r[5]) === '完了' || String(r[5]) === '対象外'; });
+    upsertConfirmHistory_(historySheet, operationId, name, oldCode, newCode, '__operation__', anyReview ? '要確認' : (allDone ? '完了' : '処理中'));
+
+    return ok_({ code: newCode, rewritten: rewritten, needsReview: anyReview });
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // 大学マスターを読み、統合元(name)・統合先(target)の行情報をまとめて返す。
