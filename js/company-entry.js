@@ -204,10 +204,27 @@ async function handleSubmit_() {
 
   if (res.ok) {
     showState_('success');
+    // 既存申込の上書きだった場合は、新規受付と区別して伝える
+    // （企業名またはメールアドレスが一致すると同一企業の再申込として更新される）
+    if (res.data && res.data.updated) {
+      const t = document.querySelector('#state-success .state-title');
+      const m = document.querySelector('#state-success .state-msg');
+      if (t) t.textContent = '申込内容を更新しました';
+      if (m) m.innerHTML = '既にご登録の申込内容を、今回の入力で更新しました。<br>' +
+                           '内容を確認後、事務局よりご連絡いたします。';
+    }
   } else {
+    const negMsg = '枚数・食数にマイナスの値が含まれています。0以上でご入力ください。';
     const msg = {
       no_active_event: '申込受付中のイベントが見つかりませんでした。',
       missing_params:  '入力に不備があります。',
+      event_inactive:  '現在この大会の申込は受け付けていません。',
+      lock_timeout:    '混み合っています。少し時間をおいて再度お試しください。',
+      negative_carCount:   negMsg,
+      negative_personPass: negMsg,
+      negative_carPass:    negMsg,
+      negative_lunchSat:   negMsg,
+      negative_lunchSun:   negMsg,
     }[res.error] || 'エラーが発生しました。時間をおいて再度お試しください。（' + (res.error || '') + '）';
     showError_('申込に失敗しました', msg);
   }
