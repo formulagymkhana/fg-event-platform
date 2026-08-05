@@ -2172,13 +2172,15 @@ async function loadEntryList_() {
   const gen = ++loadGen_;
   bindListPageEvents_();
 
-  const [preRes, cfgRes] = await Promise.all([
+  const [preRes, cfgRes, uniRes] = await Promise.all([
     adminCall_('adminGetPreRegistrations', { event: curEvent_ }),
     adminGetConfigDeduped_(curEvent_),
+    adminCall_('adminGetPendingUniversities', { event: curEvent_ }),
   ]);
   entryListLoading_ = false;
   if (gen !== loadGen_) return;
   if (!preRes.ok) { showListErr_('entry-list-wrap', preRes); return; }
+  renderPendingUniWarning_('entry-list-wrap', uniRes);
 
   preRegAll_ = preRegRowsToObjects_(preRes.data);
   const cfg  = (cfgRes.ok && cfgRes.data && cfgRes.data.config) ? cfgRes.data.config : {};
@@ -2206,12 +2208,14 @@ async function loadReceptionList_() {
   const gen = ++loadGen_;
   bindListPageEvents_();
 
-  const [preRes, cfgRes] = await Promise.all([
+  const [preRes, cfgRes, uniRes] = await Promise.all([
     adminCall_('adminGetPreRegistrations', { event: curEvent_ }),
     adminGetConfigDeduped_(curEvent_),
+    adminCall_('adminGetPendingUniversities', { event: curEvent_ }),
   ]);
   if (gen !== loadGen_) return;
   if (!preRes.ok) { showListErr_('reception-list-wrap', preRes); return; }
+  renderPendingUniWarning_('reception-list-wrap', uniRes);
 
   preRegAll_ = preRegRowsToObjects_(preRes.data);
   const cfg  = (cfgRes.ok && cfgRes.data && cfgRes.data.config) ? cfgRes.data.config : {};
@@ -2338,6 +2342,34 @@ function normalizeWomenPairings_(pairs, preRegAll) {
   };
   const out = pairs.map(p => ({ a: fix(p.a), b: fix(p.b), c: fix(p.c) }));
   return { pairs: out, dupRemoved };
+}
+
+// 承認待ち（仮コード）の大学が残っている間、リストの上に警告を出す。
+// 仮コードのままCSVを出すと、そのIDが印刷物や配布物に載ってしまい、
+// 後から確定させても紙とデータが食い違う。出力自体はブロックしない（運用判断）。
+function renderPendingUniWarning_(wrapId, pendingRes) {
+  const wrap = id_(wrapId);
+  if (!wrap || !wrap.parentNode) return;
+  const bannerId = wrapId + '-uni-warn';
+  const existing = id_(bannerId);
+  const list = (pendingRes && pendingRes.ok && pendingRes.data)
+    ? (pendingRes.data.universities || []) : [];
+  if (!list.length) { if (existing) existing.remove(); return; }
+
+  const names = list.map(u => `${u.name}（仮 ${u.code}）`).join('、');
+  const html =
+    `<strong>⚠ 承認待ちの大学が ${list.length}件 あります</strong><br>` +
+    `${esc_(names)}<br>` +
+    'この大学の学生IDは仮コードのままです。確定すると学生IDが変わるため、' +
+    '先に「大学管理」で確定させてからCSVを出力・印刷してください。';
+  const el = existing || document.createElement('div');
+  if (!existing) {
+    el.id = bannerId;
+    el.style.cssText = 'background:#FFF7E1;border:1px solid #F5D680;border-radius:8px;' +
+      'padding:10px 12px;margin:0 0 10px;font-size:12px;color:#5C4200;line-height:1.6';
+    wrap.parentNode.insertBefore(el, wrap);
+  }
+  el.innerHTML = html;
 }
 
 function showListErr_(wrapId, res) {
@@ -2656,11 +2688,19 @@ function buildSupportRows_() {
     return String(a.studentId).localeCompare(String(b.studentId));
   });
   return rows.map(r => {
-    const attr    = String(r['属性'] || '');
-    const svcCls  = String(r['サービス作業クラス'] || '');
-    const backup  = attr === '補欠ドライバー' ? svcCls : '';
-    const mech    = attr === '応援学生' && svcCls && !svcCls.includes('実施しない') ? svcCls : '';
-    const needDoc = attr === '応援学生' && svcCls && svcCls !== '' && !r['保険証明URL'] ? '※保険確認' : '';
+    // ⚠ 事前登録シートに「属性」列は存在しない（列は「参加区分」）。
+    //   以前は r['属性'] を見ていたため常に undefined となり、
+    //   補欠選手登録・メカニック登録・必要書類の3列が常に空欄になっていた。
+    const cat    = String(r['参加区分'] || r.category || '');
+    const svcCls = String(r['サービス作業クラス'] || '');
+    // 「実施しない」は区分によって文言が異なる（補欠は「サービス作業は実施しない/来場予定はない」）
+    const doesService = !!svcCls && !svcCls.includes('実施しない');
+    const isBackup    = cat === '補欠ドライバー';
+    const isSupport   = cat === '見学・応援学生(メカニック登録含む)';
+    const backup  = isBackup ? svcCls : '';
+    const mech    = isSupport && doesService ? svcCls : '';
+    // 保険証明を提出するのは「見学・応援でサービス作業を行う人」のみ（補欠は提出しない）
+    const needDoc = isSupport && doesService && !r['保険証明URL'] ? '※保険確認' : '';
     return {
       school:    String(r['大学名'] || '').trim(),
       name:      r['氏名'] || '',
