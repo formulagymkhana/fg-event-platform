@@ -300,7 +300,7 @@ function actionActivateStamp_(p) {
     let participantSheet = ss_.getSheetByName(SHEET.STAMP_PARTICIPANTS);
     if (!participantSheet) {
       participantSheet = ss_.insertSheet(SHEET.STAMP_PARTICIPANTS);
-      participantSheet.appendRow(['時刻', 'eventId', 'studentId', 'stampToken', '開始日時', 'status']);
+      participantSheet.appendRow(['時刻', 'eventId', 'studentId', 'stampToken', 'activatedAt', 'status']);
     }
 
     let stampToken = null;
@@ -386,7 +386,11 @@ function actionSaveStamp_(p) {
     const count = prevCount + 1;
 
     // 今回のスタンプで景品条件を達成したか (cfg は上で取得済み)
-    const threshold = Number(cfg.prizeThreshold) || Number(cfg.prizeCriteria) || 5;
+    // ⚠ キーの優先順は computePrizeState_ と必ず揃えること。
+    //   新規イベントは setupEventSpreadsheet_ が prizeUnitSize を書き、管理画面も
+    //   prizeUnitSize を保存するため、prizeThreshold を先に見ると通常は存在せず
+    //   ハードコードの 5 にフォールバックしてしまう。
+    const threshold = Number(cfg.prizeUnitSize) || Number(cfg.prizeThreshold) || 5;
     const justCleared = prevCount < threshold && count >= threshold;
 
     return ok_(buildStampResult_(p.event, student.studentId, count, {
@@ -1214,7 +1218,7 @@ function actionRegisterWalkIn_(p) {
       let participantSheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_PARTICIPANTS);
       if (!participantSheet) {
         participantSheet = eventSs_(p.event).insertSheet(SHEET.STAMP_PARTICIPANTS);
-        participantSheet.appendRow(['時刻', 'eventId', 'studentId', 'stampToken', '開始日時', 'status']);
+        participantSheet.appendRow(['時刻', 'eventId', 'studentId', 'stampToken', 'activatedAt', 'status']);
       }
       const pData    = participantSheet.getDataRange().getValues();
       const pHeaders = pData[0].map(String);
@@ -1300,7 +1304,7 @@ function actionRegisterWalkIn_(p) {
       let stampParticipantSheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_PARTICIPANTS);
       if (!stampParticipantSheet) {
         stampParticipantSheet = eventSs_(p.event).insertSheet(SHEET.STAMP_PARTICIPANTS);
-        stampParticipantSheet.appendRow(['時刻', 'eventId', 'studentId', 'stampToken', '開始日時', 'status']);
+        stampParticipantSheet.appendRow(['時刻', 'eventId', 'studentId', 'stampToken', 'activatedAt', 'status']);
       }
       stampParticipantSheet.appendRow([
         new Date(), p.event, studentId, stampToken, new Date(), 'active',
@@ -1711,7 +1715,9 @@ function actionAdminGetPendingUniversities_(p) {
   var nameCol   = headers.indexOf('大学名');
   var codeCol   = headers.indexOf('コード');
   var statusCol = headers.indexOf('状態');
-  var historySheet = masterSs_().getSheetByName(SHEET.CONFIRM_HISTORY); // 未作成なら未完了操作は無い(新規作成はしない)
+  // ⚠ 大学ごとに findActiveConfirmOperation_ を呼ぶと確定履歴シートを毎回全読みするN+1になる。
+  //   履歴は1回だけ読んで「大学名→未完了操作」のMapに畳んでから突き合わせる。
+  var activeByName = buildActiveConfirmOperationMap_();
   var out = [];
   data.slice(1).forEach(function (row) {
     var name   = String(row[nameCol] || '').trim();
@@ -1721,8 +1727,7 @@ function actionAdminGetPendingUniversities_(p) {
       out.push({ name: name, code: String(row[codeCol] || '').trim(), status: status, resuming: false });
       return;
     }
-    if (!historySheet) return;
-    var active = findActiveConfirmOperation_(historySheet, name);
+    var active = activeByName[name];
     if (active) {
       out.push({ name: name, code: active.newCode, status: status, resuming: true });
     }
@@ -1782,6 +1787,25 @@ function findActiveConfirmOperation_(historySheet, name) {
     }
   }
   return null;
+}
+
+// 未完了(親行が処理中／要確認)の確定操作を、大学名をキーにしたオブジェクトへ畳んで返す。
+// 一覧表示のように多数の大学を一度に判定する用途では、大学ごとに
+// findActiveConfirmOperation_ を呼ぶと履歴シートを毎回全読みするN+1になるため、
+// 必ずこちらを使って1回の読み込みで済ませる。
+// 同じ大学に複数の未完了操作があった場合は、後の行（＝新しい操作）を優先する。
+function buildActiveConfirmOperationMap_() {
+  var map = {};
+  var historySheet = masterSs_().getSheetByName(SHEET.CONFIRM_HISTORY); // 未作成なら未完了操作は無い(新規作成はしない)
+  if (!historySheet || historySheet.getLastRow() < 2) return map;
+  var data = historySheet.getRange(2, 1, historySheet.getLastRow() - 1, 6).getValues();
+  data.forEach(function (row) {
+    if (String(row[4]) !== '__operation__') return;
+    var status = String(row[5]);
+    if (status !== '処理中' && status !== '要確認') return;
+    map[String(row[1])] = { operationId: String(row[0]), oldCode: String(row[2]), newCode: String(row[3]) };
+  });
+  return map;
 }
 
 // 他大学分も含め、未完了の確定操作が予約済みのnewCodeを全て集める。
@@ -1978,6 +2002,7 @@ function actionAdminConfirmUniversity_(p) {
             n += rewriteStudentUniCodeInSheet_(ss, sheetName, oldCode, newCode);
           });
           rewriteWomenPairingsCode_(ss, oldCode, newCode);
+          CacheService.getScriptCache().remove('cfg_' + eventId); // CONFIGを書き換えたらキャッシュを捨てる
           upsertConfirmHistory_(historySheet, operationId, name, oldCode, newCode, eventId, '完了');
           rewritten += n;
         } catch (err) {
@@ -2378,6 +2403,7 @@ function actionAdminMergeUniversity_(p) {
       applyUniMergeToSheet_(ss, SHEET.PRIZE_LOG,          idMap, name, target);
       if (reconcileSchoolEntry_(ss, name, target)) schoolEntryDup = true;
       applyUniMergeToConfig_(ss, idMap, name, target);
+      CacheService.getScriptCache().remove('cfg_' + eventId); // CONFIGを書き換えたらキャッシュを捨てる
       applyUniMergeToSheet_(ss, SHEET.STUDENTS,           idMap, name, target);
 
       upsertMergeHistory_(historySheet, operationId, name, target, eventId, '完了', JSON.stringify(idMap));

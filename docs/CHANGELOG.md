@@ -31,6 +31,33 @@ GAS はリポジトリ管理外のため、push しても自動反映されま�
 
 ---
 
+## 2026-08-05 データ整合性の横断監査と修正（N+1・景品閾値・シートヘッダー・CONFIGキャッシュ）
+
+- 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `js/api.js`, `app/*.html`（11ファイル、api.jsのバスターのみ）
+- 変更内容: スキーマ定義・シート参照・API契約を横断的に突き合わせた監査で判明した不整合を修正。
+  - **`actionAdminGetPendingUniversities_`のN+1を解消**: 確定済み大学1件ごとに
+    `findActiveConfirmOperation_`が大学確定履歴シートを全読みしていた（大学マスターは約50校、
+    ダッシュボード表示のたびに発火）。`buildActiveConfirmOperationMap_`を新設し、
+    履歴を1回読んでMapに畳む方式へ変更。**同日の確定フロー改修で持ち込んだ回帰**
+  - **`actionSaveStamp_`の`justCleared`判定を修正**: `cfg.prizeThreshold`を先に見ていたため、
+    `prizeUnitSize`しか持たない通常のイベントではハードコードの5にフォールバックしていた。
+    `computePrizeState_`と同じ優先順（`prizeUnitSize`優先）に統一。
+    なお`justCleared`はどのフロントも読んでいないため実害は無かった（潜在バグ）
+  - **`スタンプ参加者`シートのヘッダー不一致を修正**: 正規スキーマ（`admin.gs`）は`activatedAt`だが、
+    `api.gs`の遅延作成3箇所が`開始日時`で作っていた。5列目を名前で読む処理は現状無いため
+    実害は無かったが、将来追加すると経路によって静かに壊れるため`activatedAt`へ統一
+  - **CONFIG書き換え後のキャッシュ削除を追加**: 統合フロー`applyUniMergeToConfig_`・
+    確定フロー`rewriteWomenPairingsCode_`がCONFIGを書き換えても`cfg_<eventId>`キャッシュを
+    消していなかった（`actionAdminUpdateConfig_`は消している）。現状これらを
+    キャッシュ経由で読む処理は無く実害ゼロだが、予防的に追加
+  - `js/api.js`の`activateStamp`コメントが実在しないフィールド`prizeCriteria`を記載していたのを実際の返り値へ修正
+- 理由/背景: 全データの接続と整合性の横断確認（ユーザー依頼）。
+  action名・シート列の位置指定読み取り・configキー・studentIdを持つ6シートの網羅性は
+  **すべて整合を確認済み**（不整合なし）
+- GAS: **再デプロイ必須**
+- 申し送り/注意点: 修正しなかった論点2件（仮コード再利用×非アクティブ除外の相互作用、
+  区分コードの3箇所不一致）は運用判断が必要なため`docs/NOTES.md`に記録した
+
 ## 2026-08-05 未登録大学の確定フローを再開可能化（大学確定履歴シート新設）
 
 - 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `js/admin.js`, `app/admin.html`, `docs/USER_MANUAL.txt`
