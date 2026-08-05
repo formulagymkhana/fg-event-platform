@@ -114,13 +114,6 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // 準備中ボタン: トースト案内
-  document.addEventListener('click', e => {
-    if (e.target.hasAttribute('data-wip')) {
-      showToast_('この機能は今後実装予定です。現在はスプレッドシート直接編集または GAS 関数で対応してください。');
-    }
-  });
-
   // ハッシュルーティング
   window.addEventListener('hashchange', () => { if (adminKey_) route_(); });
 
