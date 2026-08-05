@@ -10,7 +10,7 @@
                          https://script.googleusercontent.com;
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src 'self' https://fonts.gstatic.com;">
-  <title>FORMULA GYMKHANA — ブース出展申込</title>
+  <title>FORMULA GYMKHANA — ブース出展/パス申込</title>
   <link rel="preconnect" href="https://script.google.com">
   <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
   <link rel="stylesheet" href="../js/style.css?v=20260724b">
@@ -156,7 +156,7 @@
   <div class="card" id="state-loading">
     <div class="fg-header">
       <div class="fg-logo"><img class="fg-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
-      <div class="fg-page-name">ブース出展申込</div>
+      <div class="fg-page-name">ブース出展/パス申込</div>
     </div>
     <div class="card-body" style="text-align:center;padding:40px 24px;">
       <div class="spinner"></div>
@@ -168,7 +168,7 @@
   <div class="card" id="state-form" style="display:none">
     <div class="fg-header">
       <div class="fg-logo"><img class="fg-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
-      <div class="fg-page-name">ブース出展申込</div>
+      <div class="fg-page-name">ブース出展/パス申込</div>
     </div>
     <div class="card-body">
       <p style="font-size:13px;color:var(--fg-muted);margin-bottom:16px;line-height:1.6;">出展はオフィシャル協賛企業様に限ります。必要事項をご記入のうえお申し込みください。</p>
@@ -274,6 +274,10 @@
           <label>市区町村以降<span class="req">*</span></label>
           <input type="text" id="f-address" placeholder="例：杉並区成田東3-13-11" autocomplete="street-address">
           <p class="field-err" id="err-address"></p>
+        </div>
+        <div class="form-row">
+          <label>部署名</label>
+          <input type="text" id="f-department" placeholder="例：営業部" autocomplete="organization-title">
         </div>
         <div class="step-nav">
           <button class="btn-back" id="btn-s2-back">← 戻る</button>
@@ -454,7 +458,7 @@
   <div class="card" id="state-submitting" style="display:none">
     <div class="fg-header">
       <div class="fg-logo"><img class="fg-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
-      <div class="fg-page-name">ブース出展申込</div>
+      <div class="fg-page-name">ブース出展/パス申込</div>
     </div>
     <div class="card-body" style="text-align:center;padding:40px 24px;">
       <div class="spinner"></div>
@@ -466,7 +470,7 @@
   <div class="card" id="state-success" style="display:none">
     <div class="fg-header">
       <div class="fg-logo"><img class="fg-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
-      <div class="fg-page-name">ブース出展申込</div>
+      <div class="fg-page-name">ブース出展/パス申込</div>
     </div>
     <div class="card-body" style="text-align:center;">
       <div class="success-icon">✓</div>
@@ -487,7 +491,7 @@
   <div class="card" id="state-error" style="display:none">
     <div class="fg-header">
       <div class="fg-logo"><img class="fg-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
-      <div class="fg-page-name">ブース出展申込</div>
+      <div class="fg-page-name">ブース出展/パス申込</div>
     </div>
     <div class="card-body" style="text-align:center;">
       <div class="state-icon">⚠</div>
@@ -498,6 +502,6 @@
 
   <script src="../js/config.js?v=20260724b"></script>
   <script src="../js/api.js?v=20260805a"></script>
-  <script src="../js/company-entry.js?v=20260805a"></script>
+  <script src="../js/company-entry.js?v=20260805b"></script>
 </body>
 </html>

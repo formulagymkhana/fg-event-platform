@@ -83,6 +83,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // 出展申込ページ
   id_('btn-entry-reload')?.addEventListener('click', loadCompanyEntries_);
   id_('btn-entry-csv')?.addEventListener('click', downloadEntryCsv_);
+  id_('btn-entry-shipping-csv')?.addEventListener('click', downloadEntryShippingCsv_);
   id_('modal-entry-close')?.addEventListener('click', () => { id_('modal-entry').style.display = 'none'; });
   id_('modal-entry-edit-close')?.addEventListener('click', () => { id_('modal-entry-edit').style.display = 'none'; });
   id_('modal-school-entry-close')?.addEventListener('click', () => { id_('modal-school-entry').style.display = 'none'; });
@@ -1946,7 +1947,7 @@ async function loadCompanyEntries_() {
   const res = await adminCall_('adminGetCompanyEntries', { event: curEvent_ });
   id_('entry-loading').style.display = 'none';
 
-  if (!res.ok) { showToast_('出展申込の読み込みに失敗しました'); return; }
+  if (!res.ok) { showToast_('ブース出展/パス申込の読み込みに失敗しました'); return; }
 
   companyEntries_ = res.data.entries || [];
   renderEntries_(companyEntries_);
@@ -1985,7 +1986,7 @@ function renderEntries_(entries) {
   if (!list) return;
 
   if (!entries.length) {
-    list.innerHTML = '<p class="empty-msg">出展申込はまだありません</p>';
+    list.innerHTML = '<p class="empty-msg">ブース出展/パス申込はまだありません</p>';
     return;
   }
 
@@ -2103,6 +2104,7 @@ function showEntryDetail_(e) {
     grp('送付先住所', [
       drow('郵便番号', e['郵便番号']),
       drow('住所', (e['都道府県'] || '') + (e['住所'] || '')),
+      drow('部署名', e['部署名']),
     ].join('')),
     grp('出展内容', [
       drow('出展内容', e['出展内容']),
@@ -2129,7 +2131,7 @@ function showEntryDetail_(e) {
 
 function downloadEntryCsv_() {
   if (!companyEntries_.length) { showToast_('申込データがありません'); return; }
-  const cols = ['申込日時','社名略称','企業名正式','代表者名','担当者名','電話番号','担当者電話','メールアドレス','郵便番号','都道府県','住所','出展内容','ブース区画','展示車両数','デモ走行','デモ走行詳細','人パス','車両パス','昼食土','昼食日','備考','状態'];
+  const cols = ['申込日時','社名略称','企業名正式','代表者名','担当者名','電話番号','担当者電話','メールアドレス','郵便番号','都道府県','住所','部署名','出展内容','ブース区画','展示車両数','デモ走行','デモ走行詳細','人パス','車両パス','昼食土','昼食日','備考','状態'];
   const header = cols.join(',');
   const rows   = companyEntries_.map(e => cols.map(c => '"' + String(e[c] ?? '').replace(/"/g, '""') + '"').join(','));
   const csv    = '﻿' + [header, ...rows].join('\r\n');
@@ -2137,6 +2139,51 @@ function downloadEntryCsv_() {
   const a      = document.createElement('a');
   a.href       = URL.createObjectURL(blob);
   a.download   = '出展申込_' + curEvent_ + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/**
+ * 西濃運輸パス発送用CSV（自社雛形「西濃パス発送雛形」準拠）。
+ * 列は雛形ファイルの1行目そのまま:
+ *   お届け先電話番号 / 郵便番号 / お届け先県名 / お届け先住所1 / お届け先住所2 /
+ *   お届け先名称1 / お届け先名称2 / 出荷通知メール希望区分 / 記事
+ * 対応関係（ユーザー確認済み・2026-08-05）:
+ *   - お届け先電話番号 ← 担当者電話（代表電話ではなく、実際にパスを受け取る担当者へ連絡がつくため）
+ *   - お届け先名称1 ← 企業名正式 / お届け先名称2 ← 担当者名+「様」（部署名は使わない）
+ *   - お届け先住所2は空欄（フォームの住所欄が1本のため、全て住所1に入れる）
+ *   - 出荷通知メール希望区分は空欄（用途不明のため推測で埋めない。必要なら手動で追記）
+ *   - 記事は全行固定で「FGパス類」（雛形1行目の記入例に合わせた）
+ * ⚠ 部署名(department)は名称2に使わない方針だが、フォーム自体には別項目として残す
+ *   （事務局が住所欄で参照できるように、詳細モーダル・通常CSVには表示する）。
+ */
+function downloadEntryShippingCsv_() {
+  const targets = companyEntries_.filter(e => (Number(e['人パス']) || 0) > 0 || (Number(e['車両パス']) || 0) > 0);
+  if (!targets.length) { showToast_('人パス・車両パスの申込がある企業がありません'); return; }
+
+  const cols = ['お届け先電話番号', '郵便番号', 'お届け先県名', 'お届け先住所1', 'お届け先住所2',
+                'お届け先名称1', 'お届け先名称2', '出荷通知メール希望区分', '記事'];
+  const header = cols.join(',');
+  const rows = targets.map(e => {
+    const contact = String(e['担当者名'] || '').trim();
+    const values = [
+      e['担当者電話'] || '',
+      e['郵便番号'] || '',
+      e['都道府県'] || '',
+      e['住所'] || '',
+      '',
+      e['企業名正式'] || '',
+      contact ? contact + '様' : '',
+      '',
+      'FGパス類',
+    ];
+    return values.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',');
+  });
+  const csv  = '﻿' + [header, ...rows].join('\r\n'); // UTF-8 BOM付き（他のCSVと同じ方式）
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = 'パス発送_' + curEvent_ + '.csv';
   a.click();
   URL.revokeObjectURL(a.href);
 }
