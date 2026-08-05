@@ -2160,17 +2160,9 @@ async function loadEntryList_() {
     ...menSchools.filter(s => !schoolOrder_.includes(s)),
   ];
 
-  // 女子ペアリング: 保存済みが女子ドライバーの範囲外なら削除
-  // ⚠ Cヒートは大会によって使わない場合があるが、キー自体は必ず維持すること。
-  //   a/bだけを再構築するとCヒートの値が毎回無条件に消えてしまう不具合があった。
-  const womenIds = new Set(preRegAll_
-    .filter(r => classOf_(r) === 'W')
-    .map(r => r.studentId));
-  womenPairings_ = womenPairings_.map(p => ({
-    a: womenIds.has(p.a) ? p.a : '',
-    b: womenIds.has(p.b) ? p.b : '',
-    c: womenIds.has(p.c) ? p.c : '',
-  }));
+  const norm = normalizeWomenPairings_(womenPairings_, preRegAll_);
+  womenPairings_ = norm.pairs;
+  if (norm.dupRemoved) showToast_('女子ペアリングに重複があったため解除しました。内容を確認し保存してください。');
 
   renderSchoolOrder_();
   renderWomenPairs_();
@@ -2197,6 +2189,9 @@ async function loadReceptionList_() {
     ...schoolOrder_.filter(s => menSchools.includes(s)),
     ...menSchools.filter(s => !schoolOrder_.includes(s)),
   ];
+  const norm = normalizeWomenPairings_(womenPairings_, preRegAll_);
+  womenPairings_ = norm.pairs;
+  if (norm.dupRemoved) showToast_('女子ペアリングに重複があったため解除しました。内容を確認し保存してください。');
 
   renderReceptionList_();
   renderSupportList_();
@@ -2289,6 +2284,27 @@ function computeMenSchools_(all) {
     }
   });
   return out;
+}
+
+// 女子ペアリングの自己修復: 範囲外(女子ドライバーでなくなった)IDの除去、および
+// 全ペア横断での重複除去（ドライバー1人につき出走枠は1つのため）。
+// ⚠ Cヒートは大会によって使わない場合があるが、キー自体は必ず維持すること。
+//   a/bだけを再構築するとCヒートの値が毎回無条件に消えてしまう不具合があった。
+// 保存するまでサーバー側のCONFIGは変えない（読み込み時のメモリ上修復のみ）。
+function normalizeWomenPairings_(pairs, preRegAll) {
+  const womenIds = new Set(preRegAll
+    .filter(r => classOf_(r) === 'W')
+    .map(r => r.studentId));
+  const seen = new Set();
+  let dupRemoved = false;
+  const fix = v => {
+    if (!v || !womenIds.has(v)) return '';
+    if (seen.has(v)) { dupRemoved = true; return ''; }
+    seen.add(v);
+    return v;
+  };
+  const out = pairs.map(p => ({ a: fix(p.a), b: fix(p.b), c: fix(p.c) }));
+  return { pairs: out, dupRemoved };
 }
 
 function showListErr_(wrapId, res) {
@@ -2417,6 +2433,12 @@ async function saveSchoolOrder_() {
   }
 }
 
+// a/b/cが全て空のペア（「ペア追加」だけ押して未入力のもの）は出走枠を持たないため、
+// 走行順のM（女子登録ペア数）にも表示区分の境界計算にも含めない。
+function activeWomenPairings_() {
+  return womenPairings_.filter(p => p.a || p.b || p.c);
+}
+
 // ── 走行順の計算 ────────────
 // 男子A: 1..N / 女子A: N+1..N+M / 男子B: N+M+1..2N+M / 女子B: 2N+M+1..2N+2M /
 // 男子C: 2N+2M+1..3N+2M / 女子C: 3N+2M+1..3N+2M+Mc
@@ -2424,7 +2446,8 @@ async function saveSchoolOrder_() {
 //  その場合は既存の男子C以前の計算式に一切影響しない)
 function computeRunningOrder_() {
   const N = schoolOrder_.length;
-  const M = womenPairings_.length;
+  const activePairs = activeWomenPairings_();
+  const M = activePairs.length;
   const byId = {};  // studentId → 走行順
   const menBySchoolAndClass = new Map();
 
@@ -2449,14 +2472,14 @@ function computeRunningOrder_() {
     });
   });
 
-  womenPairings_.forEach((p, i) => {
+  activePairs.forEach((p, i) => {
     if (p.a) byId[p.a] = N + i + 1;
     if (p.b) byId[p.b] = 2 * N + M + i + 1;
   });
 
   // 女子Cヒート: Cが選ばれているペアだけ、男子Cの後ろに詰めて連番を振る
   let cSeq = 0;
-  womenPairings_.forEach(p => {
+  activePairs.forEach(p => {
     if (!p.c) return;
     cSeq++;
     byId[p.c] = 3 * N + 2 * M + cSeq;
@@ -2656,7 +2679,7 @@ function renderOrderList_() {
     .sort((a, b) => a.order - b.order);
 
   const N = schoolOrder_.length;
-  const M = womenPairings_.length;
+  const M = activeWomenPairings_().length;
   const heatA = rows.filter(r => r.order <= N + M);
   const heatB = rows.filter(r => r.order > N + M && r.order <= 2 * N + 2 * M);
   const heatC = rows.filter(r => r.order > 2 * N + 2 * M);
