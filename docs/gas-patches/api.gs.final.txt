@@ -3939,6 +3939,7 @@ function actionAdminGetCompanyEntries_(p) {
     郵便番号:     g(row, '郵便番号'),
     都道府県:     g(row, '都道府県'),
     住所:         g(row, '住所'),
+    部署名:       g(row, '部署名'),
     出展内容:     g(row, '出展内容'),
     ブース区画:   g(row, 'ブース区画'),
     展示車両数:   gn(row, '展示車両数'),
