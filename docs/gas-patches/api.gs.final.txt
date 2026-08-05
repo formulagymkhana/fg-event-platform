@@ -1438,12 +1438,22 @@ function actionRegisterPreStudent_(p) {
       studentSheet.getRange(nextPreRow, phoneIdx + 1).setNumberFormat('@');
     }
     studentSheet.getRange(nextPreRow, 1, 1, newRow.length).setValues([newRow]);
+
+    // ⚠ 事前登録シートも必ず同じロック内で書く（P0対策）。
+    //   ここをロック外に出すと、学生マスター書込→事前登録書込 の隙間に
+    //   大学確定・大学統合が走った場合、同じ申込なのに
+    //   学生マスターは新ID・事前登録は旧ID という分裂が起きる。
+    //   ファイルURLはこの時点では未確定なので空で書き、Drive保存後に該当セルだけ更新する
+    //   （アップロード中もロックを保持すると、締切直前の同時登録が waitLock で詰まるため）。
+    p.pledgeUrl = ''; p.licenseUrl = ''; p.insuranceUrl = ''; p.approvalUrl = '';
+    appendPreRegRow_(ss, p, studentId, cardToken);
   } finally {
     lock.releaseLock();
   }
 
-  // ファイル（Drive保存・非公開）→ URLを p に設定
-  // 権限未承認/一時障害でも登録自体は成立させる（サーバーエラーにしない）
+  // ファイル（Drive保存・非公開）
+  // 権限未承認/一時障害でも登録自体は成立させる（サーバーエラーにしない）が、
+  // 「保存できなかった」ことは filesSaved:false として必ず呼び出し元へ伝える。
   let fileUrls = {};
   let filesSaved = true;
   try {
@@ -1452,13 +1462,17 @@ function actionRegisterPreStudent_(p) {
     filesSaved = false;
     console.error('savePreRegFiles_ failed:', err);
   }
-  p.pledgeUrl    = fileUrls.pledgeUrl    || '';
-  p.licenseUrl   = fileUrls.licenseUrl   || '';
-  p.insuranceUrl = fileUrls.insuranceUrl || '';
-  p.approvalUrl  = fileUrls.approvalUrl  || '';
+  // 送られてきたファイルのうち1つでもURLが得られていなければ失敗として扱う
+  // （savePreRegFiles_ はファイル単位で例外を握りつぶすため、ここで突き合わせる）
+  if (!expectedFilesAllSaved_(p.files, fileUrls)) filesSaved = false;
 
-  // 事前登録シート（フル記録）
-  appendPreRegRow_(ss, p, studentId, cardToken);
+  // 保存できたURLだけ、事前登録シートの該当セルへ後追いで書き込む
+  try {
+    updatePreRegFileUrls_(ss, studentId, fileUrls);
+  } catch (err) {
+    filesSaved = false;
+    console.error('updatePreRegFileUrls_ failed:', err);
+  }
 
   // 確認メール（QR名刺は載せない・失敗しても登録は成立）
   let mailSent = true;
@@ -1639,6 +1653,45 @@ function savePreRegFiles_(eventId, studentId, files, name) {
   return urls;
 }
 
+// 送られてきたファイルすべてについて、保存後のURLが得られているかを検証する。
+// savePreRegFiles_ はファイル単位で例外を握りつぶして続行するため、
+// この突き合わせをしないと「1枚だけ保存できていない」状態を検知できない。
+function expectedFilesAllSaved_(files, urls) {
+  if (!files || typeof files !== 'object') return true;
+  const keys = ['pledge', 'license', 'insurance', 'approval'];
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    if (files[k] && files[k].b64 && !(urls || {})[k + 'Url']) return false;
+  }
+  return true;
+}
+
+// 事前登録シートの該当学生の行を探し、ファイルURL列だけを後追いで更新する。
+// 行の追加自体はロック内で済ませてあるので、ここでは既存行の該当セルのみ触る。
+function updatePreRegFileUrls_(ss, studentId, urls) {
+  if (!urls || !Object.keys(urls).length) return;
+  const sheet = ss.getSheetByName(SHEET.PRE_REG);
+  if (!sheet || sheet.getLastRow() < 2) return;
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+  const sidCol  = headers.indexOf('studentId');
+  if (sidCol < 0) return;
+  const sids = sheet.getRange(2, sidCol + 1, sheet.getLastRow() - 1, 1).getValues();
+  let rowNum = -1;
+  for (let i = sids.length - 1; i >= 0; i--) { // 同一IDが複数あれば最新行
+    if (String(sids[i][0]) === String(studentId)) { rowNum = i + 2; break; }
+  }
+  if (rowNum < 0) return;
+  const colMap = {
+    pledgeUrl: '誓約書URL', licenseUrl: '免許証URL',
+    insuranceUrl: '保険証明URL', approvalUrl: '承諾書URL',
+  };
+  Object.keys(colMap).forEach(k => {
+    if (!urls[k]) return;
+    const c = headers.indexOf(colMap[k]);
+    if (c >= 0) sheet.getRange(rowNum, c + 1).setValue(urls[k]);
+  });
+}
+
 // 親「FG事前登録書類」→ イベント別サブフォルダ を取得（無ければ作成）
 function getPreRegEventFolder_(eventId) {
   const root = getOrCreateChildFolder_(DriveApp.getRootFolder(), 'FG事前登録書類');
@@ -1723,11 +1776,19 @@ function actionAdminGetPendingUniversities_(p) {
     var name   = String(row[nameCol] || '').trim();
     var status = statusCol >= 0 ? String(row[statusCol] || '').trim() : '';
     if (!name) return;
+    var active = activeByName[name];
     if (status !== '確定') {
-      out.push({ name: name, code: String(row[codeCol] || '').trim(), status: status, resuming: false });
+      // 未確定でも未完了の確定操作があれば「反映中」。大学マスターの更新はスイープ完了後に
+      // 行うため、中断中の大学はここ（未確定）に現れる。読みの再入力は不要なので resuming 扱い。
+      out.push({
+        name: name,
+        code: active ? active.newCode : String(row[codeCol] || '').trim(),
+        status: status,
+        resuming: !!active,
+      });
       return;
     }
-    var active = activeByName[name];
+    // 確定済みなのに未完了操作が残っている＝マスター更新後に落ちたケース
     if (active) {
       out.push({ name: name, code: active.newCode, status: status, resuming: true });
     }
@@ -1914,7 +1975,11 @@ function rewriteWomenPairingsCode_(ss, oldCode, newCode) {
 //      更新前の失敗からも安全に再開できる＝P0-1対策）。
 //   2. 見つからない場合のみ新規採番する。他大学の未完了操作が予約済みのnewCodeも
 //      使用済み扱いにする（P0-4対策）。
-//   3. 対応表(oldCode/newCode)は大学マスターへの書込より先に履歴の親行へ永続化する。
+//   3. 書き込み順序は「履歴の親行 → 全イベントのスイープ → 最後に大学マスター」。
+//      大学マスターを先に新コードへ更新してしまうと、スイープが中断した隙に入った
+//      新規登録が新コードの連番を取り、再開時に旧コードの学生が同じIDへ変換されて
+//      衝突する。マスターを最後にすることで、中断中の登録も旧コードで採番され、
+//      再開時のスイープで一緒に拾える。
 //   4. ロックはスイープ完了までスクリプト全体で保持する。学生登録
 //      (actionRegisterPreStudent_)も同じLockService.getScriptLock()を使うため、
 //      スイープ中の新規登録は自然にブロックされ、途中登録によるID衝突を防げる
@@ -1943,11 +2008,6 @@ function actionAdminConfirmUniversity_(p) {
       operationId = active.operationId;
       oldCode     = active.oldCode;
       newCode     = active.newCode;
-      // マスターがまだ新コード・確定になっていなければここで書く（前回はここで落ちた可能性がある）
-      if (uni.code !== newCode || uni.status !== '確定') {
-        uni.sheet.getRange(uni.row, uni.codeCol + 1).setValue("'" + newCode);
-        if (uni.statusCol >= 0) uni.sheet.getRange(uni.row, uni.statusCol + 1).setValue('確定');
-      }
     } else {
       if (uni.status === '確定') return err_('already_confirmed_no_history'); // 履歴の無い確定済み(旧データ)は安全側で停止
       var prefix = pokebellPrefix_(p.reading);
@@ -1972,8 +2032,6 @@ function actionAdminConfirmUniversity_(p) {
 
       operationId = Utilities.getUuid();
       upsertConfirmHistory_(historySheet, operationId, name, oldCode, newCode, '__operation__', '処理中'); // 先に履歴保存(P0-1対策)
-      uni.sheet.getRange(uni.row, uni.codeCol + 1).setValue("'" + newCode);
-      if (uni.statusCol >= 0) uni.sheet.getRange(uni.row, uni.statusCol + 1).setValue('確定');
     }
 
     var rewritten = 0;
@@ -1991,10 +2049,11 @@ function actionAdminConfirmUniversity_(p) {
           upsertConfirmHistory_(historySheet, operationId, name, oldCode, newCode, eventId, '対象外');
           return;
         }
-        var existingRow    = findConfirmHistoryRow_(historySheet, operationId, eventId);
-        var existingStatus = existingRow > 0 ? String(historySheet.getRange(existingRow, 6).getValue()) : '';
-        if (existingStatus === '完了') return; // 冪等スキップ
-
+        // ⚠ 既に「完了」のイベントでもスキップしない。中断中(要確認のまま放置された間)は
+        //   大学マスターがまだ旧コードなので、新規登録は旧コードで採番される。その学生が
+        //   完了済みイベントに入る可能性があるため、毎回スイープし直す。
+        //   rewriteStudentUniCodeInSheet_ は旧コードに一致する行しか触らないので、
+        //   再実行しても二重変換にはならない（冪等）。
         try {
           var ss = eventSs_(eventId);
           var n = 0;
@@ -2019,6 +2078,19 @@ function actionAdminConfirmUniversity_(p) {
       : [];
     var anyReview = needsReview || allChildren.some(function (r) { return String(r[5]) === '要確認'; });
     var allDone   = allChildren.length === 0 || allChildren.every(function (r) { return String(r[5]) === '完了' || String(r[5]) === '対象外'; });
+
+    // ⚠ 全イベントのスイープが終わって初めて大学マスターを新コードへ更新する（P0対策）。
+    //   先にマスターを更新すると、中断中の新規登録が新コードの連番を取ってしまい、
+    //   再開時に旧コードの学生が同じIDへ変換されて衝突する。
+    //   マスターが旧コードのままなら、中断中の登録も旧コードで採番され、再開時に一緒に拾える。
+    //   これは大学統合が「全イベント完了後に統合元を削除する」のと同じ考え方。
+    if (!anyReview && allDone) {
+      var fresh = findUniversityRowByName_(name); // 行番号を取り直してから書く
+      if (fresh.found) {
+        fresh.sheet.getRange(fresh.row, fresh.codeCol + 1).setValue("'" + newCode);
+        if (fresh.statusCol >= 0) fresh.sheet.getRange(fresh.row, fresh.statusCol + 1).setValue('確定');
+      }
+    }
     upsertConfirmHistory_(historySheet, operationId, name, oldCode, newCode, '__operation__', anyReview ? '要確認' : (allDone ? '完了' : '処理中'));
 
     return ok_({ code: newCode, rewritten: rewritten, needsReview: anyReview });
@@ -2433,12 +2505,25 @@ function actionAdminMergeUniversity_(p) {
 }
 
 // 学生情報を全シート横断で一括修正（氏名/ふりがな/大学名/属性/メールアドレス）
+// ⚠ 対象は p.event のイベント1件のみ。
+//   studentId は「西暦1桁+大学コード4桁+区分1桁+連番2桁」で、連番はイベント別シート内で
+//   採番されるため、同じ年度の別イベントに同一IDの別人が実在する。
+//   以前は全イベントを走査していたため、別イベントの別人の氏名・大学・メールまで
+//   書き換わっていた（P0）。
+//
+// 大学名・属性を変更した場合は studentId を新しい大学コード/区分で採番し直し、
+// studentId を持つ全シートと CONFIG.womenPairings を追従させる。
+//   - cardToken は据え置く（名札QRは cardToken を埋め込んでいるため、
+//     既に印刷・配布済みのQRがそのまま使え、表示されるIDだけが新しくなる）
+//   - 採番と書き換えは学生登録と同じスクリプトロック内で行い、同時登録との衝突を防ぐ
 function actionAdminUpdateStudent_(p) {
   var e = validateAdmin_(p);
   if (e) return e;
 
   var sid = String(p.studentId || '').trim();
   if (!sid) return err_('missing_params');
+  if (!p.event) return err_('missing_event');
+  var eventId = String(p.event).trim();
 
   // 渡されたフィールドのみ更新
   var fields = {};
@@ -2449,17 +2534,18 @@ function actionAdminUpdateStudent_(p) {
   if (p.email    !== undefined) fields.email     = String(p.email).trim();
   if (!Object.keys(fields).length) return err_('missing_params');
 
+  // 属性は自由入力のため、未知の値だと区分コードが既定値'V'に落ちて静かに誤分類される。
+  // 採番し直す前に既知の属性かどうかを検証して弾く。
+  if (fields.category && PRE_CLASS_CODES[fields.category] === undefined) {
+    return err_('unknown_category');
+  }
+
   // 各シートの列名マッピング
   var masterMap = { name:'氏名', furigana:'ふりがな', school:'大学名', category:'属性', email:'メールアドレス' };
   var preMap    = { name:'氏名', furigana:'ふりがな', school:'大学名', email:'メールアドレス' }; // category は事前登録には書かない
 
   var updated = { students: 0, preReg: 0, stampLog: 0, prizeLog: 0 };
-
-  var evSheet  = masterSs_().getSheetByName(SHEET.EVENT_LIST);
-  if (!evSheet || evSheet.getLastRow() < 2) return err_('no_events');
-  var evData   = evSheet.getDataRange().getValues();
-  var evIdCol  = evData[0].map(String).indexOf('eventId');
-  var eventIds = evData.slice(1).map(function(r) { return String(r[evIdCol] || '').trim(); }).filter(Boolean);
+  var eventIds = [eventId];
 
   function updateSheet_(sheet, hdrs, data, sidCol, colMap) {
     for (var i = 1; i < data.length; i++) {
@@ -2473,6 +2559,10 @@ function actionAdminUpdateStudent_(p) {
     }
     return false;
   }
+
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(15000)) return err_('locked');
+  try {
 
   eventIds.forEach(function(eventId) {
     var ss;
@@ -2523,7 +2613,113 @@ function actionAdminUpdateStudent_(p) {
     }
   });
 
-  return ok_({ updated: updated });
+  // 大学名・属性が変わったら studentId を採番し直し、全シートを追従させる
+  var newSid = '';
+  if (fields.school || fields.category) {
+    var ssX;
+    try { ssX = eventSs_(eventId); } catch (e3) { ssX = null; }
+    if (ssX) {
+      newSid = renumberStudentId_(ssX, eventId, sid);
+    }
+  }
+
+  return ok_({ updated: updated, studentId: newSid || sid, renumbered: !!newSid });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// 学生マスターの現在の大学名・属性から studentId を組み直し、変わっていれば
+// studentId を持つ全シートと CONFIG.womenPairings を追従させる。
+// cardToken は触らない（名札QRを再発行しないため）。
+// 戻り値: 新しい studentId（変更が不要だった場合は空文字）
+function renumberStudentId_(ss, eventId, oldSid) {
+  var stuSheet = ss.getSheetByName(SHEET.STUDENTS);
+  if (!stuSheet || stuSheet.getLastRow() < 2) return '';
+  var data    = stuSheet.getDataRange().getValues();
+  var headers = data[0].map(String);
+  var sidCol  = headers.indexOf('studentId');
+  var schCol  = headers.indexOf('大学名');
+  var attrCol = headers.indexOf('属性');
+  if (sidCol < 0 || schCol < 0 || attrCol < 0) return '';
+
+  var rowIdx = -1;
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][sidCol]) === oldSid) { rowIdx = i; break; }
+  }
+  if (rowIdx < 0) return '';
+
+  var school = String(data[rowIdx][schCol] || '').trim();
+  var attr   = String(data[rowIdx][attrCol] || '').trim();
+  if (!school) return '';
+
+  // 大学コード（未登録の大学なら学生登録と同じく仮コードを自動採番する）
+  var uni = loadUniversityMaster_();
+  var uniCode = uni.uniMap.get(school);
+  if (!uniCode) {
+    uniCode = String(uni.maxAutoCode + 1).padStart(4, '0');
+    saveNewUniversities_([[school, uniCode, '自動割当(要確認)']]);
+  }
+
+  var classCode  = PRE_CLASS_CODES[attr] || 'V';
+  var yearMatch  = String(eventId).match(/(\d{4})/);
+  var yearSuffix = yearMatch ? yearMatch[1].slice(-1) : String(new Date().getFullYear()).slice(-1);
+  var idPrefix   = yearSuffix + uniCode + classCode;
+
+  if (oldSid.substring(0, idPrefix.length) === idPrefix) return ''; // 大学も区分も実質変わっていない
+
+  var newSid = idPrefix + String(nextStudentSeq_(data, sidCol, idPrefix)).padStart(2, '0');
+
+  // studentId を持つ全シートを書き換える（studentId 列のみ・他列は触らない）
+  [SHEET.STUDENTS, SHEET.STAMP_LOG, SHEET.STAMP_PARTICIPANTS,
+   SHEET.PRIZE_LOG, SHEET.PRE_REG, SHEET.VIEW_LOG].forEach(function (name) {
+    replaceStudentIdInSheet_(ss, name, oldSid, newSid);
+  });
+  replaceStudentIdInWomenPairings_(ss, oldSid, newSid);
+  CacheService.getScriptCache().remove('cfg_' + eventId);
+  return newSid;
+}
+
+// 指定シートの studentId 列だけを走査し、oldSid の行を newSid に差し替える
+function replaceStudentIdInSheet_(ss, sheetName, oldSid, newSid) {
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+  var sidCol  = headers.indexOf('studentId');
+  if (sidCol < 0) return 0;
+  var range = sheet.getRange(2, sidCol + 1, sheet.getLastRow() - 1, 1);
+  var vals  = range.getValues();
+  var n = 0;
+  for (var i = 0; i < vals.length; i++) {
+    if (String(vals[i][0]) === oldSid) { vals[i][0] = "'" + newSid; n++; }
+  }
+  if (n > 0) range.setValues(vals);
+  return n;
+}
+
+// CONFIG の womenPairings 内の studentId を差し替える
+function replaceStudentIdInWomenPairings_(ss, oldSid, newSid) {
+  var sheet = ss.getSheetByName(SHEET.CONFIG);
+  if (!sheet || sheet.getLastRow() < 1) return;
+  var data = sheet.getDataRange().getValues();
+  for (var i = 0; i < data.length; i++) {
+    if (String(data[i][0]) !== 'womenPairings') continue;
+    var raw = String(data[i][1] || '');
+    if (!raw) return;
+    try {
+      var arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) return;
+      var changed = false;
+      arr.forEach(function (pair) {
+        if (!pair) return;
+        ['a', 'b', 'c'].forEach(function (k) {
+          if (String(pair[k] || '') === oldSid) { pair[k] = newSid; changed = true; }
+        });
+      });
+      if (changed) sheet.getRange(i + 1, 2).setValue(JSON.stringify(arr));
+    } catch (err) { /* 壊れたJSONは触らない */ }
+    return;
+  }
 }
 
 // イベント一覧取得 + WALK_IN_CODE を返す
