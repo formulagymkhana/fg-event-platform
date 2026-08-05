@@ -1807,14 +1807,23 @@ function renderUniPending_(res) {
   const pendingNames = new Set(list.map(u => u.name));
   const mergeTargets = allSchoolNames_.filter(n => !pendingNames.has(n));
 
-  wrap.innerHTML = list.map(u => `
-    <div class="uni-row" data-name="${esc_(u.name)}">
-      <div class="uni-name">${esc_(u.name)}<span class="uni-tmp">仮 ${esc_(u.code)}</span></div>
-      <div class="uni-ctrl">
-        <input class="uni-reading" maxlength="2" placeholder="読み" autocomplete="off">
-        <span class="uni-prev">—</span>
-        <button class="sm-btn uni-confirm">確定</button>
-      </div>
+  // resuming: コードは確定済みだが学生ID反映のスイープが未完了の大学。
+  // 読み仮名入力は不要（コードは既に確定済み）、統合UIも出さない
+  // （統合機能は確定済みソースをsource_already_confirmedで拒否するため、
+  //   ここで無効化しておかないと実行段階で必ず失敗するUIになってしまう）。
+  wrap.innerHTML = list.map(u => {
+    const resuming = !!u.resuming;
+    const tagText  = resuming ? `確定 ${esc_(u.code)}（反映中）` : `仮 ${esc_(u.code)}`;
+    const ctrl = resuming
+      ? `<div class="uni-ctrl">
+           <button class="sm-btn uni-confirm">続きを実行</button>
+         </div>`
+      : `<div class="uni-ctrl">
+           <input class="uni-reading" maxlength="2" placeholder="読み" autocomplete="off">
+           <span class="uni-prev">—</span>
+           <button class="sm-btn uni-confirm">確定</button>
+         </div>`;
+    const merge = resuming ? '' : `
       <div class="uni-merge">
         <span class="uni-merge-lbl">既存の大学に統合</span>
         <select class="uni-merge-sel">
@@ -1822,17 +1831,25 @@ function renderUniPending_(res) {
           ${mergeTargets.map(n => `<option value="${esc_(n)}">${esc_(n)}</option>`).join('')}
         </select>
         <button class="sm-btn uni-merge-btn">統合</button>
-      </div>
-    </div>`).join('');
+      </div>`;
+    return `
+    <div class="uni-row" data-name="${esc_(u.name)}" data-resuming="${resuming}">
+      <div class="uni-name">${esc_(u.name)}<span class="uni-tmp">${tagText}</span></div>
+      ${ctrl}${merge}
+    </div>`;
+  }).join('');
   wrap.querySelectorAll('.uni-row').forEach(row => {
     const inp  = row.querySelector('.uni-reading');
     const prev = row.querySelector('.uni-prev');
-    inp.addEventListener('input', () => {
-      const p = pokebellPrefix_(inp.value);
-      prev.textContent = p ? `${p}xx` : '—';
-    });
+    if (inp && prev) {
+      inp.addEventListener('input', () => {
+        const p = pokebellPrefix_(inp.value);
+        prev.textContent = p ? `${p}xx` : '—';
+      });
+    }
     row.querySelector('.uni-confirm').addEventListener('click', () => confirmUniversity_(row));
-    row.querySelector('.uni-merge-btn').addEventListener('click', () => mergeUniversity_(row));
+    const mergeBtn = row.querySelector('.uni-merge-btn');
+    if (mergeBtn) mergeBtn.addEventListener('click', () => mergeUniversity_(row));
   });
 }
 
@@ -1889,22 +1906,34 @@ async function mergeUniversity_(row) {
   updateUniBadge_(loadGen_);
 }
 
-/** 読みを送ってコードを確定（連番採番はGAS側） */
+/** 読みを送ってコードを確定（連番採番はGAS側）。resuming行は読み仮名不要で続きから再開する。 */
 async function confirmUniversity_(row) {
-  const name    = row.dataset.name;
-  const reading = row.querySelector('.uni-reading').value.trim();
-  if (!pokebellPrefix_(reading)) { showToast_('読みの頭文字をひらがなで入力してください'); return; }
+  const name     = row.dataset.name;
+  const resuming = row.dataset.resuming === 'true';
+  let reading = '';
+  if (!resuming) {
+    reading = row.querySelector('.uni-reading').value.trim();
+    if (!pokebellPrefix_(reading)) { showToast_('読みの頭文字をひらがなで入力してください'); return; }
+  }
   const btn = row.querySelector('.uni-confirm');
   btn.disabled = true; btn.textContent = '…';
   const res = await adminCall_('adminConfirmUniversity', { event: curEvent_, name, reading });
   if (!res.ok) {
-    btn.disabled = false; btn.textContent = '確定';
+    btn.disabled = false; btn.textContent = resuming ? '続きを実行' : '確定';
     showToast_(res.message || '確定に失敗しました');
     return;
   }
-  row.querySelector('.uni-ctrl').innerHTML = `<span class="uni-done">✓ ${esc_(res.data.code)}</span>`;
-  const rw = res.data.rewritten || 0;
-  showToast_(`✓ ${name} → ${res.data.code}` + (rw ? `（学生ID ${rw}件を更新）` : ''));
+  const d  = res.data || {};
+  const rw = d.rewritten || 0;
+  if (d.needsReview) {
+    btn.disabled = false; btn.textContent = '続きを実行';
+    showToast_(`⚠ 一部のイベントで接続に失敗し中断しました（学生ID ${rw}件は反映済み）。\n` +
+      'もう一度「続きを実行」を押すと続きから再開します。');
+    loadUniversities_();
+    return;
+  }
+  showToast_(`✓ ${name} → ${d.code}` + (rw ? `（学生ID ${rw}件を更新）` : ''));
+  loadUniversities_();
   updateUniBadge_(loadGen_);
 }
 
