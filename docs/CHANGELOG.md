@@ -31,6 +31,24 @@ GAS はリポジトリ管理外のため、push しても自動反映されま�
 
 ---
 
+## 2026-08-10 大学管理「承認待ち」が「読み込み中...」のまま表示されない不具合を修正
+
+- 変更ファイル: `js/admin.js`, `app/admin.html`
+- 変更内容:
+  - `loadUniversities_` の承認待ち取得で `FG_API.getSchoolList()` を呼んでいたが、
+    `app/admin.html` は `js/api.js` を読み込んでいない唯一のページのため
+    `ReferenceError: FG_API is not defined` が発生し、IIFE ごと落ちて
+    `renderUniPending_` に到達せず「読み込み中...」のまま固まっていた。
+    `adminCall_('getSchoolList', {})` に置換（GAS の `doPost` も同じ
+    `dispatch_` を通るため返却形 `{ schools }` は同一）。
+  - 同 IIFE に try/catch を追加し、想定外の例外時は「読み込みに失敗しました」を表示する。
+  - `admin.js` のキャッシュバスターを `20260810a` へ更新。
+- 理由/背景: 全端末で再現。GAS 側の異常やデータ消失ではなく、フロントの参照漏れ。
+  呼び出していたのは読み取り専用アクションのみのため、データ破損は無い。
+- GAS: 再デプロイ不要
+- 申し送り/注意点: `app/admin.html` は `js/api.js` を読み込まない設計（管理系は
+  `adminCall_` の POST に統一）。admin.js 内で `FG_API` を参照しないこと。
+
 ## 2026-08-05 部署名の取得漏れ修正・パス発送CSVの住所欄マッピング変更
 
 - 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `js/admin.js`
