@@ -531,6 +531,15 @@ async function submitForm() {
     return;
   }
 
+  if (res.error === 'lock_timeout') {
+    // 事務局が大学確定・統合を実行している最中はロック待ちで弾かれる。
+    // 待てば通るので「失敗」ではなく再試行を促す文言にする。
+    banner.textContent = '現在混み合っています。30秒ほどおいて、もう一度「事前登録する」を押してください。';
+    banner.classList.add('show');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
   banner.textContent = res.message || '送信に失敗しました。時間をおいて再度お試しください。';
   banner.classList.add('show');
   window.scrollTo({ top: 0, behavior: 'smooth' });

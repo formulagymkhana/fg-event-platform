@@ -481,8 +481,9 @@ function actionExchangePrize_(p) {
   if (!student) return err_('invalid_token');
 
   // 同時リクエストによる二重交換を防ぐためロック内で再計算してから書き込む
+  // ⚠ waitLock を素で呼ばない理由は actionRegisterWalkIn_ 側のコメントを参照。
   const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  try { lock.waitLock(10000); } catch (e) { return err_('lock_timeout'); }
   try {
     const count  = countStamps_(p.event, student.studentId);
     const result = buildStampResult_(p.event, student.studentId, count, {});
@@ -1116,6 +1117,10 @@ function err_(code) {
     source_already_confirmed:  '統合元は既に確定済みです（他の操作と競合した可能性があります）',
     merge_in_progress_different_target: 'この大学は既に別の統合先への処理が進行中です。先にその統合を完了させるか、同じ統合先を選び直してください',
     locked:                    '他の処理が進行中です。しばらくしてから再度お試しください',
+    // lock_timeout はMSG未定義のまま5箇所で使われており、利用者に生の "lock_timeout" が
+    // 表示されていた（stamp.js / progress.js / exchange.js は res.message をそのまま出す）。
+    // 2026-08-10 追加。文言は company-entry.js が独自に持っていたものに揃える。
+    lock_timeout:              '混み合っています。少し時間をおいて再度お試しください',
     no_events:             'イベントが1件も登録されていません',
     // 管理者パスワード復旧
     reset_not_requested:   '再設定コードが発行されていません。先にコードを送信してください',
@@ -1202,8 +1207,13 @@ function actionRegisterWalkIn_(p) {
   const studentSheet = eventSs_(p.event).getSheetByName(SHEET.STUDENTS);
 
   // 重複チェック → 採番 → appendRow を同一ロック内で完結させ、同時登録での ID 重複を防ぐ
+  // ⚠ waitLock を素で呼ぶと、取得できなかったとき例外が dispatch_ の catch に落ちて
+  //   err_('server_error') になる。大学確定・統合はスイープ完了までロックを保持するため
+  //   （意図的な設計）、その最中の登録がここに来る。「待てば通る」状況なのに
+  //   「サーバーエラー」と出ると学生が諦めてしまうので、他のロック取得箇所と同じく
+  //   lock_timeout を返して再試行を促す。
   const lock = LockService.getScriptLock();
-  lock.waitLock(15000);
+  try { lock.waitLock(15000); } catch (e) { return err_('lock_timeout'); }
   let outcome_; // ロック内で確定した結果を外へ持ち出す
   try {
     const sData   = studentSheet.getDataRange().getValues();
@@ -1371,8 +1381,9 @@ function actionRegisterPreStudent_(p) {
   const studentSheet = ss.getSheetByName(SHEET.STUDENTS);
 
   // 重複チェック → 採番 → STUDENTS appendRow を同一ロック内で完結させ、同時登録での ID 重複を防ぐ
+  // ⚠ waitLock を素で呼ばない理由は actionRegisterWalkIn_ 側のコメントを参照。
   const lock = LockService.getScriptLock();
-  lock.waitLock(15000);
+  try { lock.waitLock(15000); } catch (e) { return err_('lock_timeout'); }
   let studentId, cardToken;
   try {
     const sData   = studentSheet.getDataRange().getValues();

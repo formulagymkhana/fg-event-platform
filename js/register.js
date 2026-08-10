@@ -141,8 +141,13 @@ async function handleSubmit() {
       invalid_code:    'URLが正しくありません。会場のQRコードから再度アクセスしてください。',
       missing_params:  '入力内容に不足があります。フォームを確認してください。',
       timeout:         '通信がタイムアウトしました。電波の良い場所で再試行してください。',
+      // 事務局が大学確定・統合を実行している最中はロック待ちで弾かれる。
+      // 待てば通るので「エラー」ではなく再試行を促す文言にする。
+      lock_timeout:    '現在混み合っています。30秒ほどおいて、もう一度「登録する」を押してください。',
     };
-    setText('error-title', 'エラーが発生しました');
+    // lock_timeout は「失敗」ではなく「今は混んでいる」。見出しまで
+    // 「エラーが発生しました」にすると学生が諦めてしまうので変える。
+    setText('error-title', res.error === 'lock_timeout' ? '混み合っています' : 'エラーが発生しました');
     setText('error-msg', msgs[res.error] || res.message || 'もう一度お試しください。');
   }
 }
