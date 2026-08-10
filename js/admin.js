@@ -1772,18 +1772,25 @@ function renderUniList_(res) {
     if (!uniMap.has(name)) uniMap.set(name, { driver: 0, spectator: 0, walkin: 0, total: 0 });
     const r = uniMap.get(name);
     r.total++;
-    // ドライバー列は「FGクラス＋女子クラス」の実出場者のみを数える。
+    // ⚠ s.category は adminGetStudents が返す STUDENTS シートの「属性」列であり、
+    //   フォームの「参加区分」ではない。GAS の preAttr_() が変換した後の値が入る。
+    //   実際に入りうる値:
+    //     Aドライバー / Bドライバー / Cドライバー … 出場選手(FGクラス)。driverClass がそのまま入る
+    //     女子クラスドライバー                  … 出場選手(女子クラス)
+    //     補欠ドライバー
+    //     メカニック / 応援学生                 … 見学・応援学生
+    //     一般参加学生                          … 当日登録
+    //   register-pre.html の radio 値（出場選手(FGクラスドライバー) 等）と混同しないこと。
+    //
+    // ドライバー列は実出場者（A/B/Cドライバー＋女子クラスドライバー）のみを数え、
     // 補欠ドライバーは出場が確定していないため見学/応援側で数える（2026-08-10 変更）。
-    // ⚠ 以前は includes('ドライバー') で判定していたため補欠も混ざっていた。
-    //   区分値の実体は次の4つ（passCategory_ / register-pre.html と対応）:
-    //     出場選手(FGクラスドライバー) / 出場選手(女子クラスドライバー) /
-    //     補欠ドライバー / 見学・応援学生(メカニック登録含む)
-    //   当日登録(register.html)は category を送らないので最後の2分岐で拾う。
-    if (s.category === '出場選手(FGクラスドライバー)'
-     || s.category === '出場選手(女子クラスドライバー)') r.driver++;
-    else if (s.category === '補欠ドライバー') r.spectator++;
+    // 補欠を先に判定してから includes('ドライバー') に落とすことで、
+    // 将来ドライバー系の属性が増えても自動的にドライバー列へ入る。
+    const cat = String(s.category || '');
+    if (cat === '補欠ドライバー') r.spectator++;
+    else if (cat.includes('ドライバー')) r.driver++;
     else if (s.regType === '当日') r.walkin++;
-    else r.spectator++; // 見学・応援学生 とその他事前 → 見学枠でまとめる
+    else r.spectator++; // メカニック・応援学生 とその他事前 → 見学枠でまとめる
   });
   const sorted = [...uniMap.entries()].sort((a, b) =>
     a[0].localeCompare(b[0], 'ja-JP', { sensitivity: 'base' }));
