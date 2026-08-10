@@ -1638,14 +1638,25 @@ function loadUniversities_() {
     renderUniList_(res);
   })();
   // 承認待ち（統合先の選択肢に使うため、大学マスターの全名称も併せて取得）
+  // ⚠ 大学名一覧は FG_API.getSchoolList() ではなく adminCall_ で取ること。
+  //   admin.html は js/api.js を読み込んでいない唯一のページのため、FG_API を
+  //   参照すると ReferenceError で IIFE ごと落ち、renderUniPending_ に到達せず
+  //   「読み込み中...」のまま固まる（2026-08-10 に発覚）。
   (async () => {
-    const [res, listRes] = await Promise.all([
-      adminCall_('adminGetPendingUniversities', { event: curEvent_ }),
-      FG_API.getSchoolList(),
-    ]);
-    if (gen !== loadGen_) return;
-    allSchoolNames_ = (listRes && listRes.ok && listRes.data) ? (listRes.data.schools || []) : [];
-    renderUniPending_(res);
+    try {
+      const [res, listRes] = await Promise.all([
+        adminCall_('adminGetPendingUniversities', { event: curEvent_ }),
+        adminCall_('getSchoolList', {}),
+      ]);
+      if (gen !== loadGen_) return;
+      allSchoolNames_ = (listRes && listRes.ok && listRes.data) ? (listRes.data.schools || []) : [];
+      renderUniPending_(res);
+    } catch (e) {
+      if (gen !== loadGen_) return;
+      const wrap = id_('uni-pending-wrap');
+      if (wrap) wrap.innerHTML = '<p style="font-size:12px;color:var(--fg-warning);text-align:center;padding:16px 0">読み込みに失敗しました</p>';
+      setText_('uni-pending-count', '');
+    }
   })();
   // 出場大学（出場校エントリー提出済み）
   (async () => {
