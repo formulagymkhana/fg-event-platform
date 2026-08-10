@@ -1658,8 +1658,13 @@ function loadUniversities_() {
         adminCall_('getSchoolList', {}),
       ]);
       if (gen !== loadGen_) return;
-      allSchoolNames_ = (listRes && listRes.ok && listRes.data) ? (listRes.data.schools || []) : [];
-      renderUniPending_(res);
+      // ⚠ 大学マスター一覧の取得失敗を「統合先が0件」と同じ扱いにしてはいけない。
+      //   統合先プルダウンが空になり、スタッフが「統合できる既存大学は無い」と誤認して
+      //   表記ゆれの大学を新規確定してしまう（＝学生IDが全シートで書き換わる）。
+      //   成否を renderUniPending_ に渡し、失敗時は操作UIごと出さない。
+      const listOk = !!(listRes && listRes.ok && listRes.data);
+      allSchoolNames_ = listOk ? (listRes.data.schools || []) : [];
+      renderUniPending_(res, listOk);
     } catch (e) {
       if (gen !== loadGen_) return;
       const wrap = id_('uni-pending-wrap');
@@ -1806,8 +1811,13 @@ function renderUniList_(res) {
     `</tbody></table>`;
 }
 
-/** 承認待ち一覧をレンダリング */
-function renderUniPending_(res) {
+/**
+ * 承認待ち一覧をレンダリング。
+ * @param {object}  res          adminGetPendingUniversities の応答
+ * @param {boolean} schoolListOk 大学マスター一覧(getSchoolList)を取得できたか。
+ *   false のときは統合先を判断できないため、確定・統合の操作UIを一切出さない。
+ */
+function renderUniPending_(res, schoolListOk) {
   const wrap = id_('uni-pending-wrap');
   if (!wrap) return;
   if (!res.ok) {
@@ -1819,6 +1829,16 @@ function renderUniPending_(res) {
   setText_('uni-pending-count', list.length ? `${list.length}件` : '');
   if (!list.length) {
     wrap.innerHTML = '<p style="font-size:12px;color:var(--gray);text-align:center;padding:16px 0">承認待ちの大学はありません</p>';
+    return;
+  }
+  // 大学マスターを取得できていないなら、統合先の候補を出せない＝正しい判断ができない。
+  // 空のプルダウンを見せて「統合先なし」と誤認させるより、操作させないほうが安全。
+  if (!schoolListOk) {
+    wrap.innerHTML =
+      '<p style="font-size:12px;color:var(--fg-warning);text-align:center;padding:16px 0;line-height:1.7">' +
+      `承認待ちが ${list.length}件 ありますが、大学マスターの一覧を取得できませんでした。<br>` +
+      '<strong>統合先を判断できないため、確定・統合の操作を停止しています。</strong><br>' +
+      'ページを再読み込みしてください。改善しない場合は通信状況をご確認ください。</p>';
     return;
   }
   // 統合先の候補＝大学マスターのうち、承認待ちでない（＝確定済みの）大学のみ
@@ -1841,7 +1861,9 @@ function renderUniPending_(res) {
            <span class="uni-prev">—</span>
            <button class="sm-btn uni-confirm">確定</button>
          </div>`;
-    const merge = resuming ? '' : `
+    // 統合先が0件の場合は空のプルダウンを出さない。
+    // 「選べない」のか「候補が無い」のかを文言で明示する。
+    const merge = resuming ? '' : (mergeTargets.length ? `
       <div class="uni-merge">
         <span class="uni-merge-lbl">既存の大学に統合</span>
         <select class="uni-merge-sel">
@@ -1849,7 +1871,10 @@ function renderUniPending_(res) {
           ${mergeTargets.map(n => `<option value="${esc_(n)}">${esc_(n)}</option>`).join('')}
         </select>
         <button class="sm-btn uni-merge-btn">統合</button>
-      </div>`;
+      </div>` : `
+      <div class="uni-merge">
+        <span class="uni-merge-lbl" style="color:var(--gray)">統合先にできる確定済みの大学がまだありません</span>
+      </div>`);
     return `
     <div class="uni-row" data-name="${esc_(u.name)}" data-resuming="${resuming}">
       <div class="uni-name">${esc_(u.name)}<span class="uni-tmp">${tagText}</span></div>
@@ -1931,7 +1956,22 @@ async function confirmUniversity_(row) {
   let reading = '';
   if (!resuming) {
     reading = row.querySelector('.uni-reading').value.trim();
-    if (!pokebellPrefix_(reading)) { showToast_('読みの頭文字をひらがなで入力してください'); return; }
+    const prefix = pokebellPrefix_(reading);
+    if (!prefix) { showToast_('読みの頭文字をひらがなで入力してください'); return; }
+    // 新規確定は学生IDを全イベントで書き換える不可逆操作。統合側(mergeUniversity_)には
+    // 確認ダイアログがあるのに確定側だけ即実行だったため、表記ゆれの見落としと
+    // 読みの入力ミスを押下前に一度止める。resuming（コード確定済みの再開）は対象外。
+    const proceed = window.confirm(
+      `「${name}」を読み「${reading}」（コード ${prefix}xx）で新規の大学として確定します。\n\n` +
+      '次の2点を確認してください。\n' +
+      '・既存の大学の表記ゆれ（別表記）ではないこと\n' +
+      '　→ 表記ゆれなら「確定」ではなく「既存の大学に統合」を使ってください\n' +
+      '・読みの頭文字が正しいこと（コードの先頭2桁がこれで決まります）\n\n' +
+      'この大学の学生IDが全イベントで新しいコードに書き換わります。\n' +
+      '元に戻すには統合をやり直す必要があり手間がかかります。\n\n' +
+      '確定しますか？'
+    );
+    if (!proceed) return;
   }
   const btn = row.querySelector('.uni-confirm');
   btn.disabled = true; btn.textContent = '…';
