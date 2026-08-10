@@ -84,6 +84,9 @@ window.addEventListener('DOMContentLoaded', () => {
   id_('btn-entry-reload')?.addEventListener('click', loadCompanyEntries_);
   id_('btn-entry-csv')?.addEventListener('click', downloadEntryCsv_);
   id_('btn-entry-shipping-csv')?.addEventListener('click', downloadEntryShippingCsv_);
+
+  // 大学管理ページ／出場大学
+  id_('btn-school-shipping-csv')?.addEventListener('click', downloadSchoolShippingCsv_);
   id_('modal-entry-close')?.addEventListener('click', () => { id_('modal-entry').style.display = 'none'; });
   id_('modal-entry-edit-close')?.addEventListener('click', () => { id_('modal-entry-edit').style.display = 'none'; });
   id_('modal-school-entry-close')?.addEventListener('click', () => { id_('modal-school-entry').style.display = 'none'; });
@@ -1832,6 +1835,57 @@ function showSchoolEntryDetail_(e) {
     e['事務局への連絡事項'] ? grp('事務局への連絡事項', `<div style="white-space:pre-wrap">${esc_(e['事務局への連絡事項'])}</div>`) : '',
   ].join('');
   id_('modal-school-entry').style.display = 'flex';
+}
+
+/**
+ * 出場校（大学）向けパス発送CSV（ゆうパック・手作業印刷用）。
+ * ⚠ 印刷ツール未確定（2026-08-10 時点）のため、特定サービスの取込フォーマットには
+ *   合わせていない。汎用的な列名にしてあり、ツールが決まったら列名・列順を
+ *   合わせ直すこと（downloadEntryShippingCsv_ の西濃運輸雛形と同じ位置づけ）。
+ * ⚠ 出場校エントリーは学校名で重複判定し上書きする設計（CLAUDE.md §4）のため、
+ *   企業出展申込と違って同一学校の重複行は構造的に発生しない。重複チェックは不要。
+ * ⚠ 発送先の必須4項目（発送先_名義/郵便番号/住所/電話）は
+ *   actionRegisterSchoolEntry_ 側で申込時に必須検証済みのため、通常の提出経路では
+ *   欠損しない。欠損しうるのはシートの手編集のみ（downloadEntryShippingCsv_ と同じ理由）。
+ */
+function downloadSchoolShippingCsv_() {
+  if (!schoolEntries_.length) { showToast_('出場校エントリーがありません'); return; }
+
+  const required = ['発送先_名義', '発送先_郵便番号', '発送先_住所', '発送先_電話'];
+  const issues = [];
+  schoolEntries_.forEach(e => {
+    const missing = required.filter(k => !String(e[k] || '').trim());
+    if (missing.length) issues.push(`【欠損】${e['学校名'] || '(学校名なし)'}: ${missing.join(' / ')}`);
+  });
+  if (issues.length) {
+    const shown = issues.slice(0, 10).join('\n');
+    const more  = issues.length > 10 ? `\n…他 ${issues.length - 10}件` : '';
+    const proceed = window.confirm(
+      `発送先データに問題が見つかりました（${issues.length}件 / 全${schoolEntries_.length}校）。\n\n` +
+      `${shown}${more}\n\n` +
+      '発送先の項目が空のまま出力されます（取込エラー・誤配送の原因）。\n' +
+      'シート上で修正してから出力し直すことを推奨します。\n\n' +
+      'このまま出力しますか？'
+    );
+    if (!proceed) { showToast_('出力を中止しました'); return; }
+  }
+
+  const cols = ['学校名', '郵便番号', '住所', '宛名', '電話番号', '内容品'];
+  const rows = schoolEntries_.map(e => {
+    const name = String(e['発送先_名義'] || '').trim();
+    return [
+      e['学校名'] || '',
+      e['発送先_郵便番号'] || '',
+      e['発送先_住所'] || '',
+      name ? name + '様' : '',
+      e['発送先_電話'] || '',
+      'FGパス類',
+    ];
+  });
+  downloadCsv_('出場校パス発送_' + curEvent_ + '.csv', toCsv_(cols, rows));
+  showToast_(issues.length
+    ? `△ ${schoolEntries_.length}校を出力しました（未解決の問題 ${issues.length}件）`
+    : `✓ ${schoolEntries_.length}校の発送先を出力しました`);
 }
 
 /** 参加大学一覧をレンダリング */

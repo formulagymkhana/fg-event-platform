@@ -1067,6 +1067,13 @@
         </div>
         <div class="section-body" id="body-u-entries">
           <p class="step-note" style="margin-top:0;margin-bottom:12px">出場校エントリーフォームから提出があった大学一覧です。提出順に表示されます。同じ学校名で再送信された場合は最新のもので上書きされます。</p>
+          <div class="action-row" style="margin-bottom:10px">
+            <button class="act-btn act-btn-ghost" id="btn-school-shipping-csv">⬇ パス発送CSV（ゆうパック）</button>
+          </div>
+          <p style="font-size:11px;color:var(--gray);margin:-4px 0 14px">
+            発送先が入力済みの出場校エントリー全件を対象に出力します（列: 学校名／郵便番号／住所／宛名／電話番号／内容品）。
+            出力前に内容をご確認ください。
+          </p>
           <div id="school-entries-wrap">
             <p style="font-size:12px;color:var(--gray);text-align:center;padding:20px 0">読み込み中...</p>
           </div>
@@ -1299,6 +1306,6 @@
 <div class="toast" id="toast"></div>
 <script src="../js/vendor/qrcode.min.js?v=20260724h"></script>
 <script src="../js/config.js?v=20260724h"></script>
-<script src="../js/admin.js?v=20260810i"></script>
+<script src="../js/admin.js?v=20260810j"></script>
 </body>
 </html>
