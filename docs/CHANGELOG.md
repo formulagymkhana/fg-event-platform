@@ -31,6 +31,35 @@ GAS はリポジトリ管理外のため、push しても自動反映されま�
 
 ---
 
+## 2026-08-10 ロック待ちの扱いを統一（`lock_timeout` の文言追加・登録/景品交換のtry/catch化）
+
+- 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `js/register.js`, `js/register-pre.js`,
+  `app/register.html`, `app/register-pre.html`
+- 変更内容:
+  - **`err_()` の MSG マップに `lock_timeout` が無かったのを追加。**
+    `lock_timeout` は既に5箇所で使われていたが未定義だったため、
+    `MSG[code] || code` のフォールバックで**生の文字列 `lock_timeout` が
+    そのまま利用者に表示されていた**（`stamp.js` / `progress.js` / `exchange.js` は
+    `res.message` を直接表示するため実際に露出。`company-entry.js` だけが
+    独自にマップを持っていて助かっていた）。
+  - **`actionRegisterWalkIn_` / `actionRegisterPreStudent_` / `actionExchangePrize_` の
+    `lock.waitLock()` を try/catch 化**し `err_('lock_timeout')` を返すようにした。
+    従来は素で呼んでいたため、取得できないと例外が `dispatch_` の catch に落ちて
+    `server_error` になっていた。大学確定・統合はスイープ完了までロックを保持する
+    **意図的な設計**（`actionAdminConfirmUniversity_` 直上のコメント参照）なので、
+    その最中の登録・景品交換がここに来る。「待てば通る」のに「サーバーエラー」と
+    出ると利用者が諦めてしまうため。これで `api.gs.final.txt` 内のロック取得6箇所が
+    すべて同じ形になった。
+  - フロント: `register.js` / `register-pre.js` に `lock_timeout` 専用の文言を追加
+    （「30秒ほどおいて、もう一度押してください」）。`register.js` は見出しも
+    「エラーが発生しました」→「混み合っています」に切り替える。
+  - キャッシュバスター: `register.js` → `20260810b`、`register-pre.js` → `20260810a`
+- 理由/背景: 大学統合・確定の本番実施にあたり、その最中に来た学生登録が
+  不親切なエラーで弾かれる問題を解消するため。
+- GAS: **再デプロイ必須（未実施）**
+- 申し送り/注意点: `stamp.js` / `progress.js` / `exchange.js` は `res.message` を
+  そのまま表示する作りなので、MSG マップの追加だけで日本語表示になる（フロント変更不要）。
+
 ## 2026-08-10 大学確定の誤操作ガード（統合先取得失敗時の停止・新規確定の確認ダイアログ）
 
 - 変更ファイル: `js/admin.js`, `app/admin.html`
