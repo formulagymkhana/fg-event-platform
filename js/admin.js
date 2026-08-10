@@ -406,9 +406,22 @@ async function fetchSchoolOrderKey_() {
   };
 }
 
+// studentId は「西暦1桁 + 大学コード4桁 + 区分1文字 + 連番2桁」で発番される
+// （actionRegisterPreStudent_ / classOf_ と同じ規則）。大学コードは常にこの位置に
+// 埋め込まれているため、大学マスターへ問い合わせなくても学生IDから直接取り出せる。
+// ⚠ 未確定大学の仮コード（0001〜の連番）は読み仮名と無関係な採番順なので、
+//   「大学コード順」は必ずしも五十音順にはならない。それは仕様どおり。
+function schoolCodeFromStudentId_(studentId) {
+  const s = String(studentId || '');
+  return s.length >= 5 ? s.slice(1, 5) : null; // 取れない場合は末尾へ回す
+}
+
 // QRパス作成用CSV（A列から：学生ID/参加区分/氏名/ふりがな/トークン/QR用URL）
 // kind: 'driver' | 'spectator' | 'all'
-// 並び順は 出走大学順 → 大学名 → 学生ID。
+// 並び順は kind によって使い分ける:
+//   driver             … 出走大学順（CONFIG の schoolRunningOrder）→ 大学名 → 学生ID
+//   spectator / all    … 大学コード順（studentId 由来。全大学に必ず割り当てられており、
+//                         女子のみ・見学のみの大学が走行順に載っていなくても抜け漏れない）
 async function downloadPreRegCsv_(kind) {
   const { headers, rows } = preRegData_;
   if (!headers.length) { showToast_('事前登録データがありません'); return; }
@@ -428,15 +441,28 @@ async function downloadPreRegCsv_(kind) {
   });
   if (!filtered.length) { showToast_('該当する事前登録がありません'); return; }
 
-  const { orderOf, state: orderState } = await fetchSchoolOrderKey_();
-  const schoolOf = r => String((ci.school >= 0 ? r[ci.school] : '') || '').trim();
-  filtered.sort((a, b) => {
-    const sa = schoolOf(a), sb = schoolOf(b);
-    const ia = orderOf(sa), ib = orderOf(sb);
-    if (ia !== ib) return ia - ib;                                        // 出走大学順
-    if (sa !== sb) return sa.localeCompare(sb, 'ja-JP', { sensitivity: 'base' }); // 走行順外は大学名順
-    return String(a[ci.sid] || '').localeCompare(String(b[ci.sid] || '')); // 同一大学内は学生ID順
-  });
+  let orderState = 'ok';
+  if (kind === 'driver') {
+    const orderRes = await fetchSchoolOrderKey_();
+    orderState = orderRes.state;
+    const { orderOf } = orderRes;
+    const schoolOf = r => String((ci.school >= 0 ? r[ci.school] : '') || '').trim();
+    filtered.sort((a, b) => {
+      const sa = schoolOf(a), sb = schoolOf(b);
+      const ia = orderOf(sa), ib = orderOf(sb);
+      if (ia !== ib) return ia - ib;                                        // 出走大学順
+      if (sa !== sb) return sa.localeCompare(sb, 'ja-JP', { sensitivity: 'base' }); // 走行順外は大学名順
+      return String(a[ci.sid] || '').localeCompare(String(b[ci.sid] || '')); // 同一大学内は学生ID順
+    });
+  } else {
+    // 応援・見学・補欠 / 全員 は大学コード順。未確定コード欠落時のみ末尾へ。
+    filtered.sort((a, b) => {
+      const ca = schoolCodeFromStudentId_(a[ci.sid]);
+      const cb = schoolCodeFromStudentId_(b[ci.sid]);
+      if (ca !== cb) return (ca ?? '9999').localeCompare(cb ?? '9999');
+      return String(a[ci.sid] || '').localeCompare(String(b[ci.sid] || '')); // 同一大学内は学生ID順
+    });
+  }
 
   const esc = v => {
     const s = String(v == null ? '' : v);
@@ -463,11 +489,12 @@ async function downloadPreRegCsv_(kind) {
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
   // 実際の並びと通知を食い違わせない（走行順で並べられなかったことを黙って握り潰さない）
-  showToast_({
+  const toastMsg = kind === 'driver' ? {
     ok:     `✓ ${filtered.length}名を出走大学順で出力しました`,
     unset:  `△ ${filtered.length}名を大学名順で出力しました（走行順が未設定です。エントリーリストで並べ替えて保存すると出走順になります）`,
     failed: `△ ${filtered.length}名を大学名順で出力しました（走行順を取得できませんでした）`,
-  }[orderState]);
+  }[orderState] : `✓ ${filtered.length}名を大学コード順で出力しました`;
+  showToast_(toastMsg);
 }
 
 // 宿泊希望リストCSV（学生ID／大学名／氏名／性別）。宿泊希望=はい の学生のみ。
