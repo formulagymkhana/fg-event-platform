@@ -1772,10 +1772,18 @@ function renderUniList_(res) {
     if (!uniMap.has(name)) uniMap.set(name, { driver: 0, spectator: 0, walkin: 0, total: 0 });
     const r = uniMap.get(name);
     r.total++;
-    if (String(s.category || '').includes('ドライバー')) r.driver++;
-    else if (s.category === '見学・応援学生') r.spectator++;
+    // ドライバー列は「FGクラス＋女子クラス」の実出場者のみを数える。
+    // 補欠ドライバーは出場が確定していないため見学/応援側で数える（2026-08-10 変更）。
+    // ⚠ 以前は includes('ドライバー') で判定していたため補欠も混ざっていた。
+    //   区分値の実体は次の4つ（passCategory_ / register-pre.html と対応）:
+    //     出場選手(FGクラスドライバー) / 出場選手(女子クラスドライバー) /
+    //     補欠ドライバー / 見学・応援学生(メカニック登録含む)
+    //   当日登録(register.html)は category を送らないので最後の2分岐で拾う。
+    if (s.category === '出場選手(FGクラスドライバー)'
+     || s.category === '出場選手(女子クラスドライバー)') r.driver++;
+    else if (s.category === '補欠ドライバー') r.spectator++;
     else if (s.regType === '当日') r.walkin++;
-    else r.spectator++; // その他事前 → 見学枠でまとめる
+    else r.spectator++; // 見学・応援学生 とその他事前 → 見学枠でまとめる
   });
   const sorted = [...uniMap.entries()].sort((a, b) =>
     a[0].localeCompare(b[0], 'ja-JP', { sensitivity: 'base' }));
@@ -1795,7 +1803,7 @@ function renderUniList_(res) {
       <thead><tr>
         <th>大学名</th>
         <th style="text-align:right">ドライバー</th>
-        <th style="text-align:right">見学/応援</th>
+        <th style="text-align:right">見学/応援・補欠</th>
         <th style="text-align:right">当日一般</th>
         <th style="text-align:right">合計</th>
       </tr></thead>
