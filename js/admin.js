@@ -355,11 +355,15 @@ function passCategory_(category, driverClass) {
   return category || '';
 }
 
-// ドライバー系か（FG/女子/補欠）。見学・応援は false。
-function isDriverCategory_(category) {
+// 実出場するドライバーか（FGクラス＋女子クラス）。
+// ⚠ 補欠ドライバーは含めない。出場が確定していないため、参加大学一覧と同じく
+//   応援・見学側で扱う（2026-08-10 変更）。
+// ⚠ ここで比較しているのは事前登録シートの「参加区分」列（フォームの送信値そのもの）。
+//   学生マスターの「属性」列（Aドライバー / 女子クラスドライバー / 応援学生 等、
+//   preAttr_() が変換した後の値）とは別物なので取り違えないこと。
+function isCompetingDriverCategory_(category) {
   return category === '出場選手(FGクラスドライバー)'
-      || category === '出場選手(女子クラスドライバー)'
-      || category === '補欠ドライバー';
+      || category === '出場選手(女子クラスドライバー)';
 }
 
 // QR名刺URL（パス印刷用）
@@ -387,8 +391,9 @@ function downloadPreRegCsv_(kind) {
 
   const filtered = rows.filter(r => {
     const cat = r[ci.cat] || '';
-    if (kind === 'driver')    return isDriverCategory_(cat);
-    if (kind === 'spectator') return !isDriverCategory_(cat);
+    // 補欠ドライバーは spectator 側に入る（isCompetingDriverCategory_ が false のため）
+    if (kind === 'driver')    return isCompetingDriverCategory_(cat);
+    if (kind === 'spectator') return !isCompetingDriverCategory_(cat);
     return true;
   });
   if (!filtered.length) { showToast_('該当する事前登録がありません'); return; }
@@ -408,7 +413,7 @@ function downloadPreRegCsv_(kind) {
     r[ci.token] ? cardPassUrl_(r[ci.token]) : '',
   ].map(esc).join(',')));
 
-  const label = kind === 'driver' ? 'ドライバー' : kind === 'spectator' ? '応援見学' : '全員';
+  const label = kind === 'driver' ? 'ドライバー' : kind === 'spectator' ? '応援見学・補欠' : '全員';
   const csv   = '﻿' + lines.join('\r\n'); // BOM付きでExcel文字化け回避
   const blob  = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url   = URL.createObjectURL(blob);
