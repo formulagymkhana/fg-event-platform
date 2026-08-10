@@ -378,15 +378,45 @@ function mypassUrl_(cardToken) {
   return new URL(`mypass.html?token=${encodeURIComponent(cardToken)}${ev}`, location.href).toString();
 }
 
+/**
+ * 出走大学順のソートキーを作る。
+ * 順序の正は CONFIG の schoolRunningOrder（エントリーリストで並べ替えて保存したもの）。
+ *
+ * ⚠ グローバルの schoolOrder_ を使わないこと。あれは loadEntryList_ /
+ *   loadReceptionList_ でしか代入されないため、学生管理ページから直接CSVを出すと
+ *   空配列のままになり「並べ替えたつもりで並んでいない」状態になる。
+ *
+ * @returns {{orderOf:(school:string)=>number, state:'ok'|'unset'|'failed'}}
+ *   state は利用者への通知文の出し分けに使う。実際の並びと通知が食い違わないよう、
+ *   「走行順で並んだ」と言えるのは state==='ok' のときだけにする。
+ *     ok     … 走行順が1件以上あり、それに従って並べた
+ *     unset  … configは取れたが走行順が未設定/壊れている → 実際は大学名順
+ *     failed … configを取得できなかった → 実際は大学名順
+ */
+async function fetchSchoolOrderKey_() {
+  const res = await adminGetConfigDeduped_(curEvent_);
+  const cfg = (res && res.ok && res.data && res.data.config) ? res.data.config : null;
+  if (!cfg) return { orderOf: () => Infinity, state: 'failed' };
+  const order = parseJsonOr_(cfg.schoolRunningOrder, []);
+  const map   = new Map((Array.isArray(order) ? order : []).map((s, i) => [String(s).trim(), i]));
+  // 走行順に載っていない大学（女子のみ・見学のみ等）は末尾へ。同順位は大学名で揃える。
+  return {
+    orderOf: school => (map.has(school) ? map.get(school) : Infinity),
+    state:   map.size ? 'ok' : 'unset',
+  };
+}
+
 // QRパス作成用CSV（A列から：学生ID/参加区分/氏名/ふりがな/トークン/QR用URL）
 // kind: 'driver' | 'spectator' | 'all'
-function downloadPreRegCsv_(kind) {
+// 並び順は 出走大学順 → 大学名 → 学生ID。
+async function downloadPreRegCsv_(kind) {
   const { headers, rows } = preRegData_;
   if (!headers.length) { showToast_('事前登録データがありません'); return; }
   const c = n => headers.indexOf(n);
   const ci = {
     sid: c('studentId'), cat: c('参加区分'), dc: c('ドライバー登録区分'),
     name: c('氏名'), kana: c('ふりがな'), token: c('cardToken'),
+    school: c('大学名'),
   };
 
   const filtered = rows.filter(r => {
@@ -397,6 +427,16 @@ function downloadPreRegCsv_(kind) {
     return true;
   });
   if (!filtered.length) { showToast_('該当する事前登録がありません'); return; }
+
+  const { orderOf, state: orderState } = await fetchSchoolOrderKey_();
+  const schoolOf = r => String((ci.school >= 0 ? r[ci.school] : '') || '').trim();
+  filtered.sort((a, b) => {
+    const sa = schoolOf(a), sb = schoolOf(b);
+    const ia = orderOf(sa), ib = orderOf(sb);
+    if (ia !== ib) return ia - ib;                                        // 出走大学順
+    if (sa !== sb) return sa.localeCompare(sb, 'ja-JP', { sensitivity: 'base' }); // 走行順外は大学名順
+    return String(a[ci.sid] || '').localeCompare(String(b[ci.sid] || '')); // 同一大学内は学生ID順
+  });
 
   const esc = v => {
     const s = String(v == null ? '' : v);
@@ -422,6 +462,12 @@ function downloadPreRegCsv_(kind) {
   a.download = `QRパス_${label}_${curEvent_}_${new Date().toISOString().slice(0,10)}.csv`;
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
+  // 実際の並びと通知を食い違わせない（走行順で並べられなかったことを黙って握り潰さない）
+  showToast_({
+    ok:     `✓ ${filtered.length}名を出走大学順で出力しました`,
+    unset:  `△ ${filtered.length}名を大学名順で出力しました（走行順が未設定です。エントリーリストで並べ替えて保存すると出走順になります）`,
+    failed: `△ ${filtered.length}名を大学名順で出力しました（走行順を取得できませんでした）`,
+  }[orderState]);
 }
 
 // 宿泊希望リストCSV（学生ID／大学名／氏名／性別）。宿泊希望=はい の学生のみ。
