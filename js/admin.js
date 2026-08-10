@@ -639,8 +639,17 @@ function nfcUrl_(stampKey) {
   return new URL(`stamp.html?ct=${encodeURIComponent(stampKey)}`, location.href).toString();
 }
 
-/** CSV文字列をBOM付きでダウンロード */
-function downloadCsv_(body, filename) {
+/**
+ * CSV文字列をBOM付きでダウンロードする唯一のヘルパー。
+ *
+ * ⚠ 引数順は (ファイル名, 本文)。本文にBOMを含めないこと（この関数が付与する）。
+ *   2026-08-10 まで本ファイル内に同名の関数が2つあり（こちらが `(body, filename)`、
+ *   CSV出力セクション側が `(filename, csv)` と引数順が逆）、関数宣言の巻き上げで
+ *   後者が前者を上書きしていた。その結果、学生QR / 企業NFC / 企業再閲覧QR の
+ *   3つのCSVは「ファイル名がCSV本文、中身がファイル名」という状態で出力され、
+ *   BOMも失われていた。定義をこの1つに統合したので、増やさないこと。
+ */
+function downloadCsv_(filename, body) {
   const blob = new Blob(['﻿' + body], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
@@ -659,7 +668,7 @@ async function downloadStudentQrCsv_() {
     s.name, s.furigana, s.school, s.category || '', s.regType,
     s.cardToken ? cardPassUrl_(s.cardToken) : '',
   ].map(esc).join(',')));
-  downloadCsv_(lines.join('\r\n'), `学生QR_URL_${curEvent_}_${new Date().toISOString().slice(0,10)}.csv`);
+  downloadCsv_(`学生QR_URL_${curEvent_}_${new Date().toISOString().slice(0,10)}.csv`, lines.join('\r\n'));
   showToast_(`✓ ${studentData_.length}名のQR用URLを出力しました`);
 }
 
@@ -674,7 +683,7 @@ async function downloadNfcCsv_() {
   const head  = ['ブース名（企業名）', 'NFC用URL', 'stampKey', '企業ID'];
   const lines = [head.join(',')].concat(list.map(c =>
     [c.name, nfcUrl_(c.stampKey), c.stampKey, c.companyId].map(esc).join(',')));
-  downloadCsv_(lines.join('\r\n'), `企業NFC_URL_${curEvent_}_${new Date().toISOString().slice(0, 10)}.csv`);
+  downloadCsv_(`企業NFC_URL_${curEvent_}_${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\r\n'));
   showToast_(`✓ ${list.length}社のNFC URLを出力しました`);
 }
 
@@ -690,7 +699,7 @@ async function downloadCompanyQrCsv_() {
   const head  = ['ブース名（企業名）', '再閲覧QR用URL', 'viewKey', '企業ID'];
   const lines = [head.join(',')].concat(list.map(c =>
     [c.name, companyQrUrl_(c.viewKey), c.viewKey, c.companyId].map(esc).join(',')));
-  downloadCsv_(lines.join('\r\n'), `企業再閲覧QR_URL_${curEvent_}_${new Date().toISOString().slice(0, 10)}.csv`);
+  downloadCsv_(`企業再閲覧QR_URL_${curEvent_}_${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\r\n'));
   showToast_(`✓ ${list.length}社の再閲覧QR URLを出力しました`);
 }
 
@@ -2055,6 +2064,7 @@ function openEntryEdit_(idx) {
   if (!e) return;
   editEntryIdx_ = idx;
   id_('modal-entry-edit-title').textContent = (e['社名略称'] || e['企業名正式'] || '') + ' 編集';
+  id_('edit-entry-dept').value  = e['部署名'] || '';
   id_('edit-entry-cars').value  = Number(e['展示車両数']) || 0;
   id_('edit-entry-ppass').value = Number(e['人パス']) || 0;
   id_('edit-entry-cpass').value = Number(e['車両パス']) || 0;
@@ -2074,6 +2084,9 @@ async function saveEntryEdit_() {
     event: curEvent_,
     company: e['企業名正式'] || e['社名略称'],
     updates: {
+      // 部署名はGAS側 actionAdminUpdateEntry_ の allowed に既に含まれている（再デプロイ不要）。
+      // 部署名列が無い古いシートでは GAS 側が黙ってスキップする（エラーにはならない）。
+      部署名:     id_('edit-entry-dept').value.trim(),
       展示車両数: Number(id_('edit-entry-cars').value) || 0,
       人パス:     Number(id_('edit-entry-ppass').value) || 0,
       車両パス:   Number(id_('edit-entry-cpass').value) || 0,
@@ -2154,6 +2167,50 @@ function downloadEntryCsv_() {
   URL.revokeObjectURL(a.href);
 }
 
+// 発送に必須の項目 → [申込シートの列名, CSVでの出力先列名]。
+// 部署名は「お届け先住所2」に入るが任意項目（申込フォームでも必須ではない）ため検査しない。
+const SHIPPING_REQUIRED_ = [
+  ['企業名正式', 'お届け先名称1'],
+  ['担当者名',   'お届け先名称2'],
+  ['担当者電話', 'お届け先電話番号'],
+  ['郵便番号',   '郵便番号'],
+  ['都道府県',   'お届け先県名'],
+  ['住所',       'お届け先住所1'],
+];
+
+/**
+ * 発送対象の欠損・重複を検出して警告文の配列を返す（空配列＝問題なし）。
+ * 重複キーは GAS の actionSubmitCompanyEntry_ と同じ「企業名正式 または メールアドレス」に揃える。
+ * ⚠ 「状態」列は意図的に見ない（枚数のみで判定する運用。2026-08-10 ユーザー確認済み）。
+ */
+function findShippingIssues_(targets) {
+  const issues = [];
+  const norm = v => String(v || '').trim().replace(/\s+/g, ' ');
+  const seenName = new Map();
+  const seenMail = new Map();
+
+  targets.forEach(e => {
+    const label = norm(e['企業名正式']) || norm(e['社名略称']) || '(企業名なし)';
+
+    const missing = SHIPPING_REQUIRED_
+      .filter(([src]) => !norm(e[src]))
+      .map(([src, dest]) => `${src}→${dest}`);
+    if (missing.length) issues.push(`【欠損】${label}: ${missing.join(' / ')}`);
+
+    const nameKey = norm(e['企業名正式']);
+    if (nameKey) {
+      if (seenName.has(nameKey)) issues.push(`【重複】企業名正式「${nameKey}」が複数行あります`);
+      else seenName.set(nameKey, true);
+    }
+    const mailKey = norm(e['メールアドレス']).toLowerCase();
+    if (mailKey) {
+      if (seenMail.has(mailKey)) issues.push(`【重複】メールアドレス「${mailKey}」が複数行あります（${label}）`);
+      else seenMail.set(mailKey, true);
+    }
+  });
+  return issues;
+}
+
 /**
  * 西濃運輸パス発送用CSV（自社雛形「西濃パス発送雛形」準拠）。
  * 列は雛形ファイルの1行目そのまま:
@@ -2169,6 +2226,23 @@ function downloadEntryCsv_() {
 function downloadEntryShippingCsv_() {
   const targets = companyEntries_.filter(e => (Number(e['人パス']) || 0) > 0 || (Number(e['車両パス']) || 0) > 0);
   if (!targets.length) { showToast_('人パス・車両パスの申込がある企業がありません'); return; }
+
+  // 欠損・重複があっても出力自体は止めない（締切直前に1社の不備で全社の発送が
+  // 止まると運用が詰まるため）。ただし必ず内容を提示して確認を取る。
+  const issues = findShippingIssues_(targets);
+  if (issues.length) {
+    const shown = issues.slice(0, 10).join('\n');
+    const more  = issues.length > 10 ? `\n…他 ${issues.length - 10}件` : '';
+    const proceed = window.confirm(
+      `発送先データに問題が見つかりました（${issues.length}件 / 対象 ${targets.length}社）。\n\n` +
+      `${shown}${more}\n\n` +
+      '【欠損】は送り状の項目が空のまま出力されます（取込エラー・誤配送の原因）。\n' +
+      '【重複】はそのままだと同じ宛先へ二重発送になります。\n' +
+      'シート上で修正してから出力し直すことを推奨します。\n\n' +
+      'このまま出力しますか？'
+    );
+    if (!proceed) { showToast_('出力を中止しました'); return; }
+  }
 
   const cols = ['お届け先電話番号', '郵便番号', 'お届け先県名', 'お届け先住所1', 'お届け先住所2',
                 'お届け先名称1', 'お届け先名称2', '出荷通知メール希望区分', '記事'];
@@ -2188,13 +2262,10 @@ function downloadEntryShippingCsv_() {
     ];
     return values.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',');
   });
-  const csv  = '﻿' + [header, ...rows].join('\r\n'); // UTF-8 BOM付き（他のCSVと同じ方式）
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  const a    = document.createElement('a');
-  a.href     = URL.createObjectURL(blob);
-  a.download = 'パス発送_' + curEvent_ + '.csv';
-  a.click();
-  URL.revokeObjectURL(a.href);
+  downloadCsv_('パス発送_' + curEvent_ + '.csv', [header, ...rows].join('\r\n'));
+  showToast_(issues.length
+    ? `△ ${targets.length}社を出力しました（未解決の問題 ${issues.length}件）`
+    : `✓ ${targets.length}社の発送先を出力しました`);
 }
 
 // ============================================================
@@ -2828,19 +2899,12 @@ function renderOrderList_() {
 }
 
 // ── CSV出力 ────────────
+// BOMは downloadCsv_ が付ける。ここでは付けない（二重BOMになるため）。
 function toCsv_(headers, rows) {
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
   const lines = [headers.map(q).join(',')];
   rows.forEach(r => lines.push(r.map(q).join(',')));
-  return '﻿' + lines.join('\r\n');
-}
-function downloadCsv_(filename, csv) {
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  return lines.join('\r\n');
 }
 
 function downloadEntryListCsv_() {

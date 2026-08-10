@@ -749,6 +749,8 @@
           <button class="modal-close" id="modal-entry-edit-close">✕</button>
         </div>
         <div class="modal-bd" style="padding:16px 20px">
+          <div class="cfg-row"><label>部署名</label><input type="text" class="cfg-input" id="edit-entry-dept" placeholder="例：営業部"></div>
+          <div class="cfg-hint" style="margin:-4px 0 10px">部署名はパス発送CSVの「お届け先住所2」に入ります。空欄でも出力できます。</div>
           <div class="cfg-row"><label>展示車両数</label><input type="number" class="cfg-input" id="edit-entry-cars" min="0"></div>
           <div class="cfg-row"><label>人パス</label><input type="number" class="cfg-input" id="edit-entry-ppass" min="0"></div>
           <div class="cfg-row"><label>車両パス</label><input type="number" class="cfg-input" id="edit-entry-cpass" min="0"></div>
@@ -1297,6 +1299,6 @@
 <div class="toast" id="toast"></div>
 <script src="../js/vendor/qrcode.min.js?v=20260724h"></script>
 <script src="../js/config.js?v=20260724h"></script>
-<script src="../js/admin.js?v=20260810a"></script>
+<script src="../js/admin.js?v=20260810b"></script>
 </body>
 </html>
