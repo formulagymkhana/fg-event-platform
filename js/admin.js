@@ -3004,7 +3004,9 @@ function buildSupportRows_() {
     const doesService = !!svcCls && !svcCls.includes('実施しない');
     const isBackup    = cat === '補欠ドライバー';
     const isSupport   = cat === '見学・応援学生(メカニック登録含む)';
-    const backup  = isBackup ? svcCls : '';
+    // 補欠選手登録列は担当クラス（FGクラス/女子クラス/FG/女子クラス）のみを表示する。
+    // 補欠は登録時点でメカニック扱いのため、「実施しない/来場予定はない」は列の意味を成さない。
+    const backup  = isBackup && doesService ? svcCls : '';
     const mech    = isSupport && doesService ? svcCls : '';
     // 保険証明を提出するのは「見学・応援でサービス作業を行う人」のみ（補欠は提出しない）
     const needDoc = isSupport && doesService && !r['保険証明URL'] ? '※保険確認' : '';
