@@ -753,6 +753,94 @@ function nfcUrl_(stampKey) {
  *   3つのCSVは「ファイル名がCSV本文、中身がファイル名」という状態で出力され、
  *   BOMも失われていた。定義をこの1つに統合したので、増やさないこと。
  */
+/**
+ * Shift_JIS(CP932) エンコーダ。
+ * 運送会社の送り状発行システムは Shift_JIS の CSV しか受け付けないものが多く、
+ * UTF-8 のまま渡すと「読み込めません」あるいは取込後に文字化けする
+ * （2026-08-17、西濃運輸の企業パス発送CSVで実際に発生）。
+ *
+ * ⚠ ブラウザ標準の TextEncoder は UTF-8 専用で、Shift_JIS への変換はできない。
+ *   一方 TextDecoder は 'shift_jis' に対応しているので、**全バイト組み合わせを一度
+ *   デコードして逆引き表を作る**ことで、外部ライブラリなしにエンコードを実現する。
+ *   このリポジトリはビルド無し・依存は手動ベンダリングのため、表を持つより軽い。
+ *   表は初回呼び出し時に一度だけ構築してキャッシュする（約9,400文字）。
+ */
+let sjisMap_ = null;
+function buildSjisMap_() {
+  if (sjisMap_) return sjisMap_;
+  const dec = new TextDecoder('shift_jis');
+  const map = new Map();
+  // 1バイト: ASCII と半角カナ
+  for (let b = 0x20; b <= 0x7E; b++) map.set(String.fromCharCode(b), [b]);
+  for (let b = 0xA1; b <= 0xDF; b++) {
+    const ch = dec.decode(new Uint8Array([b]));
+    if (ch && ch !== '\uFFFD') map.set(ch, [b]);
+  }
+  // 2バイト: リード 0x81-0x9F / 0xE0-0xFC、トレイル 0x40-0x7E / 0x80-0xFC
+  const trails = [];
+  for (let t = 0x40; t <= 0x7E; t++) trails.push(t);
+  for (let t = 0x80; t <= 0xFC; t++) trails.push(t);
+  const leads = [];
+  for (let l = 0x81; l <= 0x9F; l++) leads.push(l);
+  for (let l = 0xE0; l <= 0xFC; l++) leads.push(l);
+  for (const lead of leads) {
+    const buf = new Uint8Array(trails.length * 2);
+    trails.forEach((t, i) => { buf[i * 2] = lead; buf[i * 2 + 1] = t; });
+    const chars = [...dec.decode(buf)];
+    if (chars.length === trails.length) {
+      chars.forEach((ch, i) => {
+        if (ch !== '\uFFFD' && !map.has(ch)) map.set(ch, [lead, trails[i]]);
+      });
+    } else {
+      // 1ペア=1文字にならなかった場合のみ、1ペアずつ確認する（保険）
+      trails.forEach(t => {
+        const ch = dec.decode(new Uint8Array([lead, t]));
+        if (ch && ch !== '\uFFFD' && [...ch].length === 1 && !map.has(ch)) map.set(ch, [lead, t]);
+      });
+    }
+  }
+  // Mac と Windows で割れやすい記号を、Shift_JIS 側の対応字へ寄せる
+  // （波ダッシュ U+301C ↔ 全角チルダ U+FF5E など。放置すると '?' になる）
+  const alias = { '\u301C': '\uFF5E', '\u2212': '\uFF0D', '\u2016': '\u2225',
+                  '\u00A2': '\uFFE0', '\u00A3': '\uFFE1', '\u00AC': '\uFFE2' };
+  for (const from of Object.keys(alias)) {
+    const to = alias[from];
+    if (!map.has(from) && map.has(to)) map.set(from, map.get(to));
+  }
+  sjisMap_ = map;
+  return map;
+}
+
+/** 文字列を Shift_JIS バイト列へ。変換できない文字は '?' にし、一覧を返す。 */
+function encodeSjis_(text) {
+  const map = buildSjisMap_();
+  const out = [];
+  const bad = new Set();
+  for (const ch of String(text)) {
+    if (ch === '\n') { out.push(0x0A); continue; }
+    if (ch === '\r') { out.push(0x0D); continue; }
+    const b = map.get(ch);
+    if (b) out.push(...b);
+    else { bad.add(ch); out.push(0x3F); }
+  }
+  return { bytes: new Uint8Array(out), unsupported: [...bad] };
+}
+
+/**
+ * Shift_JIS の CSV としてダウンロードする（BOMは付けない）。
+ * 変換できない文字があれば呼び出し元へ返し、警告に使わせる。
+ */
+function downloadCsvSjis_(filename, body) {
+  const { bytes, unsupported } = encodeSjis_(body);
+  const blob = new Blob([bytes], { type: 'text/csv;charset=shift_jis;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  return unsupported;
+}
+
 function downloadCsv_(filename, body) {
   const blob = new Blob(['﻿' + body], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
@@ -2522,10 +2610,22 @@ function downloadEntryShippingCsv_() {
     ];
     return values.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',');
   });
-  downloadCsv_('パス発送_' + curEvent_ + '.csv', [header, ...rows].join('\r\n'));
+  // ⚠ 西濃運輸の送り状発行システムは Shift_JIS の CSV しか受け付けない。
+  //   UTF-8(BOM付き)で出していたため「読み込めません」となり、取り込めても文字化けした
+  //   （2026-08-17 に発覚。値をExcelへ貼り直すとExcelがShift_JISで保存するため通っていた）。
+  const unsupported = downloadCsvSjis_('パス発送_' + curEvent_ + '.csv', [header, ...rows].join('\r\n'));
+  if (unsupported.length) {
+    // Shift_JIS に無い文字は '?' で出力される。どの文字が落ちたかを必ず伝える
+    // （企業名に絵文字やローマ数字等が入っていると、送り状の宛名が欠ける）
+    window.alert(
+      'Shift_JISに変換できない文字がありました。該当箇所は「?」で出力されています。\n\n' +
+      unsupported.join(' ') + '\n\n' +
+      '送り状の宛名が欠けるため、申込データの該当文字を修正して出力し直してください。'
+    );
+  }
   showToast_(issues.length
     ? `△ ${targets.length}社を出力しました（未解決の問題 ${issues.length}件）`
-    : `✓ ${targets.length}社の発送先を出力しました`);
+    : `✓ ${targets.length}社の発送先を出力しました（Shift_JIS）`);
 }
 
 // ============================================================
