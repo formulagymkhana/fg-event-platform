@@ -192,10 +192,17 @@ async function submit() {
 
     const res = await FG_API.registerSchoolEntry(params);
     if (!res.ok) {
+      // ⚠ 最後は res.error（生のコード）ではなく res.message（GASの日本語文言）を優先する。
+      //   コードをそのまま出すと利用者に 'approval_save_failed' 等が見えてしまう
+      //   （2026-08-10 に lock_timeout で同じ問題が起きている）。
       const msg = res.error === 'form_not_open' ? '受付開始前です。' :
                   res.error === 'registration_closed' ? '受付期間が終了しました。' :
                   res.error === 'event_inactive' ? 'このイベントは公開停止中です。' :
-                  ('送信に失敗しました：' + (res.error || 'unknown'));
+                  res.error === 'approval_save_failed'
+                    ? '承諾書の保存に失敗しました。お手数ですが、もう一度送信してください。' :
+                  res.error === 'missing_approval'
+                    ? '学校職員の参加承諾書をアップロードしてください。' :
+                  ('送信に失敗しました：' + (res.message || res.error || 'unknown'));
       banner.textContent = msg;
       banner.classList.add('show');
       btn.disabled = false;

@@ -1103,6 +1103,8 @@ function err_(code) {
     email_already_used:    'このメールアドレスは既に登録されています',
     no_email:              'この参加者にはメールアドレスが登録されていません',
     form_not_open:         '受付がまだ開始されていません',
+    missing_approval:      '学校職員の参加承諾書をアップロードしてください',
+    approval_save_failed:  '承諾書の保存に失敗しました。お手数ですが、もう一度送信してください',
     registration_closed:   '受付期間が終了しました',
     event_inactive:        'このイベントへの登録は受け付けていません',
     not_event_day:         'イベント開催日ではありません',
@@ -3763,6 +3765,10 @@ function actionRegisterSchoolEntry_(p) {
   for (const k of required) {
     if (!p[k] && p[k] !== 0) return err_('missing_' + k);
   }
+  // ⚠ 承諾書はフロント(register-school.js)で必須にしているが、サーバー側でも必ず検証する。
+  //   フォームを経由しない送信や、フロントの検証が抜けた場合に、承諾書の無い申込が
+  //   「受付しました」として記録されるのを防ぐ。
+  if (!p.approval || !p.approval.b64) return err_('missing_approval');
 
   const ss = eventSs_(p.event);
   let sheet = ss.getSheetByName(SHEET.SCHOOL_ENTRIES);
@@ -3780,18 +3786,24 @@ function actionRegisterSchoolEntry_(p) {
     const idx     = n => headers.indexOf(n);
     const nameCol = idx('学校名');
 
-    // 承諾書ファイルを保存（あれば）
+    // 承諾書ファイルを保存
+    // ⚠ 以前は例外を握り潰して approvalUrl を空のまま先へ進めていたため、Driveの一時障害で
+    //   保存に失敗しても申込は「受付しました」となり、確認メールまで送られていた。
+    //   事務局は承諾書が無いことに気づけない。不完全な申込を残すより、エラーを返して
+    //   申込者に再送信してもらう方が安全（2026-08-17 ユーザー判断）。
     let approvalUrl = '';
-    if (p.approval && p.approval.b64) {
-      try {
-        const folder = getSchoolEntryEventFolder_(p.event);
-        const bytes  = Utilities.base64Decode(p.approval.b64);
-        const fname  = [Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss'),
-                        String(p.schoolName).trim(), (p.approval.name || 'approval')].join('_');
-        const blob   = Utilities.newBlob(bytes, p.approval.mime || 'application/octet-stream', fname);
-        approvalUrl  = folder.createFile(blob).getUrl();
-      } catch (err) { console.error('school entry file save', err); }
+    try {
+      const folder = getSchoolEntryEventFolder_(p.event);
+      const bytes  = Utilities.base64Decode(p.approval.b64);
+      const fname  = [Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss'),
+                      String(p.schoolName).trim(), (p.approval.name || 'approval')].join('_');
+      const blob   = Utilities.newBlob(bytes, p.approval.mime || 'application/octet-stream', fname);
+      approvalUrl  = folder.createFile(blob).getUrl();
+    } catch (err) {
+      console.error('school entry file save', err);
+      return err_('approval_save_failed');
     }
+    if (!approvalUrl) return err_('approval_save_failed');
 
     const now = new Date();
     const normSchool = String(p.schoolName).trim();
