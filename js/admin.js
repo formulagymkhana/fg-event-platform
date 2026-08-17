@@ -183,6 +183,9 @@ function resetEventCaches_() {
   schoolOrder_    = [];
   womenPairings_  = [];
   listDataEvent_  = '';
+  // preRegData_ は QRパス作成用CSV・宿泊希望リストCSV の供給源。
+  // 破棄し忘れると、イベントを切り替えた後に前イベントの名簿でCSVが出る。
+  preRegData_     = { headers: [], rows: [] };
 }
 
 // ── Hash routing ──────────────────────────────────
@@ -308,7 +311,6 @@ function updateNavLinks_() {
   const st = id_('nav-st-card');
   const fm = id_('nav-form-card');
   const un = id_('nav-uni-card');
-  const en = id_('nav-entry-card');
   const el = id_('nav-entry-list-card');
   const rc = id_('nav-reception-card');
   const backCo        = id_('back-dash-co');
@@ -316,13 +318,11 @@ function updateNavLinks_() {
   const backFm        = id_('back-dash-form');
   const backUn        = id_('back-dash-uni');
   const backEntry     = id_('back-dash-entry');
-  const backEntryList = id_('back-dash-entry-list');
   const backReception = id_('back-dash-reception');
   if (co) co.href = '#' + curEvent_ + '/companies';
   if (st) st.href = '#' + curEvent_ + '/students';
   if (fm) fm.href = '#' + curEvent_ + '/forms';
   if (un) un.href = '#' + curEvent_ + '/universities';
-  if (en) en.href = '#' + curEvent_ + '/entries';
   if (el) el.href = '#' + curEvent_ + '/entry-list';
   if (rc) rc.href = '#' + curEvent_ + '/reception';
   if (backCo)        backCo.href        = '#' + curEvent_;
@@ -330,7 +330,6 @@ function updateNavLinks_() {
   if (backFm)        backFm.href        = '#' + curEvent_;
   if (backUn)        backUn.href        = '#' + curEvent_;
   if (backEntry)     backEntry.href     = '#' + curEvent_;
-  if (backEntryList) backEntryList.href = '#' + curEvent_;
   if (backReception) backReception.href = '#' + curEvent_;
 }
 
@@ -344,7 +343,6 @@ async function loadAll_() {
   loadPrizeLog_(gen, ev);
   loadConfig_(gen, ev);
   loadCompanies_(gen, ev);
-  loadWalkIns_(gen, ev);
   updateUniBadge_(gen);
 }
 
@@ -355,22 +353,11 @@ async function loadPreRegistrations_(gen, ev) {
   if (gen !== loadGen_) return;
   if (!res.ok) return;
   preRegData_ = { headers: res.data.headers || [], rows: res.data.rows || [] };
-
-  const H = preRegData_.headers;
-  const col = n => H.indexOf(n);
-  const tbody = id_('prereg-tbody');
-  if (!tbody) return;
-  if (!preRegData_.rows.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="empty-msg">事前登録はまだありません</td></tr>';
-    return;
-  }
-  const ci = { cat: col('参加区分'), name: col('氏名'), school: col('大学名'), email: col('メールアドレス') };
-  tbody.innerHTML = preRegData_.rows.map(r => `<tr>
-    <td>${esc_(r[ci.cat] || '')}</td>
-    <td>${esc_(r[ci.name] || '')}</td>
-    <td>${esc_(r[ci.school] || '')}</td>
-    <td>${esc_(r[ci.email] || '')}</td>
-  </tr>`).join('');
+  // ⚠ この関数は表示用ではなくデータ供給用。preRegData_ は
+  //   downloadPreRegCsv_（QRパス作成用CSV）と downloadHotelListCsv_（宿泊希望リスト）が
+  //   参照するため、呼び出しを削ると両CSVが「事前登録データがありません」になる。
+  //   一覧表の描画（prereg-tbody）は 2026-06-17 の 049c3ba で admin.html から
+  //   要素ごと消えており、描画コードだけが残っていたので 2026-08-17 に削除した。
 }
 
 // 参加区分の表示ラベル（QRパス用：Aドライバー / 女子クラスドライバー / 応援学生 等）
@@ -599,16 +586,11 @@ async function loadStampLog_(gen, ev) {
 }
 
 // ── Walk-ins ──────────────────────────────────────
-async function loadWalkIns_(gen, ev) {
-  const res = await adminCall_('adminGetWalkIns', { event: ev });
-  if (gen !== loadGen_) return;
-  if (!res.ok) return;
-  const list = res.data.walkins || [];
-  setText_('walkin-count', `(${list.length}名)`);
-  id_('walkin-tbody').innerHTML = list.length
-    ? list.map(r => `<tr><td>${esc_(r.name)}</td><td>${esc_(r.school)}</td><td>${esc_(r.year)}</td><td>${esc_(r.email)}</td></tr>`).join('')
-    : '<tr><td colspan="4" class="empty-msg">データなし</td></tr>';
-}
+// loadWalkIns_ は削除した（2026-08-17）。描画先の walkin-tbody は 2026-06-16 の
+// 学生管理統合（cc173df）で admin.html から消えており、ガードも無いため
+// イベント読み込みのたびに adminGetWalkIns を叩いた上で TypeError になっていた。
+// 当日登録の件数（walkin-count）は loadStudents_ が studentData_ から算出しており、
+// この関数が無くても表示は維持される。
 
 // ── Prize log ─────────────────────────────────────
 async function loadPrizeLog_(gen, ev) {
@@ -2219,13 +2201,11 @@ async function loadCompanyEntries_() {
   companyEntries_ = res.data.entries || [];
   renderEntries_(companyEntries_);
 
-  // ダッシュボードバッジ更新
-  const badge = id_('badge-entry');
-  if (badge) {
-    const n = companyEntries_.length;
-    badge.textContent = n + '件';
-    badge.className   = 'nav-card-count ' + (n > 0 ? 'todo' : 'init');
-  }
+  // ⚠ ダッシュボードの badge-entry 更新は削除した（2026-08-17）。
+  //   admin.html に badge-entry は存在せず（企業出展申込のナビカード自体が無い）、
+  //   ガードされて何もしていなかった。似た名前の badge-entry-list は
+  //   「エントリーリスト」＝学生の走行順リスト用で意味が異なるため、
+  //   ここへ企業申込件数を流し込んではいけない。
   // タブカウント更新
   const tabCount = id_('co-tab-entry-count');
   if (tabCount) tabCount.textContent = companyEntries_.length ? ' (' + companyEntries_.length + ')' : '';
