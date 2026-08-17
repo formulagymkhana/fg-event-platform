@@ -31,6 +31,40 @@ GAS はリポジトリ管理外のため、push しても自動反映されま�
 
 ---
 
+## 2026-08-17 リリースチェックの残課題を解消（デッドコード削除・キャッシュバスター是正）
+
+- 変更ファイル: `js/admin.js`, `app/admin.html`, `app/company.html`,
+  `app/register-school.html`, `docs/gas-patches/api.gs.final.txt`
+- 変更内容:
+  - **`app/register-school.html` のキャッシュバスター更新漏れを修正**（`20260728b` → `20260817a`）。
+    `js/register-school.js` は 2026-07-29 の `7f84e38`「承諾書アップロードを必須
+    バリデーションに変更」で変更されていたが `?v=` が据え置きだった。
+    7/28以前にページを開いたブラウザは旧JSを使い続け、承諾書未添付でも送信できた可能性がある。
+  - **`loadWalkIns_` を削除。** 描画先の `walkin-tbody` は 2026-06-16 の `cc173df` で
+    admin.html から消えており、ガードも無いためイベント読み込みのたびに
+    `adminGetWalkIns` を叩いた上で TypeError になっていた。
+    当日登録の件数表示は `loadStudents_` が `studentData_` から算出するため影響なし。
+  - **`loadPreRegistrations_` は残し、死んでいた描画部分（`prereg-tbody`）のみ削除。**
+  - **`preRegData_` を `resetEventCaches_` の破棄対象に追加**（前エントリの積み残し）。
+  - ガードされて何もしていなかった `nav-entry-card` / `back-dash-entry-list` /
+    `badge-entry` の参照を削除。
+  - `app/company.html` のバスター日付を実際の更新日に合わせた（`20260803a` → `20260804a`）。
+  - `docs/gas-patches/api.gs.final.txt` の `preAttr_` のコメントを実態に合わせて更新。
+  - `admin.js` のキャッシュバスターを `20260817f` へ更新。
+- 理由/背景: 2026-08-17 のリリースチェックで検出した残課題の解消。
+- GAS: **再デプロイ不要。** `api.gs.final.txt` の変更は**コメントのみ**で、実行される
+  コードは1行も変わっていない。次回GASを更新する際に一緒に反映されれば足りる。
+- 申し送り/注意点:
+  - **`loadPreRegistrations_` を「無駄な通信」と判断して削除しかけたが、誤りだった。**
+    `preRegData_` は `downloadPreRegCsv_`（QRパス作成用CSV）と
+    `downloadHotelListCsv_`（宿泊希望リスト）の供給源であり、削除すると
+    両CSVが「事前登録データがありません」になる。死んでいたのは描画部分だけだった。
+    同じ誤解を繰り返さないよう、関数内にコメントを残した。
+  - `badge-entry-list` / `badge-reception` はダッシュボードに要素はあるが
+    JS側が一度も設定しておらず、常に `—` のまま。今回は**未対応**（表示上の欠落のみ）。
+  - チェック結果: 全JS構文OK / 重複関数定義なし / **存在しない要素IDへの参照ゼロ**
+    （実施前は admin.js に5件）/ キャッシュバスターの遅れゼロ。
+
 ## 2026-08-17 イベント別グローバルキャッシュをイベント切替時に破棄（他イベントのデータ混入の防止）
 
 - 変更ファイル: `js/admin.js`, `app/admin.html`
