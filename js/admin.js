@@ -674,6 +674,10 @@ const SCHOOL_ENTRY_MAIL_BODY_DEFAULT =
 
 async function saveConfig_(btnId, fbId) {
   if (!curEvent_) return;
+  // ⚠ 宛先イベントは保存開始時に固定する。約20キーを1件ずつ逐次保存するため完了まで
+  //   数十秒かかりえて、その間にイベントを切り替えられるとグローバルの curEvent_ が
+  //   変わり、残りのキーが別イベントへ書き込まれる（設定が2イベントに分割保存される）。
+  const ev  = curEvent_;
   const btn = id_(btnId);
   const fb  = id_(fbId);
   btn.disabled = true; fb.className = 'save-fb'; fb.textContent = '';
@@ -703,13 +707,17 @@ async function saveConfig_(btnId, fbId) {
 
   let failed = false;
   for (const [key, value] of Object.entries(map)) {
-    const r = await adminCall_('adminUpdateConfig', { event: curEvent_, key, value });
+    const r = await adminCall_('adminUpdateConfig', { event: ev, key, value });
     if (!r.ok) { failed = true; break; }
   }
 
   btn.disabled = false;
-  fb.textContent = failed ? '⚠ 保存失敗' : '✓ 保存しました';
+  // 保存中にイベントを切り替えられていた場合、画面は別イベントを表示している。
+  // どのイベントに保存したのかを明示しないと、切替先へ保存できたと誤認される。
+  const moved = ev !== curEvent_;
+  fb.textContent = failed ? '⚠ 保存失敗' : (moved ? `✓ 保存しました（${ev}）` : '✓ 保存しました');
   fb.className   = 'save-fb ' + (failed ? 'err' : 'ok');
+  if (moved && !failed) showToast_(`✓ ${ev} の設定を保存しました（表示中のイベントとは異なります）`);
   setTimeout(() => { fb.className = 'save-fb'; }, 3000);
 }
 
@@ -958,6 +966,9 @@ async function handleSaveLogo_(btn) {
 
 async function handleUploadLogo_(fileInput) {
   if (!curEvent_) return;
+  // ⚠ 宛先イベントは開始時に固定。下の FileReader が await を挟むため、
+  //   その間にイベントを切り替えられると別イベントの企業へアップロードされる。
+  const ev        = curEvent_;
   const companyId = fileInput.dataset.logoId;
   const file      = fileInput.files[0];
   const row       = fileInput.closest('.logo-row');
@@ -973,7 +984,7 @@ async function handleUploadLogo_(fileInput) {
   });
 
   const res = await adminCall_('adminUploadCompanyLogo', {
-    event: curEvent_, companyId,
+    event: ev, companyId,
     base64, mimeType: file.type || 'image/png',
   });
 
@@ -1439,6 +1450,10 @@ function dateToDtLocal_(val) {
 
 async function handleSaveEventInfo_() {
   if (!curEvent_) return;
+  // ⚠ 宛先イベントは開始時に固定（saveConfig_ と同じ理由）。
+  //   ここは adminUpdateEvent → adminUpdateConfig の2段で、後段が await 後に走るため
+  //   publicDeadline だけ別イベントへ書かれうる。
+  const ev = curEvent_;
   const eventName        = getVal_('edit-event-name').trim();
   const startDatetime    = getVal_('edit-start-datetime');
   const endDatetime      = getVal_('edit-end-datetime');
@@ -1455,7 +1470,7 @@ async function handleSaveEventInfo_() {
   const startDate = startDatetime.slice(0, 10).replace(/-/g, '/');
   const endDate   = endDatetime.slice(0, 10).replace(/-/g, '/');
   const res = await adminCall_('adminUpdateEvent', {
-    eventId: curEvent_,
+    eventId: ev,
     eventName,
     startDate,
     endDate,
@@ -1468,11 +1483,14 @@ async function handleSaveEventInfo_() {
   if (res.ok) {
     // 空欄＝終了日+2ヶ月（GAS側 isPastDeadline_ が下限適用）。値があれば延長として保存。
     const pdValue = publicDeadline ? fromDtLocal_(publicDeadline) : '';
-    await adminCall_('adminUpdateConfig', { event: curEvent_, key: 'publicDeadline', value: pdValue });
-    const ev = allEvents_.find(e => e.eventId === curEvent_);
-    if (ev) { ev.name = eventName; ev.startDate = startDate; ev.endDate = endDate; ev.status = status; }
-    setText_('dash-ev-name', eventName);
-    fb.className = 'save-fb save-fb-ok'; fb.textContent = '✓ 保存しました';
+    await adminCall_('adminUpdateConfig', { event: ev, key: 'publicDeadline', value: pdValue });
+    const evRow = allEvents_.find(e => e.eventId === ev);
+    if (evRow) { evRow.name = eventName; evRow.startDate = startDate; evRow.endDate = endDate; evRow.status = status; }
+    // 表示中のイベントが変わっていたら、ダッシュボードの見出しを書き換えてはいけない
+    // （別イベントの名前で上書きしてしまう）
+    if (ev === curEvent_) setText_('dash-ev-name', eventName);
+    fb.className = 'save-fb save-fb-ok';
+    fb.textContent = ev === curEvent_ ? '✓ 保存しました' : `✓ 保存しました（${ev}）`;
     setTimeout(() => { fb.textContent = ''; }, 3000);
   } else {
     fb.className = 'save-fb save-fb-err'; fb.textContent = '⚠ 失敗: ' + (res.message || res.error || '');
@@ -2783,22 +2801,34 @@ function renderWomenPairs_() {
 }
 
 async function saveSchoolOrder_() {
+  if (!curEvent_) return;
   const btn = id_('btn-save-order');
   const fb  = id_('save-order-fb');
   btn.disabled = true; fb.className = 'save-fb'; fb.textContent = '';
 
+  // ⚠ 宛先イベントと保存値の両方を開始時に固定する。
+  //   womenPairings は2回目の await 後に評価されるため、固定しないと
+  //   「別イベントの読み込みで置き換わった womenPairings_ を、別イベントへ書く」
+  //   という二重のズレが起きる。走行順・女子ペアリングの汚染は大会運営に直結する。
+  const ev        = curEvent_;
+  const orderJson = JSON.stringify(schoolOrder_);
+  const pairsJson = JSON.stringify(womenPairings_);
+
   const r1 = await adminCall_('adminUpdateConfig', {
-    event: curEvent_, key: 'schoolRunningOrder', value: JSON.stringify(schoolOrder_),
+    event: ev, key: 'schoolRunningOrder', value: orderJson,
   });
   const r2 = await adminCall_('adminUpdateConfig', {
-    event: curEvent_, key: 'womenPairings', value: JSON.stringify(womenPairings_),
+    event: ev, key: 'womenPairings', value: pairsJson,
   });
 
   btn.disabled = false;
   if (r1.ok && r2.ok) {
-    fb.textContent = '✓ 保存しました';
+    const moved = ev !== curEvent_;
+    fb.textContent = moved ? `✓ 保存しました（${ev}）` : '✓ 保存しました';
     fb.className = 'save-fb ok';
-    renderEntryList_(); // 表示側も更新
+    // 表示中のイベントが変わっていたら再描画しない（別イベントの一覧を汚す）
+    if (!moved) renderEntryList_(); // 表示側も更新
+    else showToast_(`✓ ${ev} の走行順を保存しました（表示中のイベントとは異なります）`);
   } else {
     fb.textContent = '保存に失敗しました';
     fb.className = 'save-fb err';
