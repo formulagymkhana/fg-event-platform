@@ -166,6 +166,25 @@ function handleLogout_() {
   if (btn) { btn.disabled = false; btn.textContent = 'ログイン'; }
 }
 
+/**
+ * イベント別グローバルキャッシュを全て破棄する。
+ * イベント切替時に route_ から呼ぶ。ここに列挙し漏れると、そのデータだけ
+ * 前イベントの内容が残って画面・CSVに紛れ込む。
+ * listDataEvent_ は「preRegAll_/schoolOrder_/womenPairings_ がどのイベントのものか」を
+ * 表す印で、空＝未ロード。走行順の保存はこれが一致するときだけ許可する
+ * （空配列のまま保存して、保存済みの並び順を消してしまうのを防ぐ）。
+ */
+function resetEventCaches_() {
+  studentData_    = [];
+  schoolEntries_  = [];
+  companyEntries_ = [];
+  allSchoolNames_ = [];
+  preRegAll_      = [];
+  schoolOrder_    = [];
+  womenPairings_  = [];
+  listDataEvent_  = '';
+}
+
 // ── Hash routing ──────────────────────────────────
 function route_() {
   const hash = location.hash.replace(/^#/, '');
@@ -184,6 +203,11 @@ function route_() {
   }
 
   const [eventId, section] = hash.split('/');
+  // ⚠ イベントが変わったら、イベント別のグローバルキャッシュを必ず捨てる。
+  //   これらは「成功時に代入されるだけ」でクリアされないため、残したままにすると
+  //   別イベントのページで前イベントのデータが表示・CSV出力される。
+  //   （例: loadUniversities_ は studentData_ が非空なら再取得せず流用する）
+  if (eventId !== curEvent_) resetEventCaches_();
   curEvent_ = eventId;
   updateNavLinks_();
 
@@ -1787,6 +1811,10 @@ function renderSchoolEntries_(res) {
   const cnt  = id_('school-entries-count');
   if (!wrap) return;
   if (!res.ok) {
+    // 取得失敗時に前回の内容を残すと、画面はエラーなのに発送CSVだけ
+    // 前イベント（または古い取得結果）の内容が出力される
+    schoolEntries_ = [];
+    if (cnt) cnt.textContent = '';
     wrap.innerHTML = '<p style="font-size:12px;color:var(--fg-warning);text-align:center;padding:16px 0">読み込みに失敗しました</p>';
     return;
   }
@@ -2500,6 +2528,7 @@ const CATEGORY_TO_CLASS_ = {
   '一般参加学生': 'V',
 };
 
+let listDataEvent_    = '';   // preRegAll_/schoolOrder_/womenPairings_ が属するイベント（空＝未ロード）
 let preRegAll_        = [];   // 事前登録全件
 let schoolOrder_      = [];   // 大学の並び順（大学名の配列）
 let womenPairings_    = [];   // 女子ペアリング [{ a: studentId, b: studentId }]
@@ -2509,16 +2538,21 @@ async function loadEntryList_() {
   if (entryListLoading_) return;
   entryListLoading_ = true;
   const gen = ++loadGen_;
+  const ev  = curEvent_;
   bindListPageEvents_();
 
   const [preRes, cfgRes, uniRes] = await Promise.all([
-    adminCall_('adminGetPreRegistrations', { event: curEvent_ }),
-    adminGetConfigDeduped_(curEvent_),
-    adminCall_('adminGetPendingUniversities', { event: curEvent_ }),
+    adminCall_('adminGetPreRegistrations', { event: ev }),
+    adminGetConfigDeduped_(ev),
+    adminCall_('adminGetPendingUniversities', { event: ev }),
   ]);
   entryListLoading_ = false;
   if (gen !== loadGen_) return;
-  if (!preRes.ok) { showListErr_('entry-list-wrap', preRes); return; }
+  // 取得失敗時は前回の内容を残さない。残すと画面はエラーなのにCSVだけ古い内容が出る。
+  if (!preRes.ok) {
+    preRegAll_ = []; schoolOrder_ = []; womenPairings_ = []; listDataEvent_ = '';
+    showListErr_('entry-list-wrap', preRes); return;
+  }
   renderPendingUniWarning_('entry-list-wrap', uniRes);
 
   preRegAll_ = preRegRowsToObjects_(preRes.data);
@@ -2538,6 +2572,7 @@ async function loadEntryList_() {
   womenPairings_ = norm.pairs;
   if (norm.dupRemoved) showToast_('女子ペアリングに重複があったため解除しました。内容を確認し保存してください。');
 
+  listDataEvent_ = ev;
   renderSchoolOrder_();
   renderWomenPairs_();
   renderEntryList_();
@@ -2545,15 +2580,20 @@ async function loadEntryList_() {
 
 async function loadReceptionList_() {
   const gen = ++loadGen_;
+  const ev  = curEvent_;
   bindListPageEvents_();
 
   const [preRes, cfgRes, uniRes] = await Promise.all([
-    adminCall_('adminGetPreRegistrations', { event: curEvent_ }),
-    adminGetConfigDeduped_(curEvent_),
-    adminCall_('adminGetPendingUniversities', { event: curEvent_ }),
+    adminCall_('adminGetPreRegistrations', { event: ev }),
+    adminGetConfigDeduped_(ev),
+    adminCall_('adminGetPendingUniversities', { event: ev }),
   ]);
   if (gen !== loadGen_) return;
-  if (!preRes.ok) { showListErr_('reception-list-wrap', preRes); return; }
+  // 取得失敗時は前回の内容を残さない（受付リスト・応援学生リストのCSVが古い内容で出る）
+  if (!preRes.ok) {
+    preRegAll_ = []; schoolOrder_ = []; womenPairings_ = []; listDataEvent_ = '';
+    showListErr_('reception-list-wrap', preRes); return;
+  }
   renderPendingUniWarning_('reception-list-wrap', uniRes);
 
   preRegAll_ = preRegRowsToObjects_(preRes.data);
@@ -2569,6 +2609,7 @@ async function loadReceptionList_() {
   womenPairings_ = norm.pairs;
   if (norm.dupRemoved) showToast_('女子ペアリングに重複があったため解除しました。内容を確認し保存してください。');
 
+  listDataEvent_ = ev;
   renderReceptionList_();
   renderSupportList_();
   renderOrderList_();
@@ -2825,6 +2866,14 @@ async function saveSchoolOrder_() {
   //   「別イベントの読み込みで置き換わった womenPairings_ を、別イベントへ書く」
   //   という二重のズレが起きる。走行順・女子ペアリングの汚染は大会運営に直結する。
   const ev        = curEvent_;
+  // ⚠ 一覧が未ロード／別イベントのものだと、空配列や別イベントの並び順を
+  //   保存済みの走行順に上書きしてしまう。読み込み済みのイベントとだけ照合して弾く。
+  if (listDataEvent_ !== ev) {
+    fb.textContent = '一覧の読み込みが完了していません。再読み込みしてください';
+    fb.className = 'save-fb err';
+    btn.disabled = false;
+    return;
+  }
   const orderJson = JSON.stringify(schoolOrder_);
   const pairsJson = JSON.stringify(womenPairings_);
 
