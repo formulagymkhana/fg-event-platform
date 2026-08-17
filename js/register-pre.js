@@ -57,7 +57,19 @@ let _formConfig = {};
   const compEl = $('label-competing');
   if (compEl) compEl.textContent = `所属する学校は、${_eventName}に出場しますか？`;
 
-  if (cfgRes.ok) {
+  // ⚠ フォーム設定を取得できないと、公開開始前の判定も区分別の締切判定も行えない。
+  //   以前はそのままフォームを開いていたため、申込者は書類のアップロードまで
+  //   入力を終えてから、送信時にGASへ弾かれていた（GASは isBeforeFormOpen_ /
+  //   isPastCategoryDeadline_ で検証しているためデータは壊れないが、やり直しになる）。
+  //   判定材料が無い時点で止め、再読み込みを促す。
+  if (!cfgRes.ok) {
+    $('error-title').textContent = '読み込みに失敗しました';
+    $('error-msg').textContent   = '受付状況を確認できませんでした。通信環境を確認して、ページを再読み込みしてください。';
+    showState('error');
+    return;
+  }
+
+  {
     _formConfig = cfgRes.data || {};
     // 書類URL上書き（設定があればアンカーの href を差し替え）
     const du = _formConfig.docUrls || {};
