@@ -214,11 +214,20 @@ function route_() {
   curEvent_ = eventId;
   updateNavLinks_();
 
+  // ⚠ どのページへ遷移するときも必ず世代を進め、全ローダーへ gen と ev を渡す。
+  //   以前はページによって進めたり進めなかったりしたため、世代ガードが効かない経路が残り、
+  //   イベントAの読み込み中にBへ切り替えると、遅れて返ったAの応答がBの画面に描画された
+  //   （例: A の学生管理 → B の企業管理 では loadGen_ が進まず、A の
+  //   loadPreRegistrations_ の応答が preRegData_ を A の内容で埋め、
+  //   その後 B のファイル名でQRパスCSVが出力されうる）。
+  const gen = ++loadGen_;
+  const ev  = curEvent_;
+
   if (section === 'companies') {
     showPage_('companies');
     activateCoTab_('register');
     populateImportSelect_();
-    loadCompanies_();
+    loadCompanies_(gen, ev);
   } else if (section === 'students') {
     showPage_('students');
     // ⚠ 以前は存在しない要素(stat-students)を参照して再取得をスキップしようとしていたが、
@@ -226,36 +235,35 @@ function route_() {
     //   いたため、loadStats_の応答到達時には世代不一致で必ず結果が破棄され、
     //   学生管理へ直接遷移した場合に食券集計等が更新されない不具合があった。
     //   1つの世代番号を共有する、他ページと同じ形に統一する。
-    const gen = ++loadGen_;
-    loadStats_(gen, curEvent_);
-    loadStudents_(gen, curEvent_);
-    loadPreRegistrations_(gen, curEvent_);
+    loadStats_(gen, ev);
+    loadStudents_(gen, ev);
+    loadPreRegistrations_(gen, ev);
   } else if (section === 'forms') {
     showPage_('forms');
-    loadConfig_(++loadGen_, curEvent_);
+    loadConfig_(gen, ev);
     updateWalkInUrl_(); // 当日参加登録URLをフォーム管理ページに表示
     bindListPageEvents_();
   } else if (section === 'universities') {
     showPage_('universities');
-    loadUniversities_();
+    loadUniversities_(gen, ev);
   } else if (section === 'entries') {
     showPage_('companies');
     activateCoTab_('entries');
     updateEntryFormUrl_();
-    loadCompanyEntries_();
+    loadCompanyEntries_(gen, ev);
   } else if (section === 'entry-list') {
     showPage_('entry-list');
-    loadEntryList_();
+    loadEntryList_(gen, ev);
   } else if (section === 'reception') {
     showPage_('reception');
-    loadReceptionList_();
+    loadReceptionList_(gen, ev);
   } else {
     showPage_('dashboard');
-    const ev = allEvents_.find(e => e.eventId === curEvent_);
-    setText_('dash-ev-name', ev ? (ev.name || ev.eventId) : curEvent_);
+    const evRow = allEvents_.find(e => e.eventId === ev);
+    setText_('dash-ev-name', evRow ? (evRow.name || evRow.eventId) : ev);
     updateWalkInUrl_();
-    loadEventInfo_();
-    loadAll_();
+    loadEventInfo_(gen, ev);
+    loadAll_(gen, ev);
   }
 }
 
@@ -334,10 +342,11 @@ function updateNavLinks_() {
 }
 
 // ── Load all data ─────────────────────────────────
-async function loadAll_() {
+// gen/ev は route_ から渡す。再読み込みボタン等、単独で呼ぶ場合は省略して新しい世代を起こす。
+async function loadAll_(gen = null, ev = null) {
   if (!curEvent_) return;
-  const gen = ++loadGen_;
-  const ev  = curEvent_;
+  if (gen === null) gen = ++loadGen_;
+  ev = ev ?? curEvent_;
   loadStats_(gen, ev);
   loadStampLog_(gen, ev);
   loadPrizeLog_(gen, ev);
@@ -825,10 +834,14 @@ function companyQrUrl_(viewKey) {
   return new URL(`company.html?viewkey=${encodeURIComponent(viewKey)}${ev}`, location.href).toString();
 }
 async function loadCompanies_(gen = null, ev = null) {
+  // ⚠ 以前は gen 省略時に世代チェックを丸ごと飛ばしていた（gen !== null && …）。
+  //   route_ から引数なしで呼ばれていたため、イベントAの応答がBの画面へ描画された。
+  //   省略時は新しい世代を起こし、必ず照合する。
+  if (gen === null) gen = ++loadGen_;
   ev = ev ?? curEvent_;
   updateWalkInUrl_();
   const res = await adminCall_('adminGetCompanies', { event: ev });
-  if (gen !== null && gen !== loadGen_) return;
+  if (gen !== loadGen_) return;
   if (!res.ok) return;
   const list = res.data.companies || [];
   renderCoSummary_(list);
@@ -1431,15 +1444,21 @@ async function handleClearCache_() {
 
 // ── Edit Event Info ───────────────────────────────
 
-async function loadEventInfo_() {
-  const ev = allEvents_.find(e => e.eventId === curEvent_);
+async function loadEventInfo_(gen = null, eventId = null) {
+  if (gen === null) gen = ++loadGen_;
+  eventId = eventId ?? curEvent_;
+  const ev = allEvents_.find(e => e.eventId === eventId);
   if (!ev) return;
   setVal_('edit-event-name', ev.name || '');
   const sel = id_('edit-event-status');
   if (sel) sel.value = (ev.status === '公開停止' || ev.status === '完了') ? '公開停止' : '公開中';
 
   // CONFIGからstampStartAt/stampEndAt/exchangeDeadlineを取得して datetime 入力を埋める
-  const cfgRes = await adminGetConfigDeduped_(curEvent_);
+  const cfgRes = await adminGetConfigDeduped_(eventId);
+  // ⚠ 世代照合が無いと、イベントAの設定がBの編集フォームに流し込まれ、
+  //   そのまま保存するとAの日時がBへ書き込まれる（handleSaveEventInfo_ は
+  //   宛先を curEvent_ = B に固定するため、値だけAという食い違いになる）。
+  if (gen !== loadGen_) return;
   const cfg = cfgRes.ok ? (cfgRes.data.config || {}) : {};
   setVal_('edit-start-datetime',    toDtLocal_(cfg.stampStartAt)    || dateToDtLocal_(ev.startDate));
   setVal_('edit-end-datetime',      toDtLocal_(cfg.stampEndAt)      || dateToDtLocal_(ev.endDate));
@@ -1489,14 +1508,23 @@ async function handleSaveEventInfo_() {
   if (res.ok) {
     // 空欄＝終了日+2ヶ月（GAS側 isPastDeadline_ が下限適用）。値があれば延長として保存。
     const pdValue = publicDeadline ? fromDtLocal_(publicDeadline) : '';
-    await adminCall_('adminUpdateConfig', { event: ev, key: 'publicDeadline', value: pdValue });
+    // ⚠ 公開期限の保存結果を必ず検査する。以前は結果を捨てていたため、
+    //   ここだけ失敗しても「✓ 保存しました」と出て、画面表示と実データが食い違った。
+    const pdRes = await adminCall_('adminUpdateConfig', { event: ev, key: 'publicDeadline', value: pdValue });
     const evRow = allEvents_.find(e => e.eventId === ev);
     if (evRow) { evRow.name = eventName; evRow.startDate = startDate; evRow.endDate = endDate; evRow.status = status; }
     // 表示中のイベントが変わっていたら、ダッシュボードの見出しを書き換えてはいけない
     // （別イベントの名前で上書きしてしまう）
     if (ev === curEvent_) setText_('dash-ev-name', eventName);
+    const evNote = ev === curEvent_ ? '' : `（${ev}）`;
+    if (!pdRes.ok) {
+      // イベント情報自体は保存済み。公開期限だけが未保存であることを明示する
+      fb.className = 'save-fb save-fb-err';
+      fb.textContent = `⚠ 公開期限の保存に失敗しました${evNote}: ` + (pdRes.message || pdRes.error || '');
+      return;
+    }
     fb.className = 'save-fb save-fb-ok';
-    fb.textContent = ev === curEvent_ ? '✓ 保存しました' : `✓ 保存しました（${ev}）`;
+    fb.textContent = `✓ 保存しました${evNote}`;
     setTimeout(() => { fb.textContent = ''; }, 3000);
   } else {
     fb.className = 'save-fb save-fb-err'; fb.textContent = '⚠ 失敗: ' + (res.message || res.error || '');
@@ -1741,13 +1769,14 @@ async function updateUniBadge_(gen) {
 
 /** 大学管理ページ: 参加大学一覧＋承認待ちを独立にロード
  *  （承認待ちは未デプロイ時にタイムアウトしうるので、一覧の描画をブロックしない） */
-function loadUniversities_() {
-  const gen = ++loadGen_;
+function loadUniversities_(gen = null, ev = null) {
+  if (gen === null) gen = ++loadGen_;
+  ev = ev ?? curEvent_;
   // 参加大学一覧（学生集計）
   (async () => {
     const res = studentData_.length
       ? { ok: true, data: { students: studentData_ } }
-      : await adminCall_('adminGetStudents', { event: curEvent_ });
+      : await adminCall_('adminGetStudents', { event: ev });
     if (gen !== loadGen_) return;
     renderUniList_(res);
   })();
@@ -1759,7 +1788,7 @@ function loadUniversities_() {
   (async () => {
     try {
       const [res, listRes] = await Promise.all([
-        adminCall_('adminGetPendingUniversities', { event: curEvent_ }),
+        adminCall_('adminGetPendingUniversities', { event: ev }),
         adminCall_('getSchoolList', {}),
       ]);
       if (gen !== loadGen_) return;
@@ -1779,7 +1808,7 @@ function loadUniversities_() {
   })();
   // 出場大学（出場校エントリー提出済み）
   (async () => {
-    const res = await adminCall_('adminGetSchoolEntries', { event: curEvent_ });
+    const res = await adminCall_('adminGetSchoolEntries', { event: ev });
     if (gen !== loadGen_) return;
     renderSchoolEntries_(res);
   })();
@@ -2187,13 +2216,17 @@ async function confirmUniversity_(row) {
 // ── 出展申込 ──────────────────────────────────────
 let companyEntries_ = [];
 
-async function loadCompanyEntries_() {
+async function loadCompanyEntries_(gen = null, ev = null) {
   if (!curEvent_) return;
+  // 世代ガードが無く、イベントAの応答がBの申込一覧として描画されていた
+  if (gen === null) gen = ++loadGen_;
+  ev = ev ?? curEvent_;
   id_('entry-loading').style.display = '';
   id_('entry-summary').style.display  = 'none';
   id_('entry-section').style.display  = 'none';
 
-  const res = await adminCall_('adminGetCompanyEntries', { event: curEvent_ });
+  const res = await adminCall_('adminGetCompanyEntries', { event: ev });
+  if (gen !== loadGen_) return;
   id_('entry-loading').style.display = 'none';
 
   if (!res.ok) { showToast_('ブース出展/パス申込の読み込みに失敗しました'); return; }
@@ -2512,13 +2545,16 @@ let listDataEvent_    = '';   // preRegAll_/schoolOrder_/womenPairings_ が属�
 let preRegAll_        = [];   // 事前登録全件
 let schoolOrder_      = [];   // 大学の並び順（大学名の配列）
 let womenPairings_    = [];   // 女子ペアリング [{ a: studentId, b: studentId }]
-let entryListLoading_ = false;
+let entryListLoading_ = 0;   // 実行中の世代番号（0=アイドル）
 
-async function loadEntryList_() {
-  if (entryListLoading_) return;
-  entryListLoading_ = true;
-  const gen = ++loadGen_;
-  const ev  = curEvent_;
+async function loadEntryList_(gen = null, ev = null) {
+  if (gen === null) gen = ++loadGen_;
+  ev = ev ?? curEvent_;
+  // ⚠ 以前は boolean で「読み込み中なら何もしない」としていたため、Aの読み込み中に
+  //   Bへ切り替えると B の取得自体が実行されず、一覧が空のままだった。
+  //   同一世代の二重呼び出しだけを抑止し、世代が変われば新しい取得を通す。
+  if (entryListLoading_ === gen) return;
+  entryListLoading_ = gen;
   bindListPageEvents_();
 
   const [preRes, cfgRes, uniRes] = await Promise.all([
@@ -2526,7 +2562,7 @@ async function loadEntryList_() {
     adminGetConfigDeduped_(ev),
     adminCall_('adminGetPendingUniversities', { event: ev }),
   ]);
-  entryListLoading_ = false;
+  entryListLoading_ = 0;
   if (gen !== loadGen_) return;
   // 取得失敗時は前回の内容を残さない。残すと画面はエラーなのにCSVだけ古い内容が出る。
   if (!preRes.ok) {
@@ -2558,9 +2594,9 @@ async function loadEntryList_() {
   renderEntryList_();
 }
 
-async function loadReceptionList_() {
-  const gen = ++loadGen_;
-  const ev  = curEvent_;
+async function loadReceptionList_(gen = null, ev = null) {
+  if (gen === null) gen = ++loadGen_;
+  ev = ev ?? curEvent_;
   bindListPageEvents_();
 
   const [preRes, cfgRes, uniRes] = await Promise.all([
