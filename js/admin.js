@@ -1860,8 +1860,12 @@ function showSchoolEntryDetail_(e) {
  * ⚠ 印刷ツール未確定（2026-08-10 時点）のため、特定サービスの取込フォーマットには
  *   合わせていない。汎用的な列名にしてあり、ツールが決まったら列名・列順を
  *   合わせ直すこと（downloadEntryShippingCsv_ の西濃運輸雛形と同じ位置づけ）。
- * ⚠ 出場校エントリーは学校名で重複判定し上書きする設計（CLAUDE.md §4）のため、
- *   企業出展申込と違って同一学校の重複行は構造的に発生しない。重複チェックは不要。
+ * ⚠ 出場校エントリーは学校名で重複判定し上書きする設計（CLAUDE.md §4）だが、
+ *   **通常の提出経路で重複しないだけで、重複行は発生しうる。**
+ *   大学統合（GAS reconcileSchoolEntry_）は、統合元・統合先の両方が提出済みの場合に
+ *   どちらを残すかを自動判定せず、意図的に重複行を残してスタッフの手動判断に委ねる。
+ *   統合直後にトーストで警告は出るが、放置されたまま出力すると同一校へ二重発送になる。
+ *   企業版（findShippingIssues_）と同じく重複も検出し、警告に含める。
  * ⚠ 発送先の必須4項目（発送先_名義/郵便番号/住所/電話）は
  *   actionRegisterSchoolEntry_ 側で申込時に必須検証済みのため、通常の提出経路では
  *   欠損しない。欠損しうるのはシートの手編集のみ（downloadEntryShippingCsv_ と同じ理由）。
@@ -1871,9 +1875,18 @@ function downloadSchoolShippingCsv_() {
 
   const required = ['発送先_名義', '発送先_郵便番号', '発送先_住所', '発送先_電話'];
   const issues = [];
+  const norm = v => String(v || '').trim().replace(/\s+/g, ' ');
+  const seenSchool = new Set();
   schoolEntries_.forEach(e => {
-    const missing = required.filter(k => !String(e[k] || '').trim());
-    if (missing.length) issues.push(`【欠損】${e['学校名'] || '(学校名なし)'}: ${missing.join(' / ')}`);
+    const label = norm(e['学校名']) || '(学校名なし)';
+    const missing = required.filter(k => !norm(e[k]));
+    if (missing.length) issues.push(`【欠損】${label}: ${missing.join(' / ')}`);
+    // 大学統合で生じた重複行の検出（二重発送の防止）
+    const key = norm(e['学校名']);
+    if (key) {
+      if (seenSchool.has(key)) issues.push(`【重複】学校名「${key}」が複数行あります（大学統合後の未整理の可能性）`);
+      else seenSchool.add(key);
+    }
   });
   if (issues.length) {
     const shown = issues.slice(0, 10).join('\n');
@@ -1881,7 +1894,8 @@ function downloadSchoolShippingCsv_() {
     const proceed = window.confirm(
       `発送先データに問題が見つかりました（${issues.length}件 / 全${schoolEntries_.length}校）。\n\n` +
       `${shown}${more}\n\n` +
-      '発送先の項目が空のまま出力されます（取込エラー・誤配送の原因）。\n' +
+      '【欠損】は発送先の項目が空のまま出力されます（取込エラー・誤配送の原因）。\n' +
+      '【重複】はそのまま出力すると同一校へ二重発送になります。\n' +
       'シート上で修正してから出力し直すことを推奨します。\n\n' +
       'このまま出力しますか？'
     );
