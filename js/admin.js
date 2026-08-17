@@ -2982,6 +2982,13 @@ function renderReceptionList_() {
 }
 
 // ── 応援学生受付リスト表示 ────────────
+// 「両クラス担当」の表記ゆれを表示上だけ揃える。
+// 補欠の旧データは 'FG/女子クラス'、見学応援と2026-08-17以降の補欠は 'FGクラス/女子クラス'。
+// 両者が同じ「メカニック登録」列に並ぶため、表示のみ新表記に寄せる（シートは書き換えない）。
+function normalizeServiceClass_(v) {
+  return String(v || '') === 'FG/女子クラス' ? 'FGクラス/女子クラス' : String(v || '');
+}
+
 function buildSupportRows_() {
   const rows = preRegAll_.filter(r => classOf_(r) === 'S');
   // 大学順にソート（schoolOrder_ に無い大学は末尾）
@@ -3000,14 +3007,22 @@ function buildSupportRows_() {
     //   補欠選手登録・メカニック登録・必要書類の3列が常に空欄になっていた。
     const cat    = String(r['参加区分'] || r.category || '');
     const svcCls = String(r['サービス作業クラス'] || '');
-    // 「実施しない」は区分によって文言が異なる（補欠は「サービス作業は実施しない/来場予定はない」）
+    // 「実施しない」は区分によって文言が異なる（旧データの補欠は
+    // 「サービス作業は実施しない/来場予定はない」。2026-08-17に「実施しない」へ統一）
     const doesService = !!svcCls && !svcCls.includes('実施しない');
     const isBackup    = cat === '補欠ドライバー';
     const isSupport   = cat === '見学・応援学生(メカニック登録含む)';
-    // 補欠選手登録列は担当クラス（FGクラス/女子クラス/FG/女子クラス）のみを表示する。
-    // 補欠は登録時点でメカニック扱いのため、「実施しない/来場予定はない」は列の意味を成さない。
-    const backup  = isBackup && doesService ? svcCls : '';
-    const mech    = isSupport && doesService ? svcCls : '';
+    // ⚠「サービス作業クラス」列は区分に関わらず「メカニックとしてどのクラスを担当するか」の回答。
+    //   補欠かどうかは「参加区分」列だけで決まるため、補欠選手登録列にクラスを出してはいけない。
+    const backup = isBackup ? 'あり' : '';
+    // メカニック登録列は補欠・見学応援で共通（フォームの設問が同一のため）。
+    // 補欠が「実施しない」を選んだ場合のみ明示する。見学応援は空欄のまま（従来の見た目を維持）。
+    // 未回答（空欄）は補欠でも空欄のままにする＝「実施なし」と断定しない。
+    let mech = '';
+    if (isBackup || isSupport) {
+      mech = doesService ? normalizeServiceClass_(svcCls)
+           : (isBackup && svcCls ? '実施なし' : '');
+    }
     // 保険証明を提出するのは「見学・応援でサービス作業を行う人」のみ（補欠は提出しない）
     const needDoc = isSupport && doesService && !r['保険証明URL'] ? '※保険確認' : '';
     return {
