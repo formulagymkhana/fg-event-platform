@@ -39,7 +39,15 @@ const FG_API = (() => {
   // イベントID不要のアクション（全件取得系・当日判定）。
   // これらを当日イベント解決のゲートに掛けると、会期前(事前登録期間)は
   // アクティブなイベントが無いため no_active_event で打ち切られてしまう。
-  const EVENT_OPTIONAL_ACTIONS = ['getCurrentEvent', 'getEventList', 'getSchoolList'];
+  //
+  // ⚠ 企業閲覧の3アクションもここに含める（2026-08-19 追加）。
+  //   企業の閲覧QRはラミネートして毎年使い回すためURLにイベントIDを持たない。
+  //   クライアント側の当日判定（= 今日が開催期間内）に掛けると、会期翌日から
+  //   no_active_event で打ち切られ、**会期後に一覧を見るという主用途が死ぬ**。
+  //   イベントの解決はサーバーの resolveCompanyViewEvent_（開始済みの最新イベント）
+  //   に任せる。URLに event が明示されていればそれがそのまま送られ、優先される。
+  const EVENT_OPTIONAL_ACTIONS = ['getCurrentEvent', 'getEventList', 'getSchoolList',
+                                  'resolveViewKey', 'getCompanyView', 'getCompanyStampVisitors'];
 
   async function call_(action, params = {}) {
     const url = new URL(FG_CONFIG.API_BASE_URL);

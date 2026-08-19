@@ -917,9 +917,17 @@ function downloadCompanyQrPng_(url, name) {
 }
 
 /** 企業QR(登録＋来訪者一覧)のURL: company.html?viewkey=<viewKey>&event=<eventId> */
+/**
+ * 企業の学生一覧 閲覧URL（QR・ラミネート配布用）。
+ * ⚠ イベントIDを付けない。ラミネート加工して毎年使い回す運用のため
+ *   （2026-08-19 変更。従来は &event= を付けていたので毎回作り直しが必要だった）。
+ *   どのイベントを見せるかは GAS の resolveCompanyViewEvent_ が
+ *   「開始済みの最新イベント」として解決する。次のイベントが始まった日から
+ *   自動的に切り替わるため、閲覧期限を手で調整する必要もない。
+ *   NFC用URL（nfcUrl_）が元々イベントIDを持たないのと同じ理由・同じ扱い。
+ */
 function companyQrUrl_(viewKey) {
-  const ev = curEvent_ ? `&event=${encodeURIComponent(curEvent_)}` : '';
-  return new URL(`company.html?viewkey=${encodeURIComponent(viewKey)}${ev}`, location.href).toString();
+  return new URL(`company.html?viewkey=${encodeURIComponent(viewKey)}`, location.href).toString();
 }
 async function loadCompanies_(gen = null, ev = null) {
   // ⚠ 以前は gen 省略時に世代チェックを丸ごと飛ばしていた（gen !== null && …）。
