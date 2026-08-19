@@ -268,11 +268,70 @@ function actionSaveViewLog_(p) {
 // 企業名を返す。cookie には viewKey を保存する(企業IDはサーバ解決)。
 // ============================================================
 
+// ============================================================
+// 企業閲覧用のイベント解決（2026-08-19 追加）
+// ============================================================
+// 企業の閲覧QRはラミネート加工して毎年使い回す運用のため、URLにイベントIDを
+// 埋め込まない。代わりにサーバー側で「開始済みの最新イベント」を解決する。
+//
+// ⚠ getCurrentEvent（actionGetCurrentEvent_）とはルールが違うので流用しないこと。
+//   getCurrentEvent は「今日が開催期間内」＝会期中しか当たらない。当日参加登録や
+//   スタンプ取得は会期中しか行われないためそれで正しいが、企業の学生一覧閲覧は
+//   **会期後に見るのが主用途**なので、それでは会期翌日から使えなくなる。
+//
+// ここでは「開始日 <= 今日」の公開中イベントのうち、開始日が最も新しいものを返す。
+//   - 会期中          → そのイベント
+//   - イベント間の期間 → 直前に開催したイベント（引き続き閲覧できる）
+//   - 次のイベント開始 → その日から次のイベントへ自動的に切り替わる
+// これにより「次のイベント開始日の前日までが前イベントの閲覧期限」となり、
+// 開催間隔が短い場合でも期限設定を手で調整する必要がない。
+//
+// なお閲覧そのものの期限（終了日+2ヶ月 / publicDeadline）は
+// 各アクションの isPastDeadline_ が別途判定する。
+function resolveCompanyViewEvent_() {
+  const sheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+  if (!sheet || sheet.getLastRow() < 2) return null;
+
+  const data      = sheet.getDataRange().getValues();
+  const headers   = data[0].map(String);
+  const idCol     = headers.indexOf('eventId');
+  const startCol  = headers.indexOf('開始日');
+  const statusCol = headers.indexOf('状態');
+  if (idCol < 0 || startCol < 0) return null;
+
+  const today = new Date(); today.setHours(23, 59, 59, 999);
+
+  let best = null, bestStart = null;
+  data.slice(1).forEach(r => {
+    if (statusCol >= 0) {
+      const st = String(r[statusCol]);
+      if (st === '公開停止' || st === '完了') return;
+    }
+    const start = new Date(r[startCol]);
+    if (isNaN(start)) return;
+    start.setHours(0, 0, 0, 0);
+    if (start > today) return;                    // まだ始まっていない
+    if (!bestStart || start >= bestStart) {       // 同日開始なら後の行を優先
+      bestStart = start;
+      best = String(r[idCol]);
+    }
+  });
+  return best;
+}
+
+// 企業閲覧3アクション共通の入口。p.event があればそれを尊重し（配布済みの
+// イベントID付きURLとの後方互換）、無ければ上のルールで解決する。
+function companyViewEvent_(p) {
+  if (p.event) return String(p.event);
+  return resolveCompanyViewEvent_();
+}
+
 function actionResolveViewKey_(p) {
   if (!p.key)   return err_('missing_key');
-  if (!p.event) return err_('missing_event');
+  const event = companyViewEvent_(p);
+  if (!event) return err_('no_active_event');
 
-  const company = findCompanyByViewKey_(p.key, p.event);
+  const company = findCompanyByViewKey_(p.key, event);
   if (!company) return err_('invalid_key');
 
   return ok_({ companyId: company.companyId, companyName: company.companyName });
@@ -587,24 +646,25 @@ function actionMarkPrizeExchanged_(p) {
 
 function actionGetCompanyView_(p) {
   if (!p.key)   return err_('missing_key');
-  if (!p.event) return err_('missing_event');
+  const event = companyViewEvent_(p);
+  if (!event) return err_('no_active_event');
 
-  const company = findCompanyByViewKey_(p.key, p.event);
+  const company = findCompanyByViewKey_(p.key, event);
   if (!company) return err_('invalid_key');
 
-  const cfg = getConfig_(p.event);
+  const cfg = getConfig_(event);
   if (isPastDeadline_(cfg)) return err_('expired');
 
-  const sheet = eventSs_(p.event).getSheetByName(SHEET.VIEW_LOG);
+  const sheet = eventSs_(event).getSheetByName(SHEET.VIEW_LOG);
   const rows  = sheet.getLastRow() > 1
     ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues()
     : [];
 
   // STUDENTSは来訪者ごとに読み直さず、1回だけ読んだMapを使い回す(N+1回避)
-  const studentIndex = buildStudentIndex_(p.event);
+  const studentIndex = buildStudentIndex_(event);
 
   const visitors = rows
-    .filter(r => String(r[1]) === String(p.event) && String(r[3]) === String(company.companyId))
+    .filter(r => String(r[1]) === String(event) && String(r[3]) === String(company.companyId))
     .map(r => {
       const s = studentIndex.get(String(r[2]));
       if (!s) return null;
@@ -625,24 +685,25 @@ function actionGetCompanyView_(p) {
 
 function actionGetCompanyStampVisitors_(p) {
   if (!p.key)   return err_('missing_key');
-  if (!p.event) return err_('missing_event');
+  const event = companyViewEvent_(p);
+  if (!event) return err_('no_active_event');
 
-  const company = findCompanyByViewKey_(p.key, p.event);
+  const company = findCompanyByViewKey_(p.key, event);
   if (!company) return err_('invalid_key');
 
-  const cfg = getConfig_(p.event);
+  const cfg = getConfig_(event);
   if (isPastDeadline_(cfg)) return err_('expired');
 
-  const sheet = eventSs_(p.event).getSheetByName(SHEET.STAMP_LOG);
+  const sheet = eventSs_(event).getSheetByName(SHEET.STAMP_LOG);
   const rows  = sheet.getLastRow() > 1
     ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).getValues()
     : [];
 
   // STUDENTSは来訪者ごとに読み直さず、1回だけ読んだMapを使い回す(N+1回避)
-  const studentIndex = buildStudentIndex_(p.event);
+  const studentIndex = buildStudentIndex_(event);
 
   const visitors = rows
-    .filter(r => String(r[1]) === String(p.event) && String(r[7]) === String(company.companyId))
+    .filter(r => String(r[1]) === String(event) && String(r[7]) === String(company.companyId))
     .map(r => {
       const s = studentIndex.get(String(r[2]));
       return {
