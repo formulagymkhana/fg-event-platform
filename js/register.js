@@ -9,7 +9,11 @@
 
 // ── イベントリスナー ──────────────────────────────
 document.getElementById('btn-submit')?.addEventListener('click', handleSubmit);
+// 初期化のイベント解決に失敗して止めた場合は true。
+// このときフォームへ戻しても入力できないので、再読み込みで解決をやり直す。
+let eventGateFailed_ = false;
 document.getElementById('btn-retry')?.addEventListener('click', () => {
+  if (eventGateFailed_) { location.reload(); return; }
   showState('form');
 });
 
@@ -76,8 +80,22 @@ let pageEvent_ = null;
     if (du.rulebook) { const a = document.getElementById('link-doc-rulebook'); if (a) a.href = du.rulebook; }
     if (du.pledge)   { const a = document.getElementById('link-doc-pledge');   if (a) a.href = du.pledge;   }
   } else {
-    // イベントが見つからない場合もフォームは表示する(GAS側でも再チェック)
-    setText('event-date-label', formatToday_());
+    // ⚠ イベントを解決できないままフォームを開かない（2026-08-19 変更）。
+    //   以前は「GAS側でも再チェックする」という理由で開いていたが、当日参加登録は
+    //   入力項目が多く、**全部入力し終えてから送信時に弾かれる**ことになっていた。
+    //   データは壊れない（actionRegisterWalkIn_ が isEventDay_ / isEventInactive_ で
+    //   検証する）が、来場者に無駄な入力をさせてしまう。
+    //   register-pre.js も同じ理由で 2026-08-17 に同様の対応を入れている。
+    eventGateFailed_ = true;
+    const noEvent = eventRes.error === 'no_active_event';
+    setText('error-title', noEvent ? '本日は受付していません' : '読み込みに失敗しました');
+    setText('error-msg', noEvent
+      ? '本日開催のイベントが見つかりませんでした。日付をお確かめのうえ、会場スタッフにお問い合わせください。'
+      : '受付状況を確認できませんでした。通信環境を確認して、「再読み込み」を押してください。');
+    const retry = document.getElementById('btn-retry');
+    if (retry) retry.textContent = '再読み込み';
+    showState('error');
+    return;
   }
 
   if (schoolRes.ok) fillSchoolList_(schoolRes.data.schools || []);

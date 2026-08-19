@@ -1586,10 +1586,17 @@ async function handleSaveEventInfo_() {
   if (!eventName || !startDatetime || !endDatetime) {
     fb.className = 'save-fb save-fb-err'; fb.textContent = '名前・開始日時・終了日時は必須です'; return;
   }
-  btn.disabled = true; fb.className = 'save-fb'; fb.textContent = '';
   // EVENT_LIST には日付のみ渡す（getCurrentEvent の日付比較用）
   const startDate = startDatetime.slice(0, 10).replace(/-/g, '/');
   const endDate   = endDatetime.slice(0, 10).replace(/-/g, '/');
+
+  // 日付を変更した結果、他の公開中イベントと期間が重ならないか確認する。
+  // 「公開停止」に変更する場合は競合しなくなるので確認しない。
+  if (status !== '公開停止') {
+    if (!confirmOverlap_(findOverlappingEvents_(startDate, endDate, ev), '保存')) return;
+  }
+
+  btn.disabled = true; fb.className = 'save-fb'; fb.textContent = '';
   const res = await adminCall_('adminUpdateEvent', {
     eventId: ev,
     eventName,
@@ -1628,6 +1635,57 @@ async function handleSaveEventInfo_() {
 }
 
 // ── Create Event ──────────────────────────────────
+/**
+ * 開催期間が重なる「公開中」イベントを探す（作成・更新時のガード）。
+ *
+ * ⚠ なぜ必要か: getCurrentEvent（GAS）は該当行を find＝最初の1件で取る。
+ *   開催日が重なる公開中イベントが2つあると、シートで先の行（＝先に作った古い方）が
+ *   黙って選ばれ、当日参加登録が意図しないイベントに入ったり、
+ *   スタンプ取得が invalid_student_token で弾かれたりする。
+ *   GAS 側は eventId の重複しか見ていないため、ここで人間に確認させる。
+ *
+ * @param {string} startStr 'YYYY-MM-DD' または 'YYYY/MM/DD'
+ * @param {string} endStr   同上
+ * @param {string} excludeId 判定から除外するeventId（更新時は自分自身）
+ * @returns {Array} 重なっているイベントの配列
+ */
+function findOverlappingEvents_(startStr, endStr, excludeId) {
+  const toDay = v => {
+    if (!v) return null;
+    const d = new Date(String(v).replace(/-/g, '/'));
+    if (isNaN(d)) return null;
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+  const s = toDay(startStr), e = toDay(endStr);
+  if (!s || !e) return [];
+  return allEvents_.filter(ev => {
+    if (excludeId && String(ev.eventId) === String(excludeId)) return false;
+    // 公開停止・完了は getCurrentEvent の対象外なので競合しない
+    if (ev.status === '公開停止' || ev.status === '完了') return false;
+    const es = toDay(ev.startDate), ee = toDay(ev.endDate);
+    if (!es || !ee) return false;
+    return s <= ee && es <= e;   // 期間が1日でも重なるか
+  });
+}
+
+/** 重複が見つかったときの確認ダイアログ。続行するなら true。 */
+function confirmOverlap_(overlaps, actionLabel) {
+  if (!overlaps.length) return true;
+  const list = overlaps
+    .map(ev => `・${ev.name || ev.eventId}（${ev.eventId}） ${fmtD_(ev.startDate)}〜${fmtD_(ev.endDate)}`)
+    .join('\n');
+  return window.confirm(
+    `開催期間が重なる「公開中」のイベントがあります。\n\n${list}\n\n` +
+    '期間が重なっていると、当日参加登録やスタンプ取得で\n' +
+    '**どちらのイベントが使われるかが日付だけでは決まりません**。\n' +
+    '（先に作成した方が優先され、もう一方は使えなくなります）\n\n' +
+    '意図した重複でなければ、日付を修正するか、\n' +
+    '使わない方のイベントを「公開停止」にしてください。\n\n' +
+    `このまま${actionLabel}しますか？`
+  );
+}
+
 async function handleCreateEvent_() {
   const eventId   = getVal_('new-event-id').trim();
   const eventName = getVal_('new-event-name').trim();
@@ -1644,6 +1702,9 @@ async function handleCreateEvent_() {
     errEl.textContent = 'IDは小文字英数字とアンダースコアのみ';
     errEl.style.display = 'block'; return;
   }
+  // 開催日が重なる公開中イベントがあれば確認する（GAS側はeventIdの重複しか見ていない）
+  if (!confirmOverlap_(findOverlappingEvents_(startDate, endDate, null), '作成')) return;
+
   const btn = id_('btn-create-event');
   btn.disabled = true; btn.textContent = '作成中...';
 
