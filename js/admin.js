@@ -73,6 +73,12 @@ window.addEventListener('DOMContentLoaded', () => {
     if (txt && !txt.startsWith('（')) copyText_(txt);
   });
 
+  // スタンプラリー開始URL（受付NFC用）コピー
+  id_('btn-copy-stamp-start-url')?.addEventListener('click', () => {
+    const txt = id_('stamp-start-url')?.textContent;
+    if (txt && !txt.startsWith('（')) copyText_(txt);
+  });
+
   // 事前登録CSVダウンロード（QRパス用・区分別）
   id_('btn-prereg-csv-driver')?.addEventListener('click', () => downloadPreRegCsv_('driver'));
   id_('btn-prereg-csv-spectator')?.addEventListener('click', () => downloadPreRegCsv_('spectator'));
@@ -241,7 +247,8 @@ function route_() {
   } else if (section === 'forms') {
     showPage_('forms');
     loadConfig_(gen, ev);
-    updateWalkInUrl_(); // 当日参加登録URLをフォーム管理ページに表示
+    updateWalkInUrl_();      // 当日参加登録URLをフォーム管理ページに表示
+    updateStampStartUrl_();  // 受付NFC用のスタンプラリー開始URLを表示
     bindListPageEvents_();
   } else if (section === 'universities') {
     showPage_('universities');
@@ -1403,6 +1410,19 @@ function updateWalkInUrl_() {
   if (!el) return;
   // 当日受付コードは撤廃済み（開放）。素の register.html を当日の受付URLとして表示する。
   const url = location.origin + location.pathname.replace(/[^/]+$/, 'register.html');
+  el.innerHTML = `<a href="${url}" target="_blank" class="url-anchor">${url}</a>`;
+}
+
+/**
+ * 受付用NFC/QRに設定する「スタンプラリー開始URL」を表示する。
+ * ⚠ イベントIDもトークンも付けない。start.html は学生証QRを読んで stampToken を
+ *   発行する入口で、対象イベントは開催日から自動判定されるため（CLAUDE.md §4）。
+ *   URLが固定＝NFCタグを毎年焼き直さずに使い回せる、という運用上の利点がある。
+ */
+function updateStampStartUrl_() {
+  const el = id_('stamp-start-url');
+  if (!el) return;
+  const url = location.origin + location.pathname.replace(/[^/]+$/, 'start.html');
   el.innerHTML = `<a href="${url}" target="_blank" class="url-anchor">${url}</a>`;
 }
 
