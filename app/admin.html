@@ -908,6 +908,24 @@
 
       <div class="section no-fold">
         <div class="section-hd">
+          <span class="section-title">📷 スタンプラリー受付URL</span>
+        </div>
+        <div class="section-body" id="body-f-stamp-start">
+          <div class="cfg-group" style="margin-top:0">
+            <div class="cfg-hint" style="margin-bottom:8px">受付でNFCタグ・QRコードに設定するURLです。学生がここから学生証QRを読み取ってスタンプラリーを開始します。イベントIDを含まないため、毎年同じURLをそのまま使い回せます（対象イベントは開催日から自動判定）。</div>
+            <div class="cfg-row" style="margin-top:8px">
+              <label>スタンプラリー開始URL</label>
+              <div class="url-box">
+                <div class="url-val" id="stamp-start-url">—</div>
+                <button class="sm-btn" id="btn-copy-stamp-start-url">URLをコピー</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section no-fold">
+        <div class="section-hd">
           <span class="section-title">🏫 出場校エントリーフォーム設定</span>
         </div>
         <div class="section-body" id="body-f-school">
@@ -1306,6 +1324,6 @@
 <div class="toast" id="toast"></div>
 <script src="../js/vendor/qrcode.min.js?v=20260724h"></script>
 <script src="../js/config.js?v=20260724h"></script>
-<script src="../js/admin.js?v=20260817h"></script>
+<script src="../js/admin.js?v=20260819a"></script>
 </body>
 </html>
