@@ -4,3 +4,15 @@
 # スクショ画像は生成物（docs/screenshots/take-screenshots.js で再生成可能）。
 # 生成スクリプト自体はソースなので追跡する。
 docs/screenshots/*.png
+
+# ── clasp（GASコード同期）関連 ──────────────────
+# .clasprc.json は OAuth リフレッシュトークンを含む。漏洩するとGASを操作される。
+# .clasp.json はスクリプトIDを含む。どちらも絶対にコミットしない。
+.clasp.json
+.clasprc.json
+node_modules/
+
+# 移行検証用の使い捨てclone置き場（docs/GAS_CLASP_MIGRATION.md 参照）。
+# ここへ clone して .final.txt と差分を取る。差分ゼロを確認するまで
+# リポジトリ内に gas/ を作らない＝正が2つある状態を作らないための隔離。
+gas-verify/
