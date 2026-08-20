@@ -134,6 +134,9 @@ async function onQRFound(qrData) {
   const res = await FG_API.activateStamp(cardToken, qrEvent);
 
   if (res.ok) {
+    // NFCブースから来た場合（stamp.html が ?ct= を引き継ぐ）は、元のブースへ戻す。
+    // 導線が無いと、登録は済んだのにスタンプを押さずに離脱してしまう。
+    showBoothReturn_();
     FG_API.saveStampToken(res.data.stampToken);
     if (res.data.isNew) {
       // 初回登録 → 遊び方ガイドを表示
@@ -155,11 +158,50 @@ async function onQRFound(qrData) {
     showState('error');
     setText('error-title', 'イベントを特定できませんでした');
     setText('error-msg', 'スタッフにお問い合わせください。');
-  } else {
+  } else if (res.error === 'stamp_closed') {
+    // ⚠ 開始前・終了後をまとめて「受付時間外」と言う。開始前に「終了しました」と
+    //   出すと、当日朝のテストで現場が混乱する。
+    showState('error');
+    setText('error-title', 'スタンプラリー受付時間外です');
+    setText('error-msg', '受付時間内に、もう一度読み取ってください。ご不明な点はスタッフへお声掛けください。');
+  } else if (res.error === 'event_inactive') {
+    showState('error');
+    setText('error-title', 'ただいま受付を停止しています');
+    setText('error-msg', 'スタッフにお問い合わせください。');
+  } else if (res.error === 'lock_timeout') {
+    // 混み合っているだけで、待てば通る。「無効」と言って諦めさせない。
+    showState('error');
+    setText('error-title', '混み合っています');
+    setText('error-msg', '30秒ほどおいて、もう一度読み取ってください。');
+  } else if (res.error === 'timeout') {
+    showState('error');
+    setText('error-title', '接続がタイムアウトしました');
+    setText('error-msg', '電波の良い場所で、もう一度読み取ってください。');
+  } else if (res.error === 'invalid_token') {
     showState('error');
     setText('error-title', 'QRコードが無効です');
     setText('error-msg', '自分の学生QR名刺を読み取ってください。');
+  } else {
+    // ⚠ ここに来るものを「QRが無効」と決めつけない。原因が別（通信・サーバー）でも
+    //   「無効」と出ると、正しいパスを持つ学生が受付でつまずく。
+    showState('error');
+    setText('error-title', '読み取りに失敗しました');
+    setText('error-msg', res.message || 'もう一度お試しください。解決しない場合はスタッフへお声掛けください。');
   }
+}
+
+/**
+ * ?ct=<企業スタンプキー> が付いていれば、「このブースのスタンプを取得する」リンクを表示する。
+ * 付いていなければ何もしない（受付から直接開いた通常の導線では出さない）。
+ */
+function showBoothReturn_() {
+  const ct = FG_API.getParam('ct');
+  if (!ct) return;
+  const href = 'stamp.html?ct=' + encodeURIComponent(ct);
+  ['back-to-booth', 'back-to-booth-2'].forEach(function (id) {
+    const a = document.getElementById(id);
+    if (a) { a.href = href; a.style.display = ''; }
+  });
 }
 
 function cancelScan() {
