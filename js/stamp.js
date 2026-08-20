@@ -16,8 +16,16 @@
     return;
   }
 
+  // ⚠ このブースのキーを start.html へ引き継ぐ。引き継がないと、登録後に元のブースへ
+  //   戻る導線が無く、スタンプを取りこぼす。NFCから初回アクセスする学生は必ずここを通る。
+  const passBoothKey = () => {
+    const a = document.querySelector('#state-no-token a.action-link.primary');
+    if (a) a.href = 'start.html?ct=' + encodeURIComponent(ct);
+  };
+
   const stampToken = FG_API.getParam('st') || FG_API.getStampToken();
   if (!stampToken) {
+    passBoothKey();
     showState('no-token');
     return;
   }
@@ -35,9 +43,25 @@
     case 'already_stamped':
       showState('already');
       break;
-    case 'no_active_event':
+    // ⚠ 開始前も終了後も同じ stamp_closed が返る。開始前に「終了しました」と
+    //   表示すると、当日朝のテストで現場が混乱するため共通表現にする。
     case 'stamp_closed':
       showState('ended');
+      break;
+    case 'no_active_event':
+      showState('ended');
+      setText('ended-title', '本日はスタンプラリーを実施していません');
+      setText('ended-msg', '開催日をご確認ください。ご不明な点はスタッフへお声掛けください。');
+      break;
+    case 'event_inactive':
+      showState('ended');
+      setText('ended-title', 'ただいま受付を停止しています');
+      setText('ended-msg', 'スタッフにお問い合わせください。');
+      break;
+    case 'lock_timeout':
+      showState('error');
+      setText('error-title', '混み合っています');
+      setText('error-msg', '30秒ほどおいて、もう一度タグにタッチしてください。');
       break;
     case 'timeout':
       showState('error');
@@ -45,6 +69,7 @@
       setText('error-msg', 'もう一度お試しください。');
       break;
     case 'invalid_student_token':
+      passBoothKey();
       showState('no-token');
       break;
     default:

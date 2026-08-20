@@ -876,14 +876,21 @@ async function downloadNfcCsv_() {
   if (!curEvent_) { showToast_('イベントが選択されていません'); return; }
   const res = await adminCall_('adminGetCompanies', { event: curEvent_ });
   if (!res.ok) { showToast_('企業の取得に失敗しました'); return; }
-  const list = (res.data.companies || []).filter(c => c.stampKey);
-  if (!list.length) { showToast_('スタンプキー発行済みの企業がありません'); return; }
+  // ⚠ スタンプラリー非参加（出店なし）の企業は除外する。
+  //   GAS の actionSaveStamp_ が company_not_in_rally で弾くためデータは汚れないが、
+  //   タグを配ってしまうと来場者の画面にエラーが出る。配布物の段階で落とす。
+  const all  = (res.data.companies || []).filter(c => c.stampKey);
+  const list = all.filter(c => c.stampRally !== false);
+  const excluded = all.length - list.length;
+  if (!list.length) { showToast_('スタンプラリー参加企業がありません'); return; }
   const esc = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const head  = ['ブース名（企業名）', 'NFC用URL', 'stampKey', '企業ID'];
   const lines = [head.join(',')].concat(list.map(c =>
     [c.name, nfcUrl_(c.stampKey), c.stampKey, c.companyId].map(esc).join(',')));
   downloadCsv_(`企業NFC_URL_${curEvent_}_${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\r\n'));
-  showToast_(`✓ ${list.length}社のNFC URLを出力しました`);
+  showToast_(excluded
+    ? `✓ ${list.length}社のNFC URLを出力しました（出店なし ${excluded}社は除外）`
+    : `✓ ${list.length}社のNFC URLを出力しました`);
 }
 
 
