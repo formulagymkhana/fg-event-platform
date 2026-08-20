@@ -606,7 +606,15 @@ function actionMarkPrizeExchanged_(p) {
   if (!p.token) return err_('missing_token');
   if (!p.event) return err_('missing_event');
 
+  // ⚠ 学生側 actionExchangePrize_ と検査を揃える（2026-08-20 追加）。
+  //   従来はスタッフキーと学生の存在しか見ておらず、**公開停止したイベントや
+  //   景品交換期限を過ぎた後でも、スタッフ画面から交換記録を書き込めた**。
+  //   exchange.html は補助・予備の位置づけ（CLAUDE.md §4）だが、
+  //   学生側だけ閉じてスタッフ側が開いているのは非対称で危険。
+  if (isEventInactive_(p.event)) return err_('event_inactive');
+
   const cfg = getConfig_(p.event);
+  if (!isExchangeOpen_(cfg)) return err_('exchange_closed');
   if (!cfg.exchangeKey || String(cfg.exchangeKey) !== String(p.key)) {
     return err_('invalid_staff_key');
   }
