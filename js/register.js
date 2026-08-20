@@ -131,6 +131,12 @@ async function handleSubmit() {
     appBase:    new URL('.', location.href).href,
     // メアド重複警告への同意（表示された場合のみtrueが送られる）
     emailDupAcknowledged: document.getElementById('f-email-dup-ack')?.checked ? 'true' : 'false',
+    // ⚠ 表示時に解決したイベントIDを固定して送る（2026-08-19 追加）。
+    //   省略すると api.js が **送信時点** で当日イベントを解決し直すため、
+    //   イベントAの開催中に開いたページをBの開催日に送信すると B へ登録される。
+    //   表示しているイベントと保存先を必ず一致させる。
+    //   （日付をまたいで送信された場合は GAS の isEventDay_ が拒否する）
+    event: pageEvent_,
   };
 
   const res = await FG_API.registerWalkIn(params);
@@ -156,6 +162,10 @@ async function handleSubmit() {
     showState('error');
     const msgs = {
       no_active_event: '本日開催のイベントが見つかりません。スタッフにお問い合わせください。',
+      // ページを開いたまま日付をまたいで送信した場合。イベントIDを固定して送るため、
+      // 「昨日のイベント」宛てになり GAS の isEventDay_ に弾かれる（想定どおりの動作）。
+      not_event_day:   'ページを開いてから日付が変わりました。お手数ですが、ページを再読み込みしてから登録してください。',
+      event_inactive:  'このイベントの受付は終了しています。スタッフにお問い合わせください。',
       invalid_code:    'URLが正しくありません。会場のQRコードから再度アクセスしてください。',
       missing_params:  '入力内容に不足があります。フォームを確認してください。',
       timeout:         '通信がタイムアウトしました。電波の良い場所で再試行してください。',

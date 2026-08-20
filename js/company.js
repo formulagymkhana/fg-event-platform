@@ -137,7 +137,15 @@ async function loadStamp() {
   if (vkParam) {
     const vkRes = await FG_API.resolveViewKey(vkParam, _event);
     if (!vkRes.ok) {
-      showErr('企業QRが無効です', '配布された企業QRを再度ご確認ください。');
+      // ⚠ 開催中のイベントが無いだけの場合を「QRが無効」と言ってはいけない。
+      //   ラミネートQRから来た企業が最初に通るのがこの経路で、
+      //   キーは正しいのに「無効」と出ると配り直しの問い合わせになる。
+      if (vkRes.error === 'no_active_event') {
+        showErr('現在イベントは開催されておりません',
+                '大会期間中および大会終了後の公開期間中にご覧いただけます。お手数ですが、大会当日以降に再度アクセスしてください。');
+      } else {
+        showErr('企業QRが無効です', '配布された企業QRを再度ご確認ください。');
+      }
       return;
     }
     FG_API.saveCompanyViewKey(vkParam);
@@ -162,6 +170,18 @@ async function loadStamp() {
 
   if (stampRes.error === 'invalid_key' && qrRes.error === 'invalid_key') {
     showErr('閲覧キーが無効です', '配布されたURLを再度ご確認ください。');
+    return;
+  }
+
+  // ⚠ 閲覧QRはイベントIDを持たない永続URL。どの大会を表示するかはGASが
+  //   「開始済みの最新イベント」として解決するため、次のいずれかで該当なしになる。
+  //     ・最初の大会がまだ開始していない
+  //     ・大会終了後に運営がイベントを「公開停止」にした（＝全停止。仕様）
+  //   このとき専用の案内を出さないと、企業側からは「QRが壊れている」と見えて
+  //   問い合わせの原因になる。
+  if (stampRes.error === 'no_active_event' && qrRes.error === 'no_active_event') {
+    showErr('現在イベントは開催されておりません',
+            '大会期間中および大会終了後の公開期間中にご覧いただけます。お手数ですが、大会当日以降に再度アクセスしてください。');
     return;
   }
 
