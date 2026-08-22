@@ -213,7 +213,122 @@ async function loadStamp() {
     // 更新ボタン
     $('btn-reload-qr')?.addEventListener('click', loadQr);
     $('btn-reload-stamp')?.addEventListener('click', loadStamp);
+
+    // 学生QR読み取り（一覧が表示できた場合のみ有効化する）
+    $('btn-scan-student')?.addEventListener('click', openStudentScan);
+    $('btn-scan-cancel')?.addEventListener('click', closeStudentScan);
   } catch (e) {
     showErr('エラーが発生しました', '再読み込みしてもう一度お試しください。');
   }
 })();
+
+// ── 学生QR読み取り（企業が学生情報を開く） ──────────────────
+// ⚠ 既存の一覧表示・ログ記録には手を入れていない。追加のみ。
+//   学生カードは card.js の autoViewLog_ が企業cookieを見て自動で閲覧ログを記録するため、
+//   ここでログを書く必要はない（二重記録を避けるためにも書かない）。
+let _scanStream = null, _scanCanvas = null, _scanCtx = null, _scanRafId = null;
+let _scanPaused = false, _jsqrPromise = null;
+
+function ensureJsQR_() {
+  if (window.jsQR) return Promise.resolve();
+  if (_jsqrPromise) return _jsqrPromise;
+  _jsqrPromise = new Promise((resolve, reject) => {
+    const el = document.createElement('script');
+    el.src = '../js/vendor/jsQR.js';
+    el.onload = () => resolve();
+    el.onerror = () => reject(new Error('jsQR load failed'));
+    document.head.appendChild(el);
+  });
+  return _jsqrPromise;
+}
+
+function setScanMsg_(text, cls) {
+  const el = $('overlay-msg');
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'overlay-msg' + (cls ? ' ' + cls : '');
+}
+
+/** QRの中身がトークン単体かどうか（学生パスのQRはトークンのみを持つ） */
+function isLikelyToken_(v) {
+  const t = String(v || '').trim();
+  if (!t || /\s/.test(t)) return false;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) return false;
+  return /^[A-Za-z0-9_-]{16,64}$/.test(t);
+}
+
+async function openStudentScan() {
+  const overlay = $('scan-overlay');
+  if (!overlay) return;
+  overlay.style.display = 'flex';
+  $('btn-open-student').style.display = 'none';
+  setScanMsg_('', '');
+  _scanPaused = false;
+  _scanCanvas = document.createElement('canvas');
+  _scanCtx    = _scanCanvas.getContext('2d');
+
+  try {
+    const jsqrReady = ensureJsQR_();
+    _scanStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+    });
+    const video = $('scan-video');
+    video.srcObject = _scanStream;
+    await video.play();
+    _scanCanvas.width  = video.videoWidth  || 1280;
+    _scanCanvas.height = video.videoHeight || 720;
+    await jsqrReady;
+    scanLoop_(video);
+  } catch (e) {
+    setScanMsg_('カメラを起動できませんでした。カメラのアクセスを許可してください。', 'err');
+  }
+}
+
+function closeStudentScan() {
+  if (_scanRafId) { cancelAnimationFrame(_scanRafId); _scanRafId = null; }
+  if (_scanStream) { _scanStream.getTracks().forEach(t => t.stop()); _scanStream = null; }
+  const v = $('scan-video'); if (v) v.srcObject = null;
+  const o = $('scan-overlay'); if (o) o.style.display = 'none';
+}
+
+function scanLoop_(video) {
+  if (!_scanStream) return;
+  if (!_scanPaused && video.readyState === video.HAVE_ENOUGH_DATA) {
+    _scanCtx.drawImage(video, 0, 0, _scanCanvas.width, _scanCanvas.height);
+    const img  = _scanCtx.getImageData(0, 0, _scanCanvas.width, _scanCanvas.height);
+    // 反転印刷にも対応するため attemptBoth
+    const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' });
+    if (code) onStudentQR_(code.data);
+  }
+  _scanRafId = requestAnimationFrame(() => scanLoop_(video));
+}
+
+function onStudentQR_(qrData) {
+  // 学生QRは「トークン単体」または card.html?token=... のURL。両方受ける。
+  const raw = String(qrData || '').trim();
+  let token = null;
+  try { token = new URL(raw).searchParams.get('token'); } catch (e) { /* URLでない */ }
+  if (!token && isLikelyToken_(raw)) token = raw;
+
+  if (!token) {
+    setScanMsg_('学生QRではありません。学生パスのQRを読み取ってください。', 'err');
+    return; // スキャン継続
+  }
+
+  _scanPaused = true;
+  const ev  = _event ? '&event=' + encodeURIComponent(_event) : '';
+  const url = 'card.html?token=' + encodeURIComponent(token) + ev;
+
+  // ⚠ 別タブを開く。iOS Safari は非同期処理からの window.open を塞ぐことがあるため、
+  //   塞がれた場合はボタンを出して手動で開けるようにする（受付を止めないため）。
+  const w = window.open(url, '_blank');
+  if (w) {
+    setScanMsg_('✓ 学生情報を新しいタブで開きました', 'ok');
+    setTimeout(() => { _scanPaused = false; setScanMsg_('', ''); }, 1500);
+  } else {
+    const btn = $('btn-open-student');
+    btn.onclick = () => { window.open(url, '_blank'); closeStudentScan(); };
+    btn.style.display = 'block';
+    setScanMsg_('読み取りました。下のボタンから学生情報を開いてください。', 'ok');
+  }
+}
