@@ -84,13 +84,15 @@ async function startScan() {
     // QRデコーダとカメラ権限を並行で準備
     const jsqrReady = ensureJsQR();
     _stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+      // ⚠ 学生QRは約120文字のURLを持つためセルが細かい。640x480では
+      //   パスを少し離すとデコードできない。解像度を上げて余裕を持たせる。
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
     });
     const video = document.getElementById('scan-video');
     video.srcObject = _stream;
     await video.play();
-    _canvas.width  = video.videoWidth  || 640;
-    _canvas.height = video.videoHeight || 480;
+    _canvas.width  = video.videoWidth  || 1280;
+    _canvas.height = video.videoHeight || 720;
     await jsqrReady;   // デコーダ読込完了を待ってからループ開始
     scanLoop(video);
   } catch (err) {
@@ -106,10 +108,27 @@ function scanLoop(video) {
   if (video.readyState === video.HAVE_ENOUGH_DATA) {
     _ctx.drawImage(video, 0, 0, _canvas.width, _canvas.height);
     const img  = _ctx.getImageData(0, 0, _canvas.width, _canvas.height);
-    const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+    // ⚠ attemptBoth にする。印刷物が白黒反転（暗い背景に白いQR）でも読めるようにするため。
+    //   dontInvert のままだと反転印刷は永久に読めない。
+    const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' });
     if (code) { onQRFound(code.data); return; }
   }
   _rafId = requestAnimationFrame(() => scanLoop(video));
+}
+
+/**
+ * QRの中身がトークン単体かどうか。
+ * ⚠ 印刷されたパスのQRにはURLではなくトークンだけが入っている場合がある
+ *   （2026-08-20に本番のパスで判明）。URLしか受け付けないと受付で全員が詰まる。
+ *   cardToken は Utilities.getUuid() の36文字UUIDだが、印刷側の都合で
+ *   別形式になることもあるため、UUIDに限定せず「URLではない英数字の塊」を許容する。
+ *   ここを通ってもサーバーが存在確認するので、誤った文字列は invalid_token で弾かれる。
+ */
+function isLikelyToken_(v) {
+  const s = String(v || '').trim();
+  if (!s || /\s/.test(s)) return false;      // 空白を含むものはトークンではない
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) return false;  // URLは対象外（上で処理済み）
+  return /^[A-Za-z0-9_-]{16,64}$/.test(s);
 }
 
 async function onQRFound(qrData) {
@@ -117,11 +136,19 @@ async function onQRFound(qrData) {
 
   let cardToken = null;
   let qrEvent   = null;
+  const raw = String(qrData || '').trim();
   try {
-    const u  = new URL(qrData);
+    const u  = new URL(raw);
     cardToken = u.searchParams.get('token');
     qrEvent   = u.searchParams.get('event');
   } catch (e) {}
+
+  // ⚠ URLとして解釈できない／token が無い場合でも、中身がトークンそのもの
+  //   （cardToken は Utilities.getUuid() の36文字UUID）なら受け付ける。
+  //   印刷物のQRがURLではなくトークンだけを持つ場合に、受付で詰まらせないため。
+  if (!cardToken && isLikelyToken_(raw)) {
+    cardToken = raw;
+  }
 
   if (!cardToken) {
     showState('error');

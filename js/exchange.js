@@ -45,7 +45,8 @@ async function startScan() {
 
   try {
     _stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+      // 学生QRは約120文字のURLでセルが細かい。640x480では距離が離れると読めない
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
     });
     const video = document.getElementById('scan-video');
     video.srcObject = _stream;
@@ -66,19 +67,41 @@ function scanLoop(video) {
   if (video.readyState === video.HAVE_ENOUGH_DATA) {
     _ctx.drawImage(video, 0, 0, _canvas.width, _canvas.height);
     const img = _ctx.getImageData(0, 0, _canvas.width, _canvas.height);
-    const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+    // 印刷物が白黒反転していても読めるように attemptBoth にする
+    const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' });
     if (code) { onQRFound(code.data); return; }
   }
   _rafId = requestAnimationFrame(() => scanLoop(video));
+}
+
+/**
+ * QRの中身がトークン単体かどうか。
+ * ⚠ 印刷されたパスのQRにはURLではなくトークンだけが入っている場合がある
+ *   （2026-08-20に本番のパスで判明）。URLしか受け付けないと受付で全員が詰まる。
+ *   cardToken は Utilities.getUuid() の36文字UUIDだが、印刷側の都合で
+ *   別形式になることもあるため、UUIDに限定せず「URLではない英数字の塊」を許容する。
+ *   ここを通ってもサーバーが存在確認するので、誤った文字列は invalid_token で弾かれる。
+ */
+function isLikelyToken_(v) {
+  const s = String(v || '').trim();
+  if (!s || /\s/.test(s)) return false;      // 空白を含むものはトークンではない
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) return false;  // URLは対象外（上で処理済み）
+  return /^[A-Za-z0-9_-]{16,64}$/.test(s);
 }
 
 async function onQRFound(qrData) {
   stopCamera();
 
   let cardToken = null;
+  const raw = String(qrData || '').trim();
   try {
-    cardToken = new URL(qrData).searchParams.get('token');
+    cardToken = new URL(raw).searchParams.get('token');
   } catch (e) { /* URLでない */ }
+
+  // URLでない／token が無くても、中身が cardToken(36文字UUID)そのものなら受け付ける
+  if (!cardToken && isLikelyToken_(raw)) {
+    cardToken = raw;
+  }
 
   if (!cardToken) {
     showState('error');
