@@ -261,7 +261,6 @@ async function openStudentScan() {
   const overlay = $('scan-overlay');
   if (!overlay) return;
   overlay.style.display = 'flex';
-  $('btn-open-student').style.display = 'none';
   setScanMsg_('', '');
   _scanPaused = false;
   _scanCanvas = document.createElement('canvas');
@@ -319,16 +318,17 @@ function onStudentQR_(qrData) {
   const ev  = _event ? '&event=' + encodeURIComponent(_event) : '';
   const url = 'card.html?token=' + encodeURIComponent(token) + ev;
 
-  // ⚠ 別タブを開く。iOS Safari は非同期処理からの window.open を塞ぐことがあるため、
-  //   塞がれた場合はボタンを出して手動で開けるようにする（受付を止めないため）。
+  // ⚠ まず別タブで開く。連続で読み取れるよう、一覧とスキャナを残すのが望ましいため。
+  //   ただし iOS Safari は非同期処理からの window.open を塞ぐことがある。
+  //   その場合は**同じタブで自動的に開く**（手動タップを挟まない）。
+  //   ブラウザの「戻る」で一覧へ復帰できる。受付を止めないことを最優先する。
   const w = window.open(url, '_blank');
   if (w) {
     setScanMsg_('✓ 学生情報を新しいタブで開きました', 'ok');
     setTimeout(() => { _scanPaused = false; setScanMsg_('', ''); }, 1500);
   } else {
-    const btn = $('btn-open-student');
-    btn.onclick = () => { window.open(url, '_blank'); closeStudentScan(); };
-    btn.style.display = 'block';
-    setScanMsg_('読み取りました。下のボタンから学生情報を開いてください。', 'ok');
+    setScanMsg_('学生情報を開いています…', 'ok');
+    closeStudentScan();      // カメラを止めてから遷移する
+    location.href = url;
   }
 }
