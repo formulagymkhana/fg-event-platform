@@ -306,7 +306,14 @@ function onStudentQR_(qrData) {
   // 学生QRは「トークン単体」または card.html?token=... のURL。両方受ける。
   const raw = String(qrData || '').trim();
   let token = null;
-  try { token = new URL(raw).searchParams.get('token'); } catch (e) { /* URLでない */ }
+  let qrEvent = null;
+  try {
+    const u = new URL(raw);
+    token   = u.searchParams.get('token');
+    // ⚠ QRに event があれば捨てずに保持する。会期後は当日判定が効かず
+    //   no_active_event になるため、QR由来のイベントを優先して引き継ぐ。
+    qrEvent = u.searchParams.get('event');
+  } catch (e) { /* URLでない */ }
   if (!token && isLikelyToken_(raw)) token = raw;
 
   if (!token) {
@@ -315,7 +322,9 @@ function onStudentQR_(qrData) {
   }
 
   _scanPaused = true;
-  const ev  = _event ? '&event=' + encodeURIComponent(_event) : '';
+  // QR由来 → ページURL由来 の順で引き継ぐ（どちらも無ければ card.js が当日判定する）
+  const evId = qrEvent || _event;
+  const ev   = evId ? '&event=' + encodeURIComponent(evId) : '';
   const url = 'card.html?token=' + encodeURIComponent(token) + ev;
 
   // ⚠ まず別タブで開く。連続で読み取れるよう、一覧とスキャナを残すのが望ましいため。
