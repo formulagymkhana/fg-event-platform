@@ -421,10 +421,12 @@ function actionSaveStamp_(p) {
       ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).getValues()
       : [];
 
+    // 同じブースでも「日が変われば」再度取得できる（日別リセット）
     const dup = rows.some(r =>
       String(r[1]) === String(p.event) &&
       String(r[2]) === String(student.studentId) &&
-      String(r[7]) === String(company.companyId)
+      String(r[7]) === String(company.companyId) &&
+      sameDayJst_(r[0])
     );
     if (dup) return err_('already_stamped');
 
@@ -443,7 +445,9 @@ function actionSaveStamp_(p) {
     ]);
 
     const prevCount = rows.filter(r =>
-      String(r[1]) === String(p.event) && String(r[2]) === String(student.studentId)
+      String(r[1]) === String(p.event) &&
+      String(r[2]) === String(student.studentId) &&
+      sameDayJst_(r[0])
     ).length;
     const count = prevCount + 1;
 
@@ -485,7 +489,10 @@ function actionGetStampProgress_(p) {
     : [];
 
   const myStamps = rows
-    .filter(r => String(r[1]) === String(p.event) && String(r[2]) === String(student.studentId))
+    .filter(r =>
+      String(r[1]) === String(p.event) &&
+      String(r[2]) === String(student.studentId) &&
+      sameDayJst_(r[0]))
     .map(r => ({
       company:   r[6],
       companyId: String(r[7] || ''),   // スタンプ帳グリッドのID突合用
@@ -817,19 +824,54 @@ function countExchanged_(eventId, studentId) {
   const evCol   = headers.indexOf('eventId');
   const sidCol  = headers.indexOf('studentId');
   const cntCol  = headers.indexOf('claimedCount');
+  const timeCol = headers.indexOf('時刻');
 
+  // 景品も日別にリセットする（土曜に上限まで交換した学生も、日曜は改めて交換できる）。
+  // 「より多くの企業を回ってもらう」ための運用判断（2026-08-22）。
   return data.slice(1)
-    .filter(r => String(r[evCol]) === String(eventId) && String(r[sidCol]) === String(studentId))
+    .filter(r => String(r[evCol]) === String(eventId) &&
+                 String(r[sidCol]) === String(studentId) &&
+                 (timeCol < 0 || sameDayJst_(r[timeCol])))
     .reduce((sum, r) => sum + (cntCol >= 0 ? Number(r[cntCol]) || 1 : 1), 0);
 }
 
 /** スタンプ数を数える */
+// ============================================================
+// スタンプ・景品の「当日分のみ」集計（2026-08-22 追加）
+// ============================================================
+// 土日2日間のイベントで、日曜は0からスタンプラリーを開始し直す運用のため、
+// 集計を暦日単位に切り替える。
+//
+// ⚠ データは一切書き換えない。STAMP_LOG / PRIZE_LOG の行はそのまま残し、
+//   「数えるときに当日分だけを対象にする」ことでリセットを実現する。
+//   これにより、土曜の記録を失わずに日曜を0から始められる。
+//
+// ⚠ 企業の来訪学生一覧（actionGetCompanyStampVisitors_）はこの絞り込みを
+//   **使わない**。企業には土日をまとめて見せる必要があるため、
+//   あちらは eventId × companyId のままにしてある。変更しないこと。
+//
+// 競技時間は9:00〜17:00で日付をまたがないため、境界は暦日で判定して問題ない。
+function sameDayJst_(v, ref) {
+  if (!(v instanceof Date)) {
+    v = new Date(v);
+    if (isNaN(v)) return false;
+  }
+  const tz  = Session.getScriptTimeZone();
+  const fmt = d => Utilities.formatDate(d, tz, 'yyyy/MM/dd');
+  return fmt(v) === fmt(ref || new Date());
+}
+
 function countStamps_(eventId, studentId) {
   const sheet = eventSs_(eventId).getSheetByName(SHEET.STAMP_LOG);
   const rows  = sheet.getLastRow() > 1
     ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).getValues()
     : [];
-  return rows.filter(r => String(r[1]) === String(eventId) && String(r[2]) === String(studentId)).length;
+  // 当日分のみ（日別リセット。sameDayJst_ のコメント参照）
+  return rows.filter(r =>
+    String(r[1]) === String(eventId) &&
+    String(r[2]) === String(studentId) &&
+    sameDayJst_(r[0])
+  ).length;
 }
 
 /**
