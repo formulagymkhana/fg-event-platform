@@ -107,6 +107,15 @@
     .nav-card-count.init{background:var(--gray-light);color:var(--gray)}
 
     /* ── Stats ── */
+    /* 設定未完了の警告バナー（ダッシュボード最上部） */
+    .cfg-warn { display: none; background: #FFF7E1; border: 1px solid #F5D680; border-radius: 10px;
+                padding: 12px 14px; margin-bottom: 12px; }
+    .cfg-warn-title { font-size: 13px; font-weight: 700; color: #8A6100; margin-bottom: 6px; }
+    .cfg-warn ul { margin: 0 0 10px; padding-left: 18px; }
+    .cfg-warn li { font-size: 12px; color: #6B4E00; line-height: 1.7; }
+    .cfg-warn li b { color: #B3261E; }
+    .cfg-warn-act { display: inline-block; font-size: 12px; font-weight: 700; color: #fff;
+                    background: var(--navy); border-radius: 6px; padding: 7px 12px; text-decoration: none; }
     .stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}
     .stat-card{background:#fff;border-radius:10px;padding:14px;text-align:center;
       box-shadow:var(--shadow-sm)}
@@ -457,6 +466,13 @@
       <button class="hd-btn" id="btn-reload">↻</button>
     </header>
     <div class="app-body">
+
+      <!-- 設定未完了の警告（未設定の項目があるときだけ表示） -->
+      <div class="cfg-warn" id="cfg-warn">
+        <div class="cfg-warn-title" id="cfg-warn-title">⚠ 設定が未完了です</div>
+        <ul id="cfg-warn-list"></ul>
+        <a class="cfg-warn-act" id="cfg-warn-link" href="#">設定画面へ →</a>
+      </div>
 
       <!-- 統計グリッド -->
       <div class="stat-grid">
@@ -1349,6 +1365,6 @@
 <script src="../js/config.js?v=20260724h"></script>
 <!-- ⚠ csv-util.js は admin.js より前に読み込むこと（CSV出力の共通ヘルパー） -->
 <script src="../js/csv-util.js?v=20260825a"></script>
-<script src="../js/admin.js?v=20260825a"></script>
+<script src="../js/admin.js?v=20260825b"></script>
 </body>
 </html>

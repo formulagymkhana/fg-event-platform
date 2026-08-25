@@ -615,6 +615,55 @@ async function loadPrizeLog_(gen, ev) {
 }
 
 // ── Config ────────────────────────────────────────
+/**
+ * 設定の未完了をダッシュボードに警告する（2026-08-25 追加）。
+ *
+ * ⚠ 保存はブロックしない（警告のみ）。未設定だと保存できない作りにすると、
+ *   日程未定の段階で枠だけ作る運用ができず、「とりあえず適当な日時を入れる」
+ *   という回避を招く。それは未設定より悪い（間違った値が設定済みに見える）。
+ *
+ * ⚠ publicDeadline は対象外。未設定でも「終了日+2ヶ月」という安全な既定値が
+ *   isPastDeadline_ で適用されるため、警告する必要がない。
+ *
+ * 文言には「未設定です」だけでなく**何が起きるか**を併記する。
+ * 実害が伝わらないと放置されるため。
+ */
+function renderConfigWarnings_(cfg) {
+  const box = id_('cfg-warn');
+  if (!box) return;
+  const c = cfg || {};
+  const items = [];
+
+  if (!c.stampStartAt || !c.stampEndAt) {
+    items.push('スタンプ取得の開始/終了日時が未設定です → <b>会期外でもスタンプを取得できます</b>');
+  }
+  if (!c.exchangeDeadline) {
+    items.push('景品交換の受付期限が未設定です → <b>期限なしで交換できます</b>');
+  }
+  if (!c.formOpenAt) {
+    items.push('事前登録フォームの公開開始日時が未設定です → <b>今すぐ誰でも送信できます</b>');
+  }
+  const dl = [
+    ['FGクラス',   c.deadlineDriver],
+    ['女子クラス', c.deadlineWomenDriver],
+    ['補欠',       c.deadlineReserve],
+    ['見学・応援', c.deadlineMechanic],
+  ].filter(([, v]) => !v).map(([k]) => k);
+  if (dl.length) {
+    items.push(`参加区分の締切が未設定です（${dl.join(' / ')}） → <b>無期限で受け付けます</b>`);
+  }
+  if (!c.schoolEntryFormOpenAt || !c.schoolEntryDeadline) {
+    items.push('出場校エントリーの公開開始/締切が未設定です → <b>今すぐ・無期限で受け付けます</b>');
+  }
+
+  if (!items.length) { box.style.display = 'none'; return; }
+  setText_('cfg-warn-title', `⚠ 設定が未完了です（${items.length}件）`);
+  id_('cfg-warn-list').innerHTML = items.map(t => `<li>${t}</li>`).join('');
+  const link = id_('cfg-warn-link');
+  if (link) link.href = '#' + curEvent_ + '/forms';
+  box.style.display = 'block';
+}
+
 async function loadConfig_(gen, ev) {
   const res = await adminGetConfigDeduped_(ev);
   if (gen !== loadGen_) return;
@@ -644,6 +693,7 @@ async function loadConfig_(gen, ev) {
   updatePreRegFormUrl_();
   updateSchoolEntryFormUrl_();
   updateFormBadge_(cfg);
+  renderConfigWarnings_(cfg);   // ダッシュボードの設定未完了バナー
 }
 
 /** フォーム管理ナビカードのバッジ: 公開状態を表示（設定読込済みデータから判定・軽量） */
@@ -1548,6 +1598,20 @@ async function handleSaveEventInfo_() {
   // 「公開停止」に変更する場合は競合しなくなるので確認しない。
   if (status !== '公開停止') {
     if (!confirmOverlap_(findOverlappingEvents_(startDate, endDate, ev), '保存')) return;
+  }
+
+  // ⚠ 終了日時が 00:00 のまま保存されるのを水際で止める。
+  //   設定が空のとき、この欄には dateToDtLocal_ が「終了日 + T00:00」を自動で入れる。
+  //   気づかず保存すると **2日目の開始直後にスタンプ取得と景品交換が止まる**。
+  //   未設定ではなく「危険な値」なので、ダッシュボードの警告バナーでは拾えない。
+  if (/T00:00$/.test(endDatetime)) {
+    const shown = endDatetime.replace('T', ' ');
+    if (!window.confirm(
+      `終了日時が「${shown}」になっています。\n\n` +
+      'この時刻でスタンプ取得と景品交換が終了します。\n' +
+      '2日開催の場合、2日目の開始直後に停止することになります。\n\n' +
+      'このまま保存しますか？'
+    )) return;
   }
 
   btn.disabled = true; fb.className = 'save-fb'; fb.textContent = '';
