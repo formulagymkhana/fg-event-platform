@@ -120,8 +120,18 @@ function v1_() {
   req('f-company-short','err-company-short','社名略称を入力してください');
   req('f-director',     'err-director',     '代表者名を入力してください');
   req('f-contact',      'err-contact',      '担当者名を入力してください');
-  req('f-tel',          'err-tel',          '電話番号を入力してください');
-  req('f-contact-tel',  'err-contact-tel',  '担当者連絡先を入力してください');
+  // ⚠ 電話番号・郵便番号はハイフン必須。
+  //   ハイフン無しの数字だけだと、CSVをExcelで開いたときに先頭の0が
+  //   落ちて数値化され、データが壊れるため（2026-08-24 運用要望）。
+  const tel = (id, errId, label) => {
+    const v = val_(id);
+    if (!v) { showErr_(errId, id, label + 'を入力してください'); ok = false; return; }
+    if (!/^0\d{1,4}-\d{1,4}-\d{3,4}$/.test(v)) {
+      showErr_(errId, id, 'ハイフン付きで入力してください（例：03-1234-5678）'); ok = false;
+    }
+  };
+  tel('f-tel',         'err-tel',         '電話番号');
+  tel('f-contact-tel', 'err-contact-tel', '担当者連絡先');
   return ok;
 }
 
@@ -140,11 +150,11 @@ function v2_() {
     showErr_('err-email-confirm', 'f-email-confirm', 'メールアドレスが一致しません'); ok = false;
   }
   const zip = val_('f-zip');
-  const zipDigits = zip.replace(/[-−ー－]/g, '');
   if (!zip) {
     showErr_('err-zip', 'f-zip', '郵便番号を入力してください'); ok = false;
-  } else if (!/^\d{7}$/.test(zipDigits)) {
-    showErr_('err-zip', 'f-zip', '7桁の数字で入力してください（ハイフン可）'); ok = false;
+  } else if (!/^\d{3}-\d{4}$/.test(zip)) {
+    // ハイフン必須（上の tel と同じ理由：Excelで先頭0が落ちるのを防ぐ）
+    showErr_('err-zip', 'f-zip', 'ハイフン付きで入力してください（例：166-0015）'); ok = false;
   }
   if (!val_('f-pref'))    { showErr_('err-pref',    'f-pref',    '都道府県を選択してください'); ok = false; }
   if (!val_('f-address')) { showErr_('err-address', 'f-address', '住所（市区町村以降）を入力してください'); ok = false; }

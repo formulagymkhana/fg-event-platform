@@ -220,11 +220,13 @@
         <div class="form-row">
           <label>代表電話番号<span class="req">*</span></label>
           <input type="tel" id="f-tel" placeholder="例：03-5305-3553" autocomplete="tel" inputmode="tel">
+          <p class="hint">ハイフンを入れてご入力ください</p>
           <p class="field-err" id="err-tel"></p>
         </div>
         <div class="form-row">
           <label>担当者連絡先（携帯等）<span class="req">*</span></label>
           <input type="tel" id="f-contact-tel" placeholder="例：090-1234-5678" autocomplete="tel" inputmode="tel">
+          <p class="hint">ハイフンを入れてご入力ください</p>
           <p class="field-err" id="err-contact-tel"></p>
         </div>
         <div class="step-nav">
@@ -249,7 +251,8 @@
         </div>
         <div class="form-row">
           <label>郵便番号<span class="req">*</span></label>
-          <input type="text" id="f-zip" placeholder="例：166-0015 または 1660015" autocomplete="postal-code" inputmode="numeric" maxlength="8">
+          <input type="text" id="f-zip" placeholder="例：166-0015" autocomplete="postal-code" inputmode="numeric" maxlength="8">
+          <p class="hint">ハイフンを入れてご入力ください</p>
           <p class="field-err" id="err-zip"></p>
         </div>
         <div class="form-row">
@@ -503,6 +506,6 @@
 
   <script src="../js/config.js?v=20260724b"></script>
   <script src="../js/api.js?v=20260819a"></script>
-  <script src="../js/company-entry.js?v=20260805b"></script>
+  <script src="../js/company-entry.js?v=20260824a"></script>
 </body>
 </html>
