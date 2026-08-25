@@ -120,9 +120,113 @@
       `<tr><td>${label}</td>${actCellHtml(actCell('stamp', group))}${actCellHtml(actCell('view', group))}</tr>`
     ).join('');
 
-    body.innerHTML = `
+    // ── サマリー（開催報告書 Highlights 相当） ──
+    // GAS 再デプロイ前は summary/attributes/booth が無いので、その場合は各カードを出さない。
+    const sm = d.summary;
+    const summaryHtml = !sm ? '' : `
       <div class="card">
+        <h2>サマリー</h2>
+        <p class="note">開催報告書の Highlights に相当する数値です。</p>
+        <div class="kpi-grid">
+          ${[['出場校', sm.schoolEntryCount, '校'],
+             ['FGクラス選手', sm.fgDrivers, '名'],
+             ['女子クラス選手', sm.womenDrivers, '名'],
+             ['応援来場学生（延べ）', totalNonDrivers, '名'],
+             ['出展ブース', sm.companyCount, '社'],
+             ['開催日数', sm.dayCount, '日間']
+            ].map(([l, v, u]) =>
+              `<div class="kpi"><div class="val">${v ?? 0}<span class="unit">${u}</span></div><div class="lbl">${l}</div></div>`
+            ).join('')}
+        </div>
+        <p class="src-note">※「出場校」は出場校エントリーの件数、「出展ブース」は企業マスターの登録数です。
+        来場学生の所属大学数は ${sm.attendeeSchoolCount ?? 0} 校でした（応援のみの大学を含む）。</p>
+      </div>`;
+
+    // ── 学生属性（学年・都道府県・学部） ──
+    const at = d.attributes;
+    // 件数の多い順に並べる。limit を超えた分は「その他」にまとめる。
+    const distRows = (obj, limit) => {
+      const es = Object.entries(obj || {}).sort((a, b) => b[1] - a[1]);
+      const head = limit ? es.slice(0, limit) : es;
+      const rest = limit ? es.slice(limit) : [];
+      const restSum = rest.reduce((s, e) => s + e[1], 0);
+      const out = head.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="num">${v}</td></tr>`);
+      if (restSum) out.push(`<tr><td>その他（${rest.length}件）</td><td class="num">${restSum}</td></tr>`);
+      return out.join('') || '<tr><td colspan="2" class="empty">データなし</td></tr>';
+    };
+    const distTable = (title, obj, limit) => `
+      <div class="dist-block">
+        <h3>${title}</h3>
+        <table class="report-tbl">
+          <thead><tr><th>区分</th><th>人数</th></tr></thead>
+          <tbody>${distRows(obj, limit)}</tbody>
+        </table>
+      </div>`;
+    const attrHtml = !at ? '' : `
+      <div class="card">
+        <h2>学生属性</h2>
+        <p class="note">
+          開催報告書の Student Attribute に相当する集計です。対象は<strong>選手</strong>と
+          <strong>来場記録のある選手以外</strong>で、登録だけあって来場記録が無い学生は含みません。<br>
+          学部学科は自由入力のため、報告書の「理工学系／人文・社会経済系」の分類は自動化していません。
+          生の学部学科名で集計しているので、分類は手作業で行ってください。
+        </p>
+        <div class="dist-grid">
+          ${distTable('学年（選手）', at.driver && at.driver.years)}
+          ${distTable('学年（選手以外）', at.nonDriver && at.nonDriver.years)}
+          ${distTable('所在地（選手）', at.driver && at.driver.prefectures, 12)}
+          ${distTable('所在地（選手以外）', at.nonDriver && at.nonDriver.prefectures, 12)}
+          ${distTable('学部学科（選手）', at.driver && at.driver.faculties, 12)}
+          ${distTable('学部学科（選手以外）', at.nonDriver && at.nonDriver.faculties, 12)}
+        </div>
+      </div>`;
+
+    // ── ブース別スタンプ数（スタンプラリー結果） ──
+    const bt = d.booth;
+    const boothHtml = !bt || !bt.rows || !bt.rows.length ? '' : `
+      <div class="card">
+        <h2>ブース別スタンプ数</h2>
+        <p class="note">企業ブースごとのスタンプ取得数を、日別・選手／応援別に集計しています（取得数の多い順）。</p>
+        <div class="tbl-scroll">
+          <table class="report-tbl">
+            <thead>
+              <tr>
+                <th rowspan="2">ブース</th>
+                ${bt.days.map(day => `<th colspan="2">${dayLabel(day)}</th>`).join('')}
+                <th rowspan="2">合計</th>
+              </tr>
+              <tr>${bt.days.map(() => '<th class="sub-th">選手</th><th class="sub-th">応援</th>').join('')}</tr>
+            </thead>
+            <tbody>
+              ${bt.rows.map(r => `<tr>
+                <td>${esc(r.name)}</td>
+                ${r.days.map(c => `<td class="num">${c.driver}</td><td class="num">${c.nonDriver}</td>`).join('')}
+                <td class="num"><strong>${r.total}</strong></td>
+              </tr>`).join('')}
+              <tr class="total-row">
+                <td>合計</td>
+                ${bt.days.map((_, i) => {
+                  const dv = bt.rows.reduce((s, r) => s + r.days[i].driver, 0);
+                  const nd = bt.rows.reduce((s, r) => s + r.days[i].nonDriver, 0);
+                  return `<td class="num">${dv}</td><td class="num">${nd}</td>`;
+                }).join('')}
+                <td class="num">${bt.rows.reduce((s, r) => s + r.total, 0)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+
+    body.innerHTML = `
+      <div class="card ev-title-card">
         <h2>${esc(ev ? (ev.name || eventId) : eventId)}</h2>
+        <p class="note">${d.days.map(dayLabel).join('・')}　全${d.days.length}日間</p>
+      </div>
+
+      ${summaryHtml}
+
+      <div class="card">
+        <h2>来場者数</h2>
         <p class="note">
           学生の来場者数（概算）。企業スタッフ・一般来場者は含みません。<br>
           「選手」は出場選手（FGクラス／女子クラスドライバー）で、来場予定日の申告項目がフォームに
@@ -174,6 +278,10 @@
           <tbody>${actRows}</tbody>
         </table>
       </div>
+
+      ${boothHtml}
+
+      ${attrHtml}
     `;
   }
 
