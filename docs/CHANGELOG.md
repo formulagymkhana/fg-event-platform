@@ -31,6 +31,31 @@ GAS はリポジトリ管理外のため、push しても自動反映されま�
 
 ---
 
+## 2026-08-24 事前登録者へ MY PASS を送信できるようにする
+
+- 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `js/admin.js`, `app/admin.html`
+- 変更内容:
+  - GAS に `sendPassMail_` を新設。CONFIG の `passMailSubject` / `passMailBody` で
+    文面を編集できる（未設定なら既定文面）。
+  - `actionAdminResendWalkInMail_` が**登録種別で文面を出し分ける**ようにした。
+    事前登録者は `sendPassMail_`、当日参加者は従来の `sendWalkInPassMail_`。
+  - 学生管理の送信ボタンを**全区分に表示**（従来は `regType !== '事前'` で除外）。
+    文言も区分で変える: 事前登録者は「**MY PASSを送信**」、当日参加者は「メール再送信」。
+  - **送信前に確認ダイアログ**を追加（宛先アドレスを明示）。メール未登録なら送信しない。
+  - 管理画面のフォーム管理に「✉️ MY PASS 送信メール」セクションを追加。
+- 理由/背景: 受付でパスを忘れた事前登録者に、その場でQRコードのリンクを送りたい
+  という要望（2026-08-24）。
+- GAS: **再デプロイ必須（未実施）**
+- 申し送り/注意点:
+  - **事前登録者にとっては「再送信」ではなく初回送信。** `sendPreRegMail_`（事前登録の
+    確認メール）にはパスURLが含まれておらず、差し込み `{passUrl}` も無いため。
+    文面もその前提で書いてある。
+  - **アクション名 `adminResendWalkInMail` は据え置いた。** 当日参加者専用ではなくなったが、
+    改名するとフロントとGASの同時デプロイが必要になるため。コードにコメントを残した。
+  - フロントの既定文面（`PASS_MAIL_SUBJECT_DEFAULT` / `PASS_MAIL_BODY_DEFAULT`）は
+    GAS の `sendPassMail_` のフォールバックと**一致させること**。片方だけ変えると、
+    管理画面の表示と実際に送られる文面がずれる。
+
 ## 2026-08-24 ブース出展申込：パス送付先の明示と、電話・郵便番号のハイフン必須化
 
 - 変更ファイル: `app/company-entry.html`, `js/company-entry.js`

@@ -994,6 +994,29 @@
 
       <div class="section no-fold">
         <div class="section-hd">
+          <span class="section-title">✉️ MY PASS 送信メール</span>
+        </div>
+        <div class="section-body" id="body-f-pass-mail">
+          <div class="cfg-group" style="margin-top:0">
+            <div class="cfg-hint" style="margin-bottom:8px">
+              学生管理ページの「MY PASSを送信」ボタンで、<strong>事前登録者</strong>へ送る文面です。
+              受付でパスを忘れた学生に、その場でQRコードのリンクを送る用途を想定しています。<br>
+              使える差し込み: <code>{name}</code>＝氏名、<code>{eventName}</code>＝大会名、<code>{passUrl}</code>＝MY PASSのURL
+            </div>
+            <div class="cfg-row">
+              <label>件名</label>
+              <input type="text" class="cfg-input" id="cfg-passMailSubject" placeholder="【{eventName}】あなたのMY PASS（QRコード）">
+            </div>
+            <div class="cfg-row">
+              <label>本文</label>
+              <textarea class="cfg-input" id="cfg-passMailBody" rows="9" style="resize:vertical;line-height:1.6"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section no-fold">
+        <div class="section-hd">
           <span class="section-title">✉️ 出場校エントリー 確認メール</span>
         </div>
         <div class="section-body" id="body-f-school-mail">
@@ -1326,6 +1349,6 @@
 <script src="../js/config.js?v=20260724h"></script>
 <!-- ⚠ csv-util.js は admin.js より前に読み込むこと（CSV出力の共通ヘルパー） -->
 <script src="../js/csv-util.js?v=20260824a"></script>
-<script src="../js/admin.js?v=20260824a"></script>
+<script src="../js/admin.js?v=20260824b"></script>
 </body>
 </html>
