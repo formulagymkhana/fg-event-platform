@@ -3272,6 +3272,35 @@ function isCompetingDriverCategory_(category) {
       || category === '出場選手(女子クラスドライバー)';
 }
 
+// 学年を開催報告書の6区分（大学1〜4年生／大学院生／その他）に正規化する。
+// ⚠ フォーム(app/register-pre.html の f-year)には「大学院生」の選択肢が無い。
+//   大学院生は「その他」＋自由記述（例「大学院修士2年」）でしか捕捉できないため、
+//   報告書でも自由記述を人が読んで数えていた。ここでも文字列で判定する。
+// ⚠ 短期大学／専門学校／自動車大学校は報告書に対応する区分が無いので「その他」に寄せる。
+//   （報告書 chart1 の その他=7 はこれらを含んでいたと考えられる）
+function normalizeYear_(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (!s) return '未回答';
+  if (/院|修士|博士/.test(s)) return '大学院生';
+  const m = s.match(/^大学学部([1-4])年生$/);
+  if (m) return '大学' + m[1] + '年生';
+  return 'その他';
+}
+
+// 学部学科（自由入力）を開催報告書の3区分に分類する。
+// ⚠ キーワードによる自動分類であり、正確性は保証されない。分類結果の内訳
+//   （facultiesDetail）で元の文字列を返すので、報告書に使う前に必ず目視確認すること。
+// ⚠ 理工判定に「科学」を入れると「社会科学部」を取り違えるため入れていない。
+var FACULTY_SCI_RE_ = /理工|工学|工業|理学|情報|機械|電気|電子|建築|土木|物理|化学|数理|数学|生物|生命|農学|医学|薬学|看護|歯学|獣医|航空|海洋|環境/;
+var FACULTY_HUM_RE_ = /経済|経営|商学|法学|文学|社会|人文|政治|外国語|国際|教育|心理|観光|福祉|言語|哲学|史学/;
+function classifyFaculty_(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (!s) return '未回答';
+  if (FACULTY_SCI_RE_.test(s)) return '理工学系';
+  if (FACULTY_HUM_RE_.test(s)) return '人文・社会経済系';
+  return 'その他';
+}
+
 function actionAdminGetAttendanceReport_(p) {
   const e = validateAdmin_(p);
   if (e) return e;
@@ -3415,7 +3444,12 @@ function actionAdminGetAttendanceReport_(p) {
   const attendedNonDrivers = new Set();
   days.forEach(d => byDay[d].forEach(sid => attendedNonDrivers.add(sid)));
 
-  const mkDist_  = () => ({ years: {}, prefectures: {}, faculties: {} });
+  // years/faculties は報告書の区分に正規化した値。yearsRaw/facultiesDetail は
+  // 正規化前の生データで、分類が妥当か目視確認するために返している。
+  const mkDist_  = () => ({
+    years: {}, yearsRaw: {}, prefectures: {},
+    faculties: {}, facultiesDetail: { '理工学系': {}, '人文・社会経済系': {}, 'その他': {}, '未回答': {} },
+  });
   const attrs_   = { driver: mkDist_(), nonDriver: mkDist_() };
   const bump_    = (obj, v) => { const k = String(v == null ? '' : v).trim() || '未回答'; obj[k] = (obj[k] || 0) + 1; };
   const schoolSet = new Set();
@@ -3434,9 +3468,13 @@ function actionAdminGetAttendanceReport_(p) {
       const isDriver = driverIds.has(sid);
       if (!isDriver && !attendedNonDrivers.has(sid)) return; // 来場記録なしは除外
       const t = isDriver ? attrs_.driver : attrs_.nonDriver;
-      if (yrC   >= 0) bump_(t.years,       r[yrC]);
+      if (yrC   >= 0) { bump_(t.years, normalizeYear_(r[yrC])); bump_(t.yearsRaw, r[yrC]); }
       if (prefC >= 0) bump_(t.prefectures, r[prefC]);
-      if (facC  >= 0) bump_(t.faculties,   r[facC]);
+      if (facC  >= 0) {
+        const cls = classifyFaculty_(r[facC]);
+        bump_(t.faculties, cls);
+        bump_(t.facultiesDetail[cls], r[facC]);
+      }
       if (schC  >= 0) { const sc = String(r[schC] || '').trim(); if (sc) schoolSet.add(sc); }
     });
   }

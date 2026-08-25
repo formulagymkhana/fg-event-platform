@@ -63,6 +63,8 @@
   .dist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .dist-block h3 { font-size: 12px; color: var(--fg-navy); margin-bottom: 6px; }
   .dist-block td.empty { color: var(--fg-muted); font-size: 12px; text-align: center; }
+  /* 学部の自動分類の検証用に、区分の下へ実際の学科名を並べる */
+  .dist-block td .detail { font-size: 10px; color: var(--fg-muted); line-height: 1.5; margin-top: 3px; }
 
   /* 横に長い表（ブース別スタンプ数）は表内だけ横スクロールさせる */
   .tbl-scroll { overflow-x: auto; }
@@ -117,6 +119,6 @@
 </div>
 
 <script src="../js/config.js?v=20260724h"></script>
-<script src="../js/report.js?v=20260825e"></script>
+<script src="../js/report.js?v=20260825f"></script>
 </body>
 </html>
