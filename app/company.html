@@ -32,9 +32,9 @@
     /* 一括ダウンロード（QR読取の下・やや大きめ）
        ⚠ 絶対配置にすると企業名と重なるため、ヘッダー内に通常配置して
           高さを押し出す。スマホ幅でも社名を隠さないための構造。 */
-    .dl-fab { display: flex; align-items: center; justify-content: center; gap: 6px;
-              width: 100%; margin-top: 14px; padding: 13px 16px; border: none; border-radius: 10px;
-              background: var(--fg-navy); color: #fff; font-size: 14px; font-weight: 700;
+    .dl-fab { display: inline-flex; align-items: center; gap: 5px;
+              margin-top: 8px; padding: 10px 14px; border: none; border-radius: 999px;
+              background: var(--fg-navy); color: #fff; font-size: 12.5px; font-weight: 700;
               cursor: pointer; line-height: 1; }
     .dl-fab:active { background: #0b2545; }
     .dl-fab:disabled { background: var(--fg-disabled); cursor: not-allowed; }
@@ -155,7 +155,7 @@
       <div class="co-name" id="co-name">—</div>
       <div class="co-subtitle">来訪学生一覧</div>
       <button class="scan-fab" id="btn-scan-student">📷 QR読取</button>
-      <button class="dl-fab" id="btn-download-csv">⬇ 学生情報を一括ダウンロード</button>
+      <button class="dl-fab" id="btn-download-csv">⬇ 学生情報を一括DL</button>
     </div>
 
     <!-- 企業QR初回スキャン時の登録完了バナー -->
@@ -215,6 +215,6 @@
   <script src="../js/api.js?v=20260819a"></script>
   <!-- ⚠ csv-util.js は company.js より前に読み込むこと（CSV出力の共通ヘルパー） -->
   <script src="../js/csv-util.js?v=20260824a"></script>
-  <script src="../js/company.js?v=20260824a"></script>
+  <script src="../js/company.js?v=20260824b"></script>
 </body>
 </html>
