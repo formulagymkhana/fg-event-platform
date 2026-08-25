@@ -521,12 +521,8 @@
           <span class="nav-card-count init" id="badge-reception">—</span>
         </a>
         <!-- ⚠ report.html は admin.html のハッシュルーティングに乗らない独立ページ。
-             管理者キーは sessionStorage(fg_admin_key) を共有するため、ここから
+             管理者キーは localStorage(fg_admin_key) を共有するため、ここから
              開けば再ログイン不要。新規タブで開き、管理画面の操作を妨げない。 -->
-        <!-- ⚠ rel="noopener" を付けない。同一オリジンのページなので tabnabbing リスクは無く、
-             むしろ noopener があると新規タブへ sessionStorage(fg_admin_key) が引き継がれず、
-             admin.html でログイン済みでも report.html で再ログインを求められてしまう
-             （HTML標準: sessionStorage は opener 関係にある新規タブにのみ複製される）。 -->
         <a class="nav-card" id="nav-report-card" href="report.html" target="_blank">
           <span class="nav-card-icon">📊</span>
           <span class="nav-card-label">開催報告</span>
@@ -1381,6 +1377,6 @@
 <script src="../js/config.js?v=20260724h"></script>
 <!-- ⚠ csv-util.js は admin.js より前に読み込むこと（CSV出力の共通ヘルパー） -->
 <script src="../js/csv-util.js?v=20260825a"></script>
-<script src="../js/admin.js?v=20260825b"></script>
+<script src="../js/admin.js?v=20260825c"></script>
 </body>
 </html>

@@ -128,7 +128,7 @@ window.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('hashchange', () => { if (adminKey_) route_(); });
 
   // セッション復元
-  const saved = sessionStorage.getItem('fg_admin_key');
+  const saved = localStorage.getItem('fg_admin_key');
   if (saved) { adminKey_ = saved; loginWithKey_(); }
   else showView_('login');
 });
@@ -149,7 +149,7 @@ async function handleLogin_() {
 async function loginWithKey_() {
   const res = await adminCall_('adminGetEvents', {});
   if (res.ok) {
-    sessionStorage.setItem('fg_admin_key', adminKey_);
+    localStorage.setItem('fg_admin_key', adminKey_);
     allEvents_  = res.data.events    || [];
     walkInCode_ = res.data.walkInCode || '';
     showView_('app');
@@ -162,7 +162,7 @@ async function loginWithKey_() {
 }
 
 function handleLogout_() {
-  sessionStorage.removeItem('fg_admin_key');
+  localStorage.removeItem('fg_admin_key');
   adminKey_ = curEvent_ = '';
   allEvents_ = [];
   history.replaceState(null, '', location.pathname); // ハッシュをクリア
@@ -1458,7 +1458,7 @@ async function handleChangeKey_() {
   btn.disabled = false; btn.textContent = 'キーを変更';
 
   if (res.ok) {
-    sessionStorage.removeItem('fg_admin_key');
+    localStorage.removeItem('fg_admin_key');
     fb.textContent = '✓ 変更しました。新しいキーで再ログインしてください。';
     fb.className = 'save-fb ok';
     setTimeout(() => {

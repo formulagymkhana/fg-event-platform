@@ -1,13 +1,13 @@
 /**
  * 開催報告ページ（2026-08-25 新設）。
  *
- * ⚠ admin.html とは独立したページ。sessionStorage の fg_admin_key を共有するため、
+ * ⚠ admin.html とは独立したページ。localStorage の fg_admin_key を共有するため、
  *   admin.html でログイン済みならそのまま使える（未ログインならここでも入力できる）。
  * ⚠ このページは書き込みを一切行わない（GAS の adminGetAttendanceReport は読み取り専用）。
  */
 (function () {
   const $ = id => document.getElementById(id);
-  let adminKey_ = sessionStorage.getItem('fg_admin_key') || '';
+  let adminKey_ = localStorage.getItem('fg_admin_key') || '';
 
   async function call_(action, params) {
     const body = JSON.stringify({ action, adminKey: adminKey_, ...params });
@@ -33,7 +33,7 @@
     const res = await call_('adminGetEvents', {});
     if (!res.ok) return false;
     adminKey_ = key;
-    sessionStorage.setItem('fg_admin_key', key);
+    localStorage.setItem('fg_admin_key', key);
     return true;
   }
 
@@ -52,7 +52,7 @@
   async function loadEvents_() {
     const res = await call_('adminGetEvents', {});
     if (!res.ok) {
-      if (res.error === 'invalid_admin_key') { sessionStorage.removeItem('fg_admin_key'); showState('login'); return; }
+      if (res.error === 'invalid_admin_key') { localStorage.removeItem('fg_admin_key'); showState('login'); return; }
       $('report-body').innerHTML = '<p class="state-msg">イベント一覧の取得に失敗しました</p>';
       return;
     }
@@ -143,7 +143,7 @@
   (async () => {
     if (!adminKey_) { showState('login'); return; }
     const ok = await tryLogin(adminKey_);
-    if (!ok) { adminKey_ = ''; sessionStorage.removeItem('fg_admin_key'); showState('login'); return; }
+    if (!ok) { adminKey_ = ''; localStorage.removeItem('fg_admin_key'); showState('login'); return; }
     showState('app');
     loadEvents_();
   })();
