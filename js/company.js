@@ -217,6 +217,9 @@ async function loadStamp() {
     // 学生QR読み取り（一覧が表示できた場合のみ有効化する）
     $('btn-scan-student')?.addEventListener('click', openStudentScan);
     $('btn-scan-cancel')?.addEventListener('click', closeStudentScan);
+
+    // 学生情報の一括ダウンロード（一覧が表示できた場合のみ有効化する）
+    $('btn-download-csv')?.addEventListener('click', downloadVisitorsCsv_);
   } catch (e) {
     showErr('エラーが発生しました', '再読み込みしてもう一度お試しください。');
   }
@@ -339,5 +342,77 @@ function onStudentQR_(qrData) {
     setScanMsg_('学生情報を開いています…', 'ok');
     closeStudentScan();      // カメラを止めてから遷移する
     location.href = url;
+  }
+}
+
+// ── 学生情報の一括ダウンロード（CSV） ──────────────────
+// ⚠ 既存の一覧表示には手を入れていない。追加のみ。
+//   画面のデータは保持していないため、押されたときに最新を取り直す
+//   （「更新」を押し忘れていても最新が出るようにするため）。
+//   文字コードは Shift_JIS（Windows の Excel でそのまま開けるように）。
+//   エンコーダは js/csv-util.js（管理画面と共通）。
+
+/** CSVの1セルを安全に整形する（改行・カンマ・引用符を含んでも壊れないように） */
+function csvCell_(v) {
+  const t = String(v == null ? '' : v);
+  return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+}
+
+const CSV_COLS_ = ['区分', '日時', '氏名', 'ふりがな', '大学名', '学部学科', '学年', '参加区分', 'メールアドレス'];
+
+function csvRows_(visitors, label) {
+  return (visitors || []).map(v => [
+    label, v.time, v.name, v.furigana, v.school,
+    v.department, v.year, v.category, v.email,
+  ].map(csvCell_).join(','));
+}
+
+async function downloadVisitorsCsv_() {
+  const btn = $('btn-download-csv');
+  if (!btn) return;
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '作成中…';
+
+  try {
+    const [qrRes, stampRes] = await Promise.all([
+      FG_API.getCompanyView(_key, _event),
+      FG_API.getCompanyStampVisitors(_key, _event),
+    ]);
+    if (!qrRes.ok && !stampRes.ok) {
+      const m = (qrRes.error === 'expired' || stampRes.error === 'expired')
+        ? '公開期限が終了しているため出力できません。'
+        : '取得に失敗しました。通信環境を確認して、もう一度お試しください。';
+      alert(m);
+      return;
+    }
+
+    const qr    = qrRes.ok    ? (qrRes.data.visitors    || []) : [];
+    const stamp = stampRes.ok ? (stampRes.data.visitors || []) : [];
+    if (!qr.length && !stamp.length) {
+      alert('出力できる来訪学生がいません。');
+      return;
+    }
+
+    // ⚠ セクション見出し＋区分列の併用。見出しだけだとExcelで並べ替えた瞬間に
+    //   区分が分からなくなり、区分列だけだと見た目の分離が無いため。
+    //   同じ学生がQR・スタンプの両方に出るのは意図どおり（別々の来訪事実）。
+    const head = CSV_COLS_.join(',');
+    const lines = []
+      .concat(['■ QRスキャン（名刺交換）', head], csvRows_(qr, 'QR'))
+      .concat(['', '■ スタンプラリー来訪', head], csvRows_(stamp, 'スタンプ'));
+
+    const company = (qrRes.ok && qrRes.data.companyName)
+      || (stampRes.ok && stampRes.data.companyName) || '来訪学生';
+    const stamp10 = new Date().toISOString().slice(0, 10);
+    const bad = downloadCsvSjis_(`来訪学生一覧_${company}_${stamp10}.csv`, lines.join('\r\n'));
+    if (bad && bad.length) {
+      alert('一部の文字がShift_JISに変換できず「?」になりました。\n\n' + bad.join(' '));
+    }
+  } catch (e) {
+    alert('出力に失敗しました。もう一度お試しください。');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
   }
 }
