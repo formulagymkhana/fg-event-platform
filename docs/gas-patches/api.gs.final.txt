@@ -125,6 +125,7 @@ function dispatch_(e) {
       case 'adminGetStats':     return actionAdminGetStats_(p);
       case 'adminGetStampLog':  return actionAdminGetStampLog_(p);
       case 'adminGetStudents':  return actionAdminGetStudents_(p);
+      case 'adminGetAttendanceReport': return actionAdminGetAttendanceReport_(p);
       case 'adminGetWalkIns':   return actionAdminGetWalkIns_(p);
       case 'adminGetPrizeLog':  return actionAdminGetPrizeLog_(p);
       case 'adminGetPreRegistrations': return actionAdminGetPreRegistrations_(p);
@@ -3236,6 +3237,119 @@ function actionAdminGetStampLog_(p) {
 
 // 当日参加者一覧
 // 全学生一覧（事前登録 + 当日）
+/**
+ * 開催報告用：土日別の来場者数を概算する（2026-08-25 追加・管理者専用）。
+ *
+ * 「学生だけ」を対象にする（企業スタッフ・一般来場者はカウントしない、
+ * 2026-08-25 ユーザー確認）。
+ *
+ * 集計方針（2026-08-25 ユーザー確定）:
+ *   - 選手（出場選手 FGクラス/女子クラスドライバー）: 来場予定日を申告する項目自体が
+ *     フォームに無い（レースが2日間にまたがるため）。**土日とも「来場確定」として
+ *     一律加算する**。来場実績（登録/スタンプ/QR）の集計には含めない。
+ *   - 補欠ドライバー・見学応援・当日参加登録: 「選手以外」として、
+ *     次の3方向のいずれかで存在すれば、その日の来場者としてカウントする
+ *     （studentId で重複排除・和集合）。
+ *       ① 登録   … STAMP_PARTICIPANTS（当日参加登録は登録と同時にここへ行が作られる）
+ *       ② スタンプ … STAMP_LOG（ブースでのスタンプ取得）
+ *       ③ QR読み取り … VIEW_LOG（企業が学生QRを読む＝名刺交換）
+ *   - 「概算合計」は 選手（確定）+ 選手以外（来場実績） で、選手込みの数値であることを
+ *     必ず明示する（呼び出し元の表示でも「※選手込み」等を付けること）。
+ *
+ * ⚠ この関数は読み取りのみ。シートへの書き込みは一切ない。
+ */
+function actionAdminGetAttendanceReport_(p) {
+  const e = validateAdmin_(p);
+  if (e) return e;
+  if (!p.event) return err_('missing_event');
+
+  const ss = eventSs_(p.event);
+  const tz = Session.getScriptTimeZone();
+  const dayOf = d => (d instanceof Date) ? Utilities.formatDate(d, tz, 'yyyy/MM/dd') : null;
+
+  // イベントの開催日（2日分）を EVENT_LIST から取得し、それ以外の日付は無視する
+  // （テストデータ等の日付混入で日を増やさないため）。
+  const evSheet = masterSs_().getSheetByName(SHEET.EVENT_LIST);
+  const evData  = evSheet.getDataRange().getValues();
+  const evHdr   = evData[0].map(String);
+  const evRow   = evData.slice(1).find(r => String(r[evHdr.indexOf('eventId')]) === String(p.event));
+  if (!evRow) return err_('event_not_found');
+  const startDate = new Date(evRow[evHdr.indexOf('開始日')]);
+  const endDate   = new Date(evRow[evHdr.indexOf('終了日')]);
+  const days = [];
+  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+    days.push(Utilities.formatDate(d, tz, 'yyyy/MM/dd'));
+  }
+
+  // ── 選手（確定・両日一律加算） ──────────────────────
+  const preSheet = ss.getSheetByName(SHEET.PRE_REG);
+  let driverCount = 0;
+  if (preSheet && preSheet.getLastRow() > 1) {
+    const pData = preSheet.getDataRange().getValues();
+    const pHdr  = pData[0].map(String);
+    const catCol = pHdr.indexOf('参加区分');
+    driverCount = pData.slice(1).filter(r =>
+      isCompetingDriverCategory_(String(r[catCol] || ''))
+    ).length;
+  }
+
+  // ── 選手以外（3方向の和集合・日別） ──────────────────
+  const byDay = {}; // day -> Set(studentId)
+  days.forEach(d => { byDay[d] = new Set(); });
+  const bySource = {}; // day -> { registration, stamp, view } の件数（内訳表示用。重複除去前の延べ数）
+  days.forEach(d => { bySource[d] = { registration: 0, stamp: 0, view: 0 }; });
+
+  const addRows = (sheetName, timeColName, sidColName, key) => {
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet || sheet.getLastRow() < 2) return;
+    const data = sheet.getDataRange().getValues();
+    const hdr  = data[0].map(String);
+    const tCol = hdr.indexOf(timeColName);
+    const sCol = hdr.indexOf(sidColName);
+    if (tCol < 0 || sCol < 0) return;
+    data.slice(1).forEach(r => {
+      const day = dayOf(r[tCol]);
+      if (!day || !byDay[day]) return; // 開催日外は無視
+      const sid = String(r[sCol] || '');
+      if (!sid) return;
+      byDay[day].add(sid);
+      bySource[day][key]++;
+    });
+  };
+  addRows(SHEET.STAMP_PARTICIPANTS, '時刻',       'studentId', 'registration');
+  addRows(SHEET.STAMP_LOG,          '時刻',       'studentId', 'stamp');
+  addRows(SHEET.VIEW_LOG,           '時刻',       'studentId', 'view');
+
+  // ⚠ 選手（driverCount）は上の3方向の集計に混ざらないよう、対象シートには
+  //   selectしていない点に注意。同一学生が選手かつ何らかの理由でスタンプ等に
+  //   記録されていても、選手側と選手以外側で二重にならないよう分離してある。
+  //   ただし選手が実際にスタンプ等の行を持つケース自体は、この関数では
+  //   選手以外の集計にも入りうる（例: 出走選手が余興でスタンプを押した場合）。
+  //   その場合は selectin 上「選手」と「選手以外」の両方に1名ずつ計上され、
+  //   合計が実人数より多く出うる。概算値としての制約として許容する
+  //   （2026-08-25 ユーザー確認: 選手は来場実績の集計対象にしない方針のため、
+  //   これ以上厳密にする場合は選手のstudentIdを選手以外の集計から除外する
+  //   実装が必要。今回は「概算でよい」との要望のため見送り）。
+
+  const byDayResult = {};
+  days.forEach(d => {
+    const nonDriver = byDay[d].size;
+    byDayResult[d] = {
+      drivers: driverCount,
+      nonDrivers: nonDriver,
+      total: driverCount + nonDriver,
+      sources: bySource[d],
+    };
+  });
+
+  return ok_({
+    eventId: p.event,
+    days: days,
+    drivers: driverCount,
+    byDay: byDayResult,
+  });
+}
+
 function actionAdminGetStudents_(p) {
   const e = validateAdmin_(p);
   if (e) return e;
