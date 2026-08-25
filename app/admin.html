@@ -77,13 +77,18 @@
     .area-label::after{content:'';flex:1;height:1px;background:var(--border)}
 
     /* ── イベント一覧カード ── */
-    .event-card{display:block;background:#fff;border-radius:var(--radius-ui);padding:16px;
+    .event-card{position:relative;display:block;background:#fff;border-radius:var(--radius-ui);padding:16px;
       margin-bottom:10px;box-shadow:var(--shadow-sm);text-decoration:none;
       color:inherit;border:2px solid transparent;transition:border-color .15s,box-shadow .15s}
     .event-card:hover{border-color:var(--navy);box-shadow:0 3px 12px rgba(11,37,69,.14)}
     .ev-card-name{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:4px}
     .ev-card-sub{font-size:12px;color:var(--gray);margin-bottom:6px}
     .ev-card-row{display:flex;align-items:center;justify-content:space-between}
+    /* イベント一覧の各カードから直接「開催結果」を開くボタン（2026-08-25 追加） */
+    .ev-report-btn{position:relative;z-index:2;display:inline-flex;align-items:center;gap:4px;
+      margin-top:10px;padding:6px 10px;border:1px solid var(--fg-line);border-radius:8px;
+      background:var(--fg-bg);color:var(--navy);font-size:11px;font-weight:700;text-decoration:none}
+    .ev-report-btn:hover{border-color:var(--navy)}
     .ev-card-id{font-size:10px;font-family:monospace;color:var(--gray)}
     .ev-card-status{font-size:11px;font-weight:700;padding:2px 9px;border-radius:100px}
     .ev-card-status.active{background:var(--fg-success-bg,#EAF8F0);color:var(--fg-success,#1A6640)}
@@ -518,7 +523,11 @@
         <!-- ⚠ report.html は admin.html のハッシュルーティングに乗らない独立ページ。
              管理者キーは sessionStorage(fg_admin_key) を共有するため、ここから
              開けば再ログイン不要。新規タブで開き、管理画面の操作を妨げない。 -->
-        <a class="nav-card" id="nav-report-card" href="report.html" target="_blank" rel="noopener">
+        <!-- ⚠ rel="noopener" を付けない。同一オリジンのページなので tabnabbing リスクは無く、
+             むしろ noopener があると新規タブへ sessionStorage(fg_admin_key) が引き継がれず、
+             admin.html でログイン済みでも report.html で再ログインを求められてしまう
+             （HTML標準: sessionStorage は opener 関係にある新規タブにのみ複製される）。 -->
+        <a class="nav-card" id="nav-report-card" href="report.html" target="_blank">
           <span class="nav-card-icon">📊</span>
           <span class="nav-card-label">開催報告</span>
         </a>

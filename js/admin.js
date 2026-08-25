@@ -308,15 +308,22 @@ function renderEventList_() {
     // 公開停止(旧: 完了)は done、それ以外(公開中/旧 準備中・開催中)は active
     const stopped = ev.status === '公開停止' || ev.status === '完了';
     const statusClass = stopped ? 'done' : 'active';
+    // ⚠ カード全体が <a> だったところに「開催結果」ボタンを追加するため、
+    //   外側を <div> にし、遷移用リンクとボタンを兄弟要素にした（<a>の入れ子は無効）。
+    //   .event-card-link に position:relative は付けず、ボタン側だけ z-index を上げて
+    //   ボタン領域だけがクリックを奪うようにしてある（カード全体のクリック領域は維持）。
     return `
-      <a class="event-card" href="#${esc_(ev.eventId)}">
-        <div class="ev-card-name">${esc_(ev.name || ev.eventId)}</div>
-        <div class="ev-card-sub">${fmtD_(ev.startDate)} 〜 ${fmtD_(ev.endDate)}</div>
-        <div class="ev-card-row">
-          <span class="ev-card-id">${esc_(ev.eventId)}</span>
-          <span class="ev-card-status ${statusClass}">${esc_(ev.status || '—')}</span>
-        </div>
-      </a>`;
+      <div class="event-card">
+        <a class="event-card-link" href="#${esc_(ev.eventId)}" style="display:block;text-decoration:none;color:inherit">
+          <div class="ev-card-name">${esc_(ev.name || ev.eventId)}</div>
+          <div class="ev-card-sub">${fmtD_(ev.startDate)} 〜 ${fmtD_(ev.endDate)}</div>
+          <div class="ev-card-row">
+            <span class="ev-card-id">${esc_(ev.eventId)}</span>
+            <span class="ev-card-status ${statusClass}">${esc_(ev.status || '—')}</span>
+          </div>
+        </a>
+        <a class="ev-report-btn" href="report.html?event=${esc_(ev.eventId)}" target="_blank">📊 開催結果</a>
+      </div>`;
   }).join('');
 }
 
