@@ -109,15 +109,28 @@
       return `<tr><td>${dayLabel(day)}</td><td class="num">${s.registration}</td><td class="num">${s.stamp}</td><td class="num">${s.view}</td></tr>`;
     }).join('');
 
+    // 活動記録（選手／選手以外）。GAS 側が未対応の場合（再デプロイ前）は 0 表示になる。
+    const act = d.activity || {};
+    const actCell = (kind, group) => {
+      const g = (act[kind] || {})[group] || {};
+      return { count: g.count ?? 0, users: g.users ?? 0 };
+    };
+    const actCellHtml = a => `<td class="num">${a.count}<span class="sub">（${a.users}人）</span></td>`;
+    const actRows = [['選手', 'driver'], ['選手以外', 'nonDriver']].map(([label, group]) =>
+      `<tr><td>${label}</td>${actCellHtml(actCell('stamp', group))}${actCellHtml(actCell('view', group))}</tr>`
+    ).join('');
+
     body.innerHTML = `
       <div class="card">
         <h2>${esc(ev ? (ev.name || eventId) : eventId)}</h2>
         <p class="note">
           学生の来場者数（概算）。企業スタッフ・一般来場者は含みません。<br>
           「選手」は出場選手（FGクラス／女子クラスドライバー）で、来場予定日の申告項目がフォームに
-          無いため <strong>開催日すべてに一律で加算</strong>しています（補欠ドライバーは選手以外に含む）。<br>
-          「選手以外」は 登録／スタンプ取得／企業によるQR読み取り のいずれかが記録された学生を、
-          その日ごとに重複なく数えた人数です。
+          無いため <strong>開催日すべてに一律で加算</strong>しています（補欠ドライバーは選手以外に含む）。
+          選手はスタンプやQR読み取りの記録があっても「選手以外」には計上しません（二重計上を避けるため）。<br>
+          「選手以外」は スタンプ開始・当日登録／スタンプ取得／企業によるQR読み取り のいずれかが
+          記録された学生を、その日ごとに重複なく数えた人数です。記録が一切ない学生は、
+          来場していても区別できないため来場者に含めていません。
         </p>
         <table class="report-tbl">
           <thead><tr><th>日程</th><th>選手</th><th>選手以外</th><th>合計</th></tr></thead>
@@ -139,10 +152,26 @@
 
       <div class="card">
         <h2>内訳（選手以外・集計元）</h2>
-        <p class="note">1人が複数の方法で記録されると、各列にそれぞれ計上されます（列同士の合計は「選手以外」の人数と一致しません）。</p>
+        <p class="note">
+          1人が複数の方法で記録されると、各列にそれぞれ計上されます（列同士の合計は「選手以外」の人数と一致しません）。<br>
+          「スタンプ開始・当日登録」は、事前登録済みの学生が会場でスタンプラリーを開始した記録と、
+          当日登録の記録です（当日登録は登録と同時に記録されます）。事前登録そのものは含みません。
+        </p>
         <table class="report-tbl">
-          <thead><tr><th>日程</th><th>登録</th><th>スタンプ</th><th>QR読み取り</th></tr></thead>
+          <thead><tr><th>日程</th><th>スタンプ開始<br>当日登録</th><th>スタンプ</th><th>QR読み取り</th></tr></thead>
           <tbody>${srcRows}</tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>活動記録</h2>
+        <p class="note">
+          スタンプ取得とQR読み取りの記録数。上の来場者数とは独立した集計で、<strong>選手も対象に含みます</strong>。<br>
+          大きい数字が記録された延べ回数、カッコ内はその記録を持つ学生の実人数です。
+        </p>
+        <table class="report-tbl">
+          <thead><tr><th>区分</th><th>スタンプ取得</th><th>QR読み取り</th></tr></thead>
+          <tbody>${actRows}</tbody>
         </table>
       </div>
     `;

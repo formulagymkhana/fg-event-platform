@@ -3256,6 +3256,11 @@ function actionAdminGetStampLog_(p) {
  *   - 「概算合計」は 選手（確定）+ 選手以外（来場実績） で、選手込みの数値であることを
  *     必ず明示する（呼び出し元の表示でも「※選手込み」等を付けること）。
  *
+ * 併せて「活動記録」（スタンプ取得・QR読み取りの延べ回数と実人数）を
+ * 選手／選手以外に分けて返す（2026-08-25 追加）。こちらは来場者数とは独立した
+ * 行動量の集計で、選手も対象に含める（来場者数では一律加算のため実績を見ないが、
+ * 選手がどれだけ活動したかは別途分析価値があるという運用判断）。
+ *
  * ⚠ この関数は読み取りのみ。シートへの書き込みは一切ない。
  */
 // 実出場するドライバーか（FGクラス＋女子クラス）。事前登録シートの「参加区分」列
@@ -3291,15 +3296,27 @@ function actionAdminGetAttendanceReport_(p) {
   }
 
   // ── 選手（確定・両日一律加算） ──────────────────────
+  // driverIds は「選手以外」の集計から選手を除外するために使う。
+  // これが無いと、選手がスタンプを押したりQRを読まれたりした場合に
+  // 「選手」（一律加算）と「選手以外」（来場実績）の両方へ計上され、
+  // 合計が実人数より多く出る（2026-08-25 修正。上のコメントにある
+  // 「来場実績の集計には含めない」という設計意図に実装を合わせた）。
   const preSheet = ss.getSheetByName(SHEET.PRE_REG);
   let driverCount = 0;
+  const driverIds = new Set();
   if (preSheet && preSheet.getLastRow() > 1) {
     const pData = preSheet.getDataRange().getValues();
     const pHdr  = pData[0].map(String);
     const catCol = pHdr.indexOf('参加区分');
-    driverCount = pData.slice(1).filter(r =>
-      isCompetingDriverCategory_(String(r[catCol] || ''))
-    ).length;
+    const sidCol = pHdr.indexOf('studentId');
+    pData.slice(1).forEach(r => {
+      if (!isCompetingDriverCategory_(String(r[catCol] || ''))) return;
+      driverCount++;
+      if (sidCol >= 0) {
+        const sid = String(r[sidCol] || '');
+        if (sid) driverIds.add(sid);
+      }
+    });
   }
 
   // ── 選手以外（3方向の和集合・日別） ──────────────────
@@ -3321,6 +3338,7 @@ function actionAdminGetAttendanceReport_(p) {
       if (!day || !byDay[day]) return; // 開催日外は無視
       const sid = String(r[sCol] || '');
       if (!sid) return;
+      if (driverIds.has(sid)) return;  // 選手は一律加算済み。二重計上を防ぐ
       byDay[day].add(sid);
       bySource[day][key]++;
     });
@@ -3351,6 +3369,40 @@ function actionAdminGetAttendanceReport_(p) {
     };
   });
 
+  // ── 活動記録（スタンプ取得・QR読み取り） ────────────
+  // 来場者数の集計とは独立した「行動量」の集計（2026-08-25 追加）。
+  // 来場者数では選手を一律加算にして実績から除外しているが、
+  // 「選手が実際に何回スタンプを押したか／何回QRを読まれたか」は
+  // 運用上の分析価値があるため、選手／選手以外を分けて延べ回数と実人数を出す。
+  // ⚠ ここでの区分は driverIds（＝事前登録の参加区分が出場選手）による。
+  //   補欠ドライバーは選手以外に入る（isCompetingDriverCategory_ が false のため）。
+  const countActivity_ = (sheetName) => {
+    const res = {
+      driver:    { count: 0, users: new Set() },
+      nonDriver: { count: 0, users: new Set() },
+    };
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet || sheet.getLastRow() < 2) return res;
+    const data = sheet.getDataRange().getValues();
+    const hdr  = data[0].map(String);
+    const tCol = hdr.indexOf('時刻');
+    const sCol = hdr.indexOf('studentId');
+    if (tCol < 0 || sCol < 0) return res;
+    data.slice(1).forEach(r => {
+      const day = dayOf(r[tCol]);
+      if (!day || !byDay[day]) return; // 開催日外は無視（来場者数の集計と揃える）
+      const sid = String(r[sCol] || '');
+      if (!sid) return;
+      const bucket = driverIds.has(sid) ? res.driver : res.nonDriver;
+      bucket.count++;
+      bucket.users.add(sid);
+    });
+    return res;
+  };
+  const stampAct_ = countActivity_(SHEET.STAMP_LOG);
+  const viewAct_  = countActivity_(SHEET.VIEW_LOG);
+  const actOut_   = a => ({ count: a.count, users: a.users.size });
+
   // ── 景品（交換済み個数・交換回数） ──────────────────
   const prizeSheet = ss.getSheetByName(SHEET.PRIZE_LOG);
   let prizeItemCount = 0, prizeExchangeCount = 0;
@@ -3369,6 +3421,10 @@ function actionAdminGetAttendanceReport_(p) {
     days: days,
     drivers: driverCount,
     byDay: byDayResult,
+    activity: {
+      stamp: { driver: actOut_(stampAct_.driver), nonDriver: actOut_(stampAct_.nonDriver) },
+      view:  { driver: actOut_(viewAct_.driver),  nonDriver: actOut_(viewAct_.nonDriver) },
+    },
     prizeItemCount,
     prizeExchangeCount,
   });
