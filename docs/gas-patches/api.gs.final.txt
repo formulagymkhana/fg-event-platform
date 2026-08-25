@@ -1029,6 +1029,10 @@ function isPastCategoryDeadline_(cfg, attr) {
     '女子クラスドライバー':     cfg.deadlineWomenDriver,
     '補欠ドライバー':           cfg.deadlineReserve,
     'メカニック':               cfg.deadlineMechanic,
+    // ⚠ 作業をしない見学・応援学生は preAttr_ が '応援学生' を返す。
+    //   フロントは「見学・応援学生」を1区分として deadlineMechanic で締め切るため、
+    //   ここに無いとサーバー側だけ素通りする（2026-08-25 追加）。
+    '応援学生':                 cfg.deadlineMechanic,
   }[attr];
   if (!dl) return false;
   return new Date() > new Date(dl);
@@ -1213,6 +1217,7 @@ function err_(code) {
     already_registered:    'すでに本日のイベントに登録済みです', // T6 追加
     email_already_used:    'このメールアドレスは既に登録されています',
     no_email:              'この参加者にはメールアドレスが登録されていません',
+    mail_send_failed:      'メールの送信に失敗しました。アドレスを確認のうえ、もう一度お試しください',
     form_not_open:         '受付がまだ開始されていません',
     missing_approval:      '学校職員の参加承諾書をアップロードしてください',
     approval_save_failed:  '承諾書の保存に失敗しました。お手数ですが、もう一度送信してください',
@@ -1607,9 +1612,12 @@ function actionRegisterPreStudent_(p) {
   }
 
   // 確認メール（QR名刺は載せない・失敗しても登録は成立）
-  let mailSent = true;
+  // ⚠ sendPreRegMail_ は例外を投げず true/false を返す（2026-08-25 変更）。
+  //   以前はここで try/catch しか見ておらず、関数内部で握り潰された失敗を
+  //   検知できず mailSent が常に true になっていた。
+  let mailSent = false;
   try {
-    sendPreRegMail_(p.email, p.name, p.event);
+    mailSent = sendPreRegMail_(p.email, p.name, p.event);
   } catch (err) {
     mailSent = false;
     console.error('sendPreRegMail_ failed:', err);
@@ -1695,7 +1703,7 @@ function appendPreRegRow_(ss, p, studentId, cardToken) {
 
 // 確認メール送信（GASオーナーGmailから。失敗しても登録は成立させる）
 function sendPreRegMail_(to, name, eventId) {
-  if (!to) return;
+  if (!to) return false;
   try {
     const cfg    = getConfig_(eventId);
     const evName = cfg.eventName || eventId;
@@ -1712,8 +1720,13 @@ function sendPreRegMail_(to, name, eventId) {
       .replace(/\{name\}/g, name || '')
       .replace(/\{eventName\}/g, evName);
     MailApp.sendEmail({ to: String(to), subject: fill(subjTpl), body: fill(bodyTpl) });
+    return true;
   } catch (err) {
+    // ⚠ 例外を握り潰したまま成功扱いにしない（2026-08-25）。
+    //   以前は catch でログを出すだけだったため、送信失敗でも呼び出し元は
+    //   成功と判断し、管理画面に「送信しました」と表示されていた。
     console.error('sendPreRegMail_ error:', err);
+    return false;
   }
 }
 
@@ -1742,7 +1755,7 @@ function buildPassUrl_(appBase, token, eventId) {
  * 差し込み: {name}＝氏名、{eventName}＝大会名、{passUrl}＝マイページURL。
  */
 function sendPassMail_(to, name, eventId, passUrl) {
-  if (!to) return;
+  if (!to) return false;
   try {
     const cfg    = getConfig_(eventId);
     const evName = cfg.eventName || eventId;
@@ -1764,13 +1777,18 @@ function sendPassMail_(to, name, eventId, passUrl) {
       .replace(/\{eventName\}/g, evName)
       .replace(/\{passUrl\}/g, safeUrl);
     MailApp.sendEmail({ to: String(to), subject: fill(subjTpl), body: fill(bodyTpl) });
+    return true;
   } catch (err) {
+    // ⚠ 例外を握り潰したまま成功扱いにしない（2026-08-25）。
+    //   以前は catch でログを出すだけだったため、送信失敗でも呼び出し元は
+    //   成功と判断し、管理画面に「送信しました」と表示されていた。
     console.error('sendPassMail_ error:', err);
+    return false;
   }
 }
 
 function sendWalkInPassMail_(to, name, eventId, passUrl) {
-  if (!to) return;
+  if (!to) return false;
   try {
     const cfg    = getConfig_(eventId);
     const evName = cfg.eventName || eventId;
@@ -1793,8 +1811,13 @@ function sendWalkInPassMail_(to, name, eventId, passUrl) {
       .replace(/\{eventName\}/g, evName)
       .replace(/\{passUrl\}/g, safeUrl);
     MailApp.sendEmail({ to: String(to), subject: fill(subjTpl), body: fill(bodyTpl) });
+    return true;
   } catch (err) {
+    // ⚠ 例外を握り潰したまま成功扱いにしない（2026-08-25）。
+    //   以前は catch でログを出すだけだったため、送信失敗でも呼び出し元は
+    //   成功と判断し、管理画面に「送信しました」と表示されていた。
     console.error('sendWalkInPassMail_ error:', err);
+    return false;
   }
 }
 
@@ -1814,11 +1837,12 @@ function actionAdminResendWalkInMail_(p) {
   //   改名するとフロントとGASの同時デプロイが必要になるため名前は据え置く。
   //   文面だけ区分で出し分ける: 事前登録者は「初回送信」なので専用テンプレを使う。
   const passUrl = buildPassUrl_(p.appBase, p.token, p.event);
-  if (String(student.regType) === '事前') {
-    sendPassMail_(student.email, student.name, p.event, passUrl);
-  } else {
-    sendWalkInPassMail_(student.email, student.name, p.event, passUrl);
-  }
+  const sent = (String(student.regType) === '事前')
+    ? sendPassMail_(student.email, student.name, p.event, passUrl)
+    : sendWalkInPassMail_(student.email, student.name, p.event, passUrl);
+  // ⚠ 送信できなかったら成功を返さない。受付で「送信しました」と出たのに
+  //   届いていない、という状況を作らないため（2026-08-25）。
+  if (!sent) return err_('mail_send_failed');
   return ok_({ sent: true, email: student.email, regType: String(student.regType || '') });
 }
 

@@ -494,10 +494,7 @@ async function downloadPreRegCsv_(kind) {
     });
   }
 
-  const esc = v => {
-    const s = String(v == null ? '' : v);
-    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-  };
+  const esc = csvSafe_;   // 数式インジェクション対策込み（js/csv-util.js）
   const head = ['学生ID', '参加区分', '苗字', '氏名', 'ふりがな', 'トークン', 'QR用URL'];
   const lines = [head.join(',')].concat(filtered.map(r => [
     r[ci.sid] || '',
@@ -537,10 +534,7 @@ function downloadHotelListCsv_() {
   const filtered = rows.filter(r => (r[ci.hotel] || '') === 'はい');
   if (!filtered.length) { showToast_('宿泊希望の学生がいません'); return; }
 
-  const esc = v => {
-    const s = String(v == null ? '' : v);
-    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-  };
+  const esc = csvSafe_;   // 数式インジェクション対策込み（js/csv-util.js）
   const head = ['学生ID', '大学名', '氏名', '性別'];
   const lines = [head.join(',')].concat(filtered.map(r => [
     r[ci.sid] || '', r[ci.school] || '', r[ci.name] || '', r[ci.gender] || '',
@@ -775,7 +769,7 @@ function nfcUrl_(stampKey) {
 async function downloadStudentQrCsv_() {
   if (!curEvent_) { showToast_('イベントが選択されていません'); return; }
   if (!studentData_.length) { showToast_('学生データがありません（先に学生管理ページを開いてください）'); return; }
-  const esc = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const esc = csvSafe_;   // 数式インジェクション対策込み（js/csv-util.js）
   const head  = ['氏名', 'ふりがな', '大学名', '属性', '登録種別', 'QR用URL'];
   const lines = [head.join(',')].concat(studentData_.map(s => [
     s.name, s.furigana, s.school, s.category || '', s.regType,
@@ -797,7 +791,7 @@ async function downloadNfcCsv_() {
   const list = all.filter(c => c.stampRally !== false);
   const excluded = all.length - list.length;
   if (!list.length) { showToast_('スタンプラリー参加企業がありません'); return; }
-  const esc = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const esc = csvSafe_;   // 数式インジェクション対策込み（js/csv-util.js）
   const head  = ['ブース名（企業名）', 'NFC用URL', 'stampKey', '企業ID'];
   const lines = [head.join(',')].concat(list.map(c =>
     [c.name, nfcUrl_(c.stampKey), c.stampKey, c.companyId].map(esc).join(',')));
@@ -815,7 +809,7 @@ async function downloadCompanyQrCsv_() {
   if (!res.ok) { showToast_('企業の取得に失敗しました'); return; }
   const list = (res.data.companies || []).filter(c => c.viewKey);
   if (!list.length) { showToast_('閲覧キー発行済みの企業がありません'); return; }
-  const esc = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const esc = csvSafe_;   // 数式インジェクション対策込み（js/csv-util.js）
   const head  = ['ブース名（企業名）', '再閲覧QR用URL', 'viewKey', '企業ID'];
   const lines = [head.join(',')].concat(list.map(c =>
     [c.name, companyQrUrl_(c.viewKey), c.viewKey, c.companyId].map(esc).join(',')));
@@ -2534,7 +2528,7 @@ function downloadEntryCsv_() {
   if (!companyEntries_.length) { showToast_('申込データがありません'); return; }
   const cols = ['申込日時','社名略称','企業名正式','代表者名','担当者名','電話番号','担当者電話','メールアドレス','郵便番号','都道府県','住所','部署名','出展内容','ブース区画','展示車両数','デモ走行','デモ走行詳細','人パス','車両パス','昼食土','昼食日','備考','状態'];
   const header = cols.join(',');
-  const rows   = companyEntries_.map(e => cols.map(c => '"' + String(e[c] ?? '').replace(/"/g, '""') + '"').join(','));
+  const rows   = companyEntries_.map(e => cols.map(c => csvSafe_(e[c])).join(','));
   const csv    = '﻿' + [header, ...rows].join('\r\n');
   const blob   = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const a      = document.createElement('a');
@@ -2637,7 +2631,7 @@ function downloadEntryShippingCsv_() {
       '',
       'FGパス類',
     ];
-    return values.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',');
+    return values.map(csvSafe_).join(',');
   });
   // ⚠ 西濃運輸の送り状発行システムは Shift_JIS の CSV しか受け付けない。
   //   UTF-8(BOM付き)で出していたため「読み込めません」となり、取り込めても文字化けした
@@ -3343,9 +3337,11 @@ function renderOrderList_() {
 // ── CSV出力 ────────────
 // BOMは downloadCsv_ が付ける。ここでは付けない（二重BOMになるため）。
 function toCsv_(headers, rows) {
-  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-  const lines = [headers.map(q).join(',')];
-  rows.forEach(r => lines.push(r.map(q).join(',')));
+  // ⚠ 数式インジェクション対策は csvSafe_（js/csv-util.js）に集約している。
+  //   以前はここで全セルを引用符で囲むだけだったが、Excelは囲みを外してから
+  //   数式を評価するため、それでは防げない。
+  const lines = [headers.map(csvSafe_).join(',')];
+  rows.forEach(r => lines.push(r.map(csvSafe_).join(',')));
   return lines.join('\r\n');
 }
 

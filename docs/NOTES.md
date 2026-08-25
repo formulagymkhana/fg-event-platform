@@ -209,7 +209,7 @@
 ## [未解決] CSV出力が5系統に散らばっており、うち3つは今もインラインでBlobを組んでいる（2026-08-10 記録）
 - 状況: `js/admin.js` のCSV出力は、共通ヘルパー `downloadCsv_` を通る経路と、
   関数内で直接 `new Blob(...)` を組む経路が混在している。後者は
-  QRパス（`downloadPassQrCsv_` 付近）・宿泊リスト（`downloadHotelListCsv_`）・
+  QRパス（`downloadStudentQrCsv_`）・宿泊リスト（`downloadHotelListCsv_`）・
   出展申込（`downloadEntryCsv_`）の3つ。いずれも `'﻿' + csv` を各自で付けている。
 - 懸念/論点: 2026-08-10 に発覚した `downloadCsv_` の二重定義（引数順が逆で、後の定義が
   前を上書きし、3つのCSVがファイル名と中身が入れ替わったまま気づかれなかった）は、
