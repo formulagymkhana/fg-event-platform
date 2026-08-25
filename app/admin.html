@@ -77,17 +77,21 @@
     .area-label::after{content:'';flex:1;height:1px;background:var(--border)}
 
     /* ── イベント一覧カード ── */
+    /* カード本体＋「開催結果」ボタンを横並びにする行（2026-08-25 レイアウト変更）。
+       ボタンをカードの外・右側に、カードと同じ高さで配置する。 */
+    .event-card-row{display:flex;align-items:stretch;gap:8px;margin-bottom:10px}
     .event-card{position:relative;display:block;background:#fff;border-radius:var(--radius-ui);padding:16px;
-      margin-bottom:10px;box-shadow:var(--shadow-sm);text-decoration:none;
+      box-shadow:var(--shadow-sm);text-decoration:none;flex:1;min-width:0;
       color:inherit;border:2px solid transparent;transition:border-color .15s,box-shadow .15s}
     .event-card:hover{border-color:var(--navy);box-shadow:0 3px 12px rgba(11,37,69,.14)}
     .ev-card-name{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:4px}
     .ev-card-sub{font-size:12px;color:var(--gray);margin-bottom:6px}
     .ev-card-row{display:flex;align-items:center;justify-content:space-between}
-    /* イベント一覧の各カードから直接「開催結果」を開くボタン（2026-08-25 追加） */
-    .ev-report-btn{position:relative;z-index:2;display:inline-flex;align-items:center;gap:4px;
-      margin-top:10px;padding:6px 10px;border:1px solid var(--fg-line);border-radius:8px;
-      background:var(--fg-bg);color:var(--navy);font-size:11px;font-weight:700;text-decoration:none}
+    /* イベント一覧の各カードの横に開催結果を開くボタン（2026-08-25 追加） */
+    .ev-report-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:4px;flex-shrink:0;padding:6px 14px;border:1px solid var(--fg-line);border-radius:var(--radius-ui);
+      background:#fff;color:var(--navy);font-size:11px;font-weight:700;text-decoration:none;
+      text-align:center;white-space:nowrap;box-shadow:var(--shadow-sm);transition:border-color .15s}
     .ev-report-btn:hover{border-color:var(--navy)}
     .ev-card-id{font-size:10px;font-family:monospace;color:var(--gray)}
     .ev-card-status{font-size:11px;font-weight:700;padding:2px 9px;border-radius:100px}
@@ -484,7 +488,7 @@
         <div class="stat-card"><div class="stat-val" id="stat-preregistered">—</div><div class="stat-lbl">事前登録学生</div></div>
         <div class="stat-card"><div class="stat-val" id="stat-walkins">—</div><div class="stat-lbl">当日参加学生</div></div>
         <div class="stat-card"><div class="stat-val" id="stat-stamp-participants">—</div><div class="stat-lbl">スタンプ参加者</div></div>
-        <div class="stat-card"><div class="stat-val" id="stat-prizes">—</div><div class="stat-lbl">景品交換済</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-prizes">—</div><div class="stat-lbl">交換済み景品数</div></div>
       </div>
 
       <!-- ナビカード（企業・学生管理ページへ） -->
@@ -1370,6 +1374,6 @@
 <script src="../js/config.js?v=20260724h"></script>
 <!-- ⚠ csv-util.js は admin.js より前に読み込むこと（CSV出力の共通ヘルパー） -->
 <script src="../js/csv-util.js?v=20260825a"></script>
-<script src="../js/admin.js?v=20260825c"></script>
+<script src="../js/admin.js?v=20260825d"></script>
 </body>
 </html>

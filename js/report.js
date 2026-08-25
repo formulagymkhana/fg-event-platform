@@ -130,6 +130,14 @@
       </div>
 
       <div class="card">
+        <h2>景品交換</h2>
+        <div class="prize-stats">
+          <div class="prize-stat"><div class="val">${d.prizeItemCount ?? 0}</div><div class="lbl">交換済み景品数</div></div>
+          <div class="prize-stat"><div class="val">${d.prizeExchangeCount ?? 0}</div><div class="lbl">景品交換回数</div></div>
+        </div>
+      </div>
+
+      <div class="card">
         <h2>内訳（選手以外・集計元）</h2>
         <p class="note">1人が複数の方法で記録されると、各列にそれぞれ計上されます（列同士の合計は「選手以外」の人数と一致しません）。</p>
         <table class="report-tbl">

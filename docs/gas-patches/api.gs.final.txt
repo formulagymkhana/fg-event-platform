@@ -3258,6 +3258,15 @@ function actionAdminGetStampLog_(p) {
  *
  * ⚠ この関数は読み取りのみ。シートへの書き込みは一切ない。
  */
+// 実出場するドライバーか（FGクラス＋女子クラス）。事前登録シートの「参加区分」列
+// （フォームの送信値そのもの）を判定する。js/admin.js の同名関数と揃えてある
+// （2026-08-25 発覚: この関数が定義されないまま actionAdminGetAttendanceReport_ から
+// 呼ばれており、事前登録データがあるイベントで ReferenceError → server_error になっていた）。
+function isCompetingDriverCategory_(category) {
+  return category === '出場選手(FGクラスドライバー)'
+      || category === '出場選手(女子クラスドライバー)';
+}
+
 function actionAdminGetAttendanceReport_(p) {
   const e = validateAdmin_(p);
   if (e) return e;
@@ -3342,11 +3351,26 @@ function actionAdminGetAttendanceReport_(p) {
     };
   });
 
+  // ── 景品（交換済み個数・交換回数） ──────────────────
+  const prizeSheet = ss.getSheetByName(SHEET.PRIZE_LOG);
+  let prizeItemCount = 0, prizeExchangeCount = 0;
+  if (prizeSheet && prizeSheet.getLastRow() > 1) {
+    const pData    = prizeSheet.getDataRange().getValues();
+    const pHeaders = pData[0].map(String);
+    const pEvCol   = pHeaders.indexOf('eventId');
+    const pCntCol  = pHeaders.indexOf('claimedCount');
+    const pRows    = pData.slice(1).filter(r => String(r[pEvCol]) === String(p.event));
+    prizeExchangeCount = pRows.length;
+    prizeItemCount = pRows.reduce((sum, r) => sum + (pCntCol >= 0 ? Number(r[pCntCol]) || 1 : 1), 0);
+  }
+
   return ok_({
     eventId: p.event,
     days: days,
     drivers: driverCount,
     byDay: byDayResult,
+    prizeItemCount,
+    prizeExchangeCount,
   });
 }
 
