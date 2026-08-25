@@ -352,11 +352,8 @@ function onStudentQR_(qrData) {
 //   文字コードは Shift_JIS（Windows の Excel でそのまま開けるように）。
 //   エンコーダは js/csv-util.js（管理画面と共通）。
 
-/** CSVの1セルを安全に整形する（改行・カンマ・引用符を含んでも壊れないように） */
-function csvCell_(v) {
-  const t = String(v == null ? '' : v);
-  return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
-}
+/** CSVの1セル整形。実体は js/csv-util.js の csvSafe_（数式インジェクション対策込み）。 */
+const csvCell_ = csvSafe_;
 
 const CSV_COLS_ = ['区分', '日時', '氏名', 'ふりがな', '大学名', '学部学科', '学年', '参加区分', 'メールアドレス'];
 
@@ -379,16 +376,23 @@ async function downloadVisitorsCsv_() {
       FG_API.getCompanyView(_key, _event),
       FG_API.getCompanyStampVisitors(_key, _event),
     ]);
-    if (!qrRes.ok && !stampRes.ok) {
-      const m = (qrRes.error === 'expired' || stampRes.error === 'expired')
+    // ⚠ 片方でも失敗したら出力しない。以前は「両方失敗」でのみ止めていたため、
+    //   片側が落ちると**そのセクションだけ空の、一見正常なCSV**が出ていた。
+    //   企業側からは欠損に気づけず、名刺交換した学生が抜け落ちる。
+    if (!qrRes.ok || !stampRes.ok) {
+      const err = !qrRes.ok ? qrRes.error : stampRes.error;
+      const msg = !qrRes.ok ? (stampRes.ok ? 'QRスキャンの取得に失敗しました。' : '')
+                            : 'スタンプの取得に失敗しました。';
+      alert(err === 'expired'
         ? '公開期限が終了しているため出力できません。'
-        : '取得に失敗しました。通信環境を確認して、もう一度お試しください。';
-      alert(m);
+        : (msg || '取得に失敗しました。') +
+          '\n不完全なファイルにならないよう、出力を中止しました。' +
+          '\n通信環境を確認して、もう一度お試しください。');
       return;
     }
 
-    const qr    = qrRes.ok    ? (qrRes.data.visitors    || []) : [];
-    const stamp = stampRes.ok ? (stampRes.data.visitors || []) : [];
+    const qr    = qrRes.data.visitors    || [];
+    const stamp = stampRes.data.visitors || [];
     if (!qr.length && !stamp.length) {
       alert('出力できる来訪学生がいません。');
       return;
