@@ -515,6 +515,13 @@
           <span class="nav-card-label">受付リスト</span>
           <span class="nav-card-count init" id="badge-reception">—</span>
         </a>
+        <!-- ⚠ report.html は admin.html のハッシュルーティングに乗らない独立ページ。
+             管理者キーは sessionStorage(fg_admin_key) を共有するため、ここから
+             開けば再ログイン不要。新規タブで開き、管理画面の操作を妨げない。 -->
+        <a class="nav-card" id="nav-report-card" href="report.html" target="_blank" rel="noopener">
+          <span class="nav-card-icon">📊</span>
+          <span class="nav-card-label">開催報告</span>
+        </a>
       </div>
 
       <!-- 食券集計 -->
