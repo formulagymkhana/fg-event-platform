@@ -632,6 +632,8 @@ async function loadConfig_(gen, ev) {
   setVal_('cfg-preRegMailBody',    cfg.preRegMailBody    || PREREG_MAIL_BODY_DEFAULT);
   setVal_('cfg-walkInMailSubject', cfg.walkInMailSubject || WALKIN_MAIL_SUBJECT_DEFAULT);
   setVal_('cfg-walkInMailBody',    cfg.walkInMailBody    || WALKIN_MAIL_BODY_DEFAULT);
+  setVal_('cfg-passMailSubject',   cfg.passMailSubject   || PASS_MAIL_SUBJECT_DEFAULT);
+  setVal_('cfg-passMailBody',      cfg.passMailBody      || PASS_MAIL_BODY_DEFAULT);
   setVal_('cfg-formOpenAt',         toDtLocal_(cfg.formOpenAt));
   setVal_('cfg-deadlineDriver',     toDtLocal_(cfg.deadlineDriver));
   setVal_('cfg-deadlineWomenDriver',toDtLocal_(cfg.deadlineWomenDriver));
@@ -684,6 +686,19 @@ const WALKIN_MAIL_BODY_DEFAULT =
   '・スタンプの進捗が消えてしまった場合も、このページから元に戻せます。\n\n' +
   '── FORMULA GYMKHANA 事務局';
 
+// MY PASS 送信メールの既定文面（GAS sendPassMail_ のフォールバックと一致させること）
+const PASS_MAIL_SUBJECT_DEFAULT = '【{eventName}】あなたのMY PASS（QRコード）';
+const PASS_MAIL_BODY_DEFAULT =
+  '{name} 様\n\n' +
+  '{eventName} のMY PASS（氏名・QRコード）のリンクをお送りします。\n\n' +
+  '▼あなたのMY PASS\n' +
+  '{passUrl}\n\n' +
+  '・このページを開くと、受付でお渡しするパスと同じQRコードが表示されます。\n' +
+  '・企業ブースの方には、このページのQRコードを見せてください。\n' +
+  '・スタンプラリーもこのQRコードから参加できます。\n' +
+  '・ブックマーク／ホーム画面に追加しておくと、いつでも開けます。\n\n' +
+  '── FORMULA GYMKHANA 事務局';
+
 // 出場校エントリー 確認メールの既定文面（GAS sendSchoolEntryConfirmMail_ のフォールバックと一致させる）
 const SCHOOL_ENTRY_MAIL_SUBJECT_DEFAULT        = '【{eventName}】出場校エントリーを受け付けました';
 const SCHOOL_ENTRY_MAIL_SUBJECT_UPDATE_DEFAULT = '【{eventName}】出場校エントリーの更新を受け付けました';
@@ -712,6 +727,8 @@ async function saveConfig_(btnId, fbId) {
     preRegMailBody:       getVal_('cfg-preRegMailBody'),
     walkInMailSubject:    getVal_('cfg-walkInMailSubject'),
     walkInMailBody:       getVal_('cfg-walkInMailBody'),
+    passMailSubject:      getVal_('cfg-passMailSubject'),
+    passMailBody:         getVal_('cfg-passMailBody'),
     formOpenAt:           toIso_(getVal_('cfg-formOpenAt')),
     deadlineDriver:       toIso_(getVal_('cfg-deadlineDriver')),
     deadlineWomenDriver:  toIso_(getVal_('cfg-deadlineWomenDriver')),
@@ -1120,8 +1137,14 @@ function renderStudentList_() {
             <span style="font-size:9px;color:var(--gray);flex-shrink:0;width:52px">MY PASS</span>
             <a href="${esc_(mypassUrl_(s.cardToken))}" target="_blank" class="stu-card-link">${esc_(mypassUrl_(s.cardToken))}</a>
             <button class="copy-btn" data-copy="${esc_(mypassUrl_(s.cardToken))}" style="flex-shrink:0;font-size:10px;padding:2px 8px">コピー</button>
-            ${s.regType !== '事前' ? `
-            <button class="copy-btn" data-resend="${esc_(s.cardToken)}" style="flex-shrink:0;font-size:10px;padding:2px 8px">メール再送信</button>` : ''}
+            ${'' /* ⚠ 事前登録者にも出す。事前登録の確認メールにはパスURLが含まれないため、
+                   受付でパスを忘れた学生への「初回送信」としてここから送る（2026-08-24）。
+                   当日参加者は登録時に送信済みなので文言を「再送信」のまま分ける。 */}
+            <button class="copy-btn" data-resend="${esc_(s.cardToken)}"
+              data-regtype="${esc_(s.regType || '')}" data-name="${esc_(s.name || '')}"
+              data-email="${esc_(s.email || '')}"
+              style="flex-shrink:0;font-size:10px;padding:2px 8px"
+            >${s.regType === '事前' ? 'MY PASSを送信' : 'メール再送信'}</button>
           </div>
           <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
             <span style="font-size:9px;color:var(--gray);flex-shrink:0;width:52px">学生カード</span>
@@ -1188,10 +1211,22 @@ async function handleSaveStudentEdit_(btn, wrap) {
 }
 
 // 当日参加者へ個人ページ(氏名+QR)のリンクをメール再送信する
+/**
+ * MY PASS のリンクをメールで送る。
+ * ⚠ 事前登録者にとっては「初回送信」（事前登録の確認メールにパスURLは入っていない）。
+ *   当日参加者は登録時に送信済みなので「再送信」。文面はGAS側が区分で出し分ける。
+ * ⚠ 受付で使うため確認は1回だけにする。ただし誤送信は取り消せないので宛先は必ず見せる。
+ */
 async function handleResendWalkInMail_(btn) {
   if (!curEvent_) return;
   const token = btn.dataset.resend;
   if (!token) return;
+  const isPre = btn.dataset.regtype === '事前';
+  const label = isPre ? 'MY PASSを送信' : 'メールを再送信';
+  const email = btn.dataset.email || '';
+  if (!email) { showToast_('⚠ この学生にはメールアドレスが登録されていません'); return; }
+  if (!window.confirm(`${btn.dataset.name || ''} さんへ ${label}します。\n\n宛先: ${email}\n\nよろしいですか？`)) return;
+
   const orig = btn.textContent;
   btn.disabled = true; btn.textContent = '送信中…';
   const res = await adminCall_('adminResendWalkInMail', {
@@ -1201,9 +1236,10 @@ async function handleResendWalkInMail_(btn) {
   });
   btn.disabled = false; btn.textContent = orig;
   if (res.ok) {
-    showToast_(`✓ メールを再送信しました（${res.data && res.data.email ? res.data.email : ''}）`);
+    const sentTo = (res.data && res.data.email) || email;
+    showToast_(`✓ ${isPre ? 'MY PASSを送信' : 'メールを再送信'}しました（${sentTo}）`);
   } else {
-    showToast_('⚠ 再送信に失敗: ' + (res.message || res.error || ''));
+    showToast_(`⚠ 送信に失敗: ` + (res.message || res.error || ''));
   }
 }
 

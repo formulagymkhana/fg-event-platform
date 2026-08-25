@@ -1730,6 +1730,45 @@ function buildPassUrl_(appBase, token, eventId) {
 
 // 当日参加者へ個人ページ(氏名+QR)のリンクをメール送信。
 // QR画像は埋め込まず、リンクのみ（cardTokenを外部サービスに送らない方針）。
+/**
+ * 事前登録者へ MY PASS のリンクを送る（2026-08-24 追加）。
+ *
+ * ⚠ 当日参加者向けの sendWalkInPassMail_ とは文面を分ける。
+ *   事前登録の確認メール(sendPreRegMail_)にはパスURLが含まれないため、
+ *   事前登録者にとってこれは「再送信」ではなく**初回送信**になる。
+ *   受付でパスを忘れた学生にその場で送る用途を想定している。
+ *
+ * 件名・本文は CONFIG(passMailSubject / passMailBody)で編集可。未設定なら既定文面。
+ * 差し込み: {name}＝氏名、{eventName}＝大会名、{passUrl}＝マイページURL。
+ */
+function sendPassMail_(to, name, eventId, passUrl) {
+  if (!to) return;
+  try {
+    const cfg    = getConfig_(eventId);
+    const evName = cfg.eventName || eventId;
+    const subjTpl = cfg.passMailSubject ||
+      '【{eventName}】あなたのMY PASS（QRコード）';
+    const bodyTpl = cfg.passMailBody ||
+      ('{name} 様\n\n' +
+       '{eventName} のMY PASS（氏名・QRコード）のリンクをお送りします。\n\n' +
+       '▼あなたのMY PASS\n' +
+       '{passUrl}\n\n' +
+       '・このページを開くと、受付でお渡しするパスと同じQRコードが表示されます。\n' +
+       '・企業ブースの方には、このページのQRコードを見せてください。\n' +
+       '・スタンプラリーもこのQRコードから参加できます。\n' +
+       '・ブックマーク／ホーム画面に追加しておくと、いつでも開けます。\n\n' +
+       '── FORMULA GYMKHANA 事務局');
+    const safeUrl = passUrl || '（リンクの発行に失敗しました。会場スタッフにお問い合わせください）';
+    const fill = s => String(s)
+      .replace(/\{name\}/g, name || '')
+      .replace(/\{eventName\}/g, evName)
+      .replace(/\{passUrl\}/g, safeUrl);
+    MailApp.sendEmail({ to: String(to), subject: fill(subjTpl), body: fill(bodyTpl) });
+  } catch (err) {
+    console.error('sendPassMail_ error:', err);
+  }
+}
+
 function sendWalkInPassMail_(to, name, eventId, passUrl) {
   if (!to) return;
   try {
@@ -1770,9 +1809,17 @@ function actionAdminResendWalkInMail_(p) {
   if (!student)        return err_('invalid_token');
   if (!student.email)  return err_('no_email');
 
-  sendWalkInPassMail_(student.email, student.name, p.event,
-                      buildPassUrl_(p.appBase, p.token, p.event));
-  return ok_({ sent: true, email: student.email });
+  // ⚠ アクション名は adminResendWalkInMail のままだが、当日参加者専用ではない。
+  //   事前登録者にも送れる（受付でパスを忘れた学生への送信）。
+  //   改名するとフロントとGASの同時デプロイが必要になるため名前は据え置く。
+  //   文面だけ区分で出し分ける: 事前登録者は「初回送信」なので専用テンプレを使う。
+  const passUrl = buildPassUrl_(p.appBase, p.token, p.event);
+  if (String(student.regType) === '事前') {
+    sendPassMail_(student.email, student.name, p.event, passUrl);
+  } else {
+    sendWalkInPassMail_(student.email, student.name, p.event, passUrl);
+  }
+  return ok_({ sent: true, email: student.email, regType: String(student.regType || '') });
 }
 
 // 事前登録の提出ファイルをDriveに保存（非公開＝オーナー/組織のみ閲覧）。URLを返す。
