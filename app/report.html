@@ -16,109 +16,232 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;
-         background: var(--fg-bg); color: var(--fg-text); font-size: 14px; padding: 20px 16px 60px; }
-  .wrap { max-width: 760px; margin: 0 auto; }
+         background: var(--fg-bg); color: var(--fg-text); font-size: 14px; min-height: 100vh; }
+  button, input, select { font: inherit; }
 
-  /* ログイン（admin.html と同じ鍵。localStorage を共有するので admin.html でログイン済みなら不要） */
-  .login-card { background: #fff; border-radius: var(--radius-card); max-width: 360px; margin: 80px auto;
+  /* ログイン（admin.html と同じ鍵。localStorage を共有する） */
+  .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
+  .login-card { width: 100%; max-width: 360px; background: #fff; border-radius: var(--radius-card);
                 box-shadow: var(--shadow-card); overflow: hidden; }
-  .login-hd { padding: 18px 22px; border-bottom: 3px solid var(--fg-blue); font-weight: 700; }
-  .login-body { padding: 20px 22px; }
-  .login-body input { width: 100%; padding: 11px 13px; border: 1.5px solid var(--fg-line); border-radius: 8px;
-                       font-size: 15px; margin-bottom: 10px; }
-  .login-body button { width: 100%; padding: 12px; background: var(--fg-blue); color: #fff; border: none;
-                        border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; }
-  .login-err { color: var(--fg-error); font-size: 12px; margin-top: 8px; display: none; }
+  .login-hd { padding: 18px 22px 15px; border-bottom: 3px solid var(--fg-blue); }
+  .login-logo { height: 34px; width: auto; display: block; }
+  .login-sub { color: var(--fg-muted); font-size: 11px; margin-top: 5px; }
+  .login-body { padding: 24px 22px 28px; }
+  .login-label { display: block; color: var(--fg-text); font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+  .login-input { width: 100%; padding: 12px 14px; border: 1.5px solid var(--fg-line); border-radius: var(--radius-ui);
+                 color: var(--fg-text); font-size: 15px; margin-bottom: 12px; }
+  .login-input:focus, .event-select:focus { outline: none; border-color: var(--fg-blue); }
+  .login-btn { width: 100%; padding: 13px; background: var(--fg-blue); color: #fff; border: 0;
+               border-radius: var(--radius-ui); font-size: 14px; font-weight: 700; cursor: pointer; }
+  .login-btn:disabled { background: var(--fg-disabled); cursor: wait; }
+  .login-err { display: none; color: var(--fg-error); font-size: 12px; line-height: 1.5; margin-bottom: 10px; }
 
-  .hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 10px; }
-  .hd h1 { font-size: 16px; color: var(--fg-navy); }
-  .ev-select { padding: 8px 10px; border: 1.5px solid var(--fg-line); border-radius: 8px; font-size: 13px; }
-
-  .card { background: #fff; border-radius: var(--radius-card); box-shadow: var(--shadow-card);
-          padding: 18px 20px; margin-bottom: 16px; }
-  .card h2 { font-size: 14px; color: var(--fg-navy); margin-bottom: 4px; }
-  .card .note { font-size: 11px; color: var(--fg-muted); margin-bottom: 14px; line-height: 1.6; }
-
-  table.report-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-  table.report-tbl th { text-align: left; padding: 8px 6px; border-bottom: 2px solid var(--fg-line);
-                         font-size: 11px; color: var(--fg-muted); font-weight: 700; }
-  table.report-tbl td { padding: 9px 6px; border-bottom: 1px solid var(--fg-line); }
-  table.report-tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  table.report-tbl td.num .sub { color: var(--fg-muted); font-size: 11px; margin-left: 2px; }
-  table.report-tbl tr.total-row td { font-weight: 700; border-top: 2px solid var(--fg-navy);
-                                      border-bottom: none; background: var(--fg-blue-soft); }
-  .src-note { font-size: 11px; color: var(--fg-muted); margin-top: 10px; line-height: 1.7; }
-
-  .ev-title-card h2 { font-size: 17px; }
-  .ev-title-card .note { margin-bottom: 0; font-size: 12px; }
-
-  /* サマリー（開催報告書 Highlights 相当） */
-  .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .kpi { background: var(--fg-bg); border-radius: 10px; padding: 14px 8px; text-align: center; }
-  .kpi .val { font-size: 26px; font-weight: 700; color: var(--fg-navy); line-height: 1; }
-  .kpi .val .unit { font-size: 11px; font-weight: 600; color: var(--fg-muted); margin-left: 2px; }
-  .kpi .lbl { font-size: 10px; color: var(--fg-muted); font-weight: 600; margin-top: 6px; line-height: 1.4; }
-
-  /* 学生属性の分布テーブル群 */
-  .dist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .dist-block h3 { font-size: 12px; color: var(--fg-navy); margin-bottom: 6px; }
-  .dist-block td.empty { color: var(--fg-muted); font-size: 12px; text-align: center; }
-  /* 学部の自動分類の検証用に、区分の下へ実際の学科名を並べる */
-  .dist-block td .detail { font-size: 10px; color: var(--fg-muted); line-height: 1.5; margin-top: 3px; }
-
-  /* 横に長い表（ブース別スタンプ数）は表内だけ横スクロールさせる */
-  .tbl-scroll { overflow-x: auto; }
-  .tbl-scroll table { min-width: 460px; }
-  table.report-tbl th.sub-th { font-size: 10px; font-weight: 600; }
-
-  @media (max-width: 560px) {
-    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-    .dist-grid { grid-template-columns: 1fr; }
+  /* 管理画面のサブページと揃えた固定ヘッダー */
+  .report-header { height: 48px; background: #fff; border-bottom: 3px solid var(--fg-blue);
+                   position: sticky; top: 0; z-index: 100; }
+  .report-header-inner { width: 100%; max-width: 960px; height: 100%; margin: 0 auto; padding: 0 24px;
+                         display: grid; grid-template-columns: minmax(64px,1fr) auto minmax(64px,1fr);
+                         align-items: center; gap: 10px; }
+  .report-back { justify-self: start; color: var(--fg-blue); font-size: 12px; font-weight: 600;
+                 text-decoration: none; white-space: nowrap; }
+  .report-header-title { color: var(--fg-navy); font-size: 13px; font-weight: 700; text-align: center; }
+  .print-btn { justify-self: end; padding: 6px 12px; background: #fff; color: var(--fg-navy);
+               border: 1px solid var(--fg-line); border-radius: 5px; font-size: 11px; font-weight: 700; cursor: pointer; }
+  .report-back:focus-visible, .print-btn:focus-visible, .login-btn:focus-visible,
+  .retry-btn:focus-visible, .report-details summary:focus-visible {
+    outline: 3px solid rgba(53,32,208,.2); outline-offset: 2px;
   }
 
-  .prize-stats { display: flex; gap: 12px; }
-  .prize-stat { flex: 1; text-align: center; }
-  .prize-stat .val { font-size: 26px; font-weight: 700; color: var(--fg-navy); line-height: 1; margin-bottom: 4px; }
-  .prize-stat .lbl { font-size: 11px; color: var(--fg-muted); font-weight: 600; }
+  .report-main { width: 100%; max-width: 960px; margin: 0 auto; padding: 16px 24px 60px; }
+  .report-controls { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .event-label { color: var(--fg-muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .event-select { width: min(100%, 440px); min-width: 280px; padding: 9px 32px 9px 11px;
+                  border: 1.5px solid var(--fg-line); border-radius: var(--radius-ui);
+                  background: #fff; color: var(--fg-text); font-size: 13px; }
 
-  .state-msg { text-align: center; color: var(--fg-muted); padding: 40px 0; font-size: 13px; }
-  .print-btn { padding: 8px 14px; background: var(--fg-navy); color: #fff; border: none; border-radius: 8px;
-               font-size: 12px; font-weight: 700; cursor: pointer; }
+  /* 報告全体を1つの作業面として扱い、各セクションは罫線で区切る */
+  .report-sheet { background: #fff; border: 1px solid var(--fg-line); border-radius: var(--radius-ui);
+                  box-shadow: var(--shadow-sm); overflow: hidden; }
+  .report-event { padding: 24px; border-bottom: 1px solid var(--fg-line); }
+  .report-event h1 { color: var(--fg-navy); font-size: 21px; line-height: 1.35; overflow-wrap: anywhere; }
+  .report-event-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 7px;
+                       color: var(--fg-muted); font-size: 12px; }
+  .report-badge { display: inline-flex; align-items: center; min-height: 22px; padding: 2px 8px;
+                  border: 1px solid var(--fg-warning-border); border-radius: 100px;
+                  background: var(--fg-warning-bg); color: var(--fg-warning); font-size: 10px; font-weight: 700; }
+  .report-section { padding: 22px 24px 24px; border-bottom: 1px solid var(--fg-line); }
+  .report-section:last-child { border-bottom: 0; }
+  .section-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+  .section-header h2 { color: var(--fg-navy); font-size: 16px; line-height: 1.4; }
+  .section-note { color: var(--fg-muted); font-size: 11px; line-height: 1.7; margin-top: 3px; }
+  .section-side-note { flex-shrink: 0; color: var(--fg-muted); font-size: 10px; line-height: 1.5; text-align: right; }
+
+  /* サマリー */
+  .metric-grid { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 9px; }
+  .metric { min-width: 0; min-height: 92px; padding: 13px 9px 11px; border: 1px solid var(--fg-line);
+            border-radius: 6px; background: var(--fg-bg-soft); text-align: center;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .metric-primary { border-color: var(--fg-blue-border); background: var(--fg-blue-soft); }
+  .metric-value { color: var(--fg-navy); font-size: 27px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .metric-unit { color: var(--fg-muted); font-size: 10px; font-weight: 700; margin-left: 2px; }
+  .metric-label { color: var(--fg-muted); font-size: 10px; font-weight: 700; line-height: 1.35; margin-top: 7px; }
+  .metric-detail { color: var(--fg-muted); font-size: 9px; line-height: 1.4; margin-top: 3px; }
+  .summary-foot { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 11px;
+                  color: var(--fg-muted); font-size: 10px; line-height: 1.6; }
+
+  /* 表 */
+  .table-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--fg-line); border-radius: 6px;
+                -webkit-overflow-scrolling: touch; }
+  table.report-table { width: 100%; border-collapse: separate; border-spacing: 0; color: var(--fg-text); font-size: 12px; }
+  table.report-table th { padding: 8px 10px; background: var(--fg-navy); color: #fff;
+                          font-size: 10px; font-weight: 700; line-height: 1.35; text-align: left; vertical-align: middle; }
+  table.report-table th.num, table.report-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.report-table td, table.report-table tbody th { padding: 9px 10px; border-bottom: 1px solid var(--fg-line);
+                                                       background: #fff; vertical-align: top; }
+  table.report-table tbody th { color: var(--fg-text); font-size: 12px; font-weight: 600; text-align: left; }
+  table.report-table tbody tr:nth-child(even):not(.total-row) td,
+  table.report-table tbody tr:nth-child(even):not(.total-row) th { background: var(--fg-bg-soft); }
+  table.report-table tbody tr:last-child td, table.report-table tbody tr:last-child th { border-bottom: 0; }
+  table.report-table .total-row td, table.report-table .total-row th {
+    background: var(--fg-blue-soft); color: var(--fg-navy); font-weight: 700; border-top: 1px solid var(--fg-blue-border);
+  }
+  .th-sub { display: block; color: rgba(255,255,255,.72); font-size: 9px; font-weight: 600; margin-top: 2px; }
+  .num .sub { display: block; color: var(--fg-muted); font-size: 9px; margin-top: 2px; white-space: nowrap; }
+  .attendance-table { min-width: 520px; }
+
+  /* スタンプラリー */
+  .rally-metrics { margin-bottom: 16px; }
+  .booth-table { min-width: 720px; }
+  .booth-table thead th { text-align: center; }
+  .booth-table thead .booth-name-col { text-align: left; }
+  .booth-table .booth-name-col { position: sticky; left: 0; z-index: 2;
+                                 min-width: 150px; max-width: 220px; overflow-wrap: anywhere; }
+  .booth-table thead .booth-name-col { z-index: 4; }
+  .booth-table .booth-total-col { position: sticky; right: 0; z-index: 2;
+                                  border-left: 1px solid var(--fg-line); }
+  .booth-table thead .booth-total-col { z-index: 4; }
+  .empty-inline { padding: 22px; border: 1px dashed var(--fg-line); border-radius: 6px;
+                  color: var(--fg-muted); font-size: 12px; text-align: center; }
+
+  /* 学生属性 */
+  .attribute-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .attribute-block-wide { grid-column: 1 / -1; }
+  .attribute-title { color: var(--fg-navy); font-size: 12px; font-weight: 700; margin-bottom: 7px; }
+  .attribute-table { min-width: 360px; }
+  .attr-detail { color: var(--fg-muted); font-size: 9px; font-weight: 400; line-height: 1.55; margin-top: 4px; }
+  .attr-detail span { display: block; }
+  .empty-cell { color: var(--fg-muted); text-align: center !important; }
+
+  /* 集計根拠は画面上では折りたたみ、印刷時は展開する */
+  .report-details { border: 1px solid var(--fg-line); border-radius: 6px; overflow: hidden; }
+  .report-details summary { position: relative; padding: 12px 38px 12px 14px; cursor: pointer;
+                            color: var(--fg-navy); font-size: 12px; font-weight: 700; list-style: none; }
+  .report-details summary::-webkit-details-marker { display: none; }
+  .report-details summary::after { content: '+'; position: absolute; top: 50%; right: 14px;
+                                   color: var(--fg-muted); font-size: 18px; font-weight: 400; transform: translateY(-50%); }
+  .report-details[open] summary::after { content: '\2212'; }
+  .details-body { padding: 0 14px 15px; border-top: 1px solid var(--fg-line); }
+  .details-copy { color: var(--fg-muted); font-size: 11px; line-height: 1.75; padding-top: 13px; }
+  .details-copy strong { color: var(--fg-text); }
+  .details-copy p + p { margin-top: 8px; }
+  .audit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+  .audit-block h3 { color: var(--fg-navy); font-size: 11px; margin-bottom: 6px; }
+  .audit-table { min-width: 400px; }
+
+  .state-msg { padding: 64px 20px; color: var(--fg-muted); font-size: 13px; line-height: 1.7; text-align: center; }
+  .state-msg .spinner { margin-bottom: 14px; }
+  .retry-btn { margin-top: 12px; padding: 8px 14px; border: 1px solid var(--fg-line);
+               border-radius: var(--radius-ui); background: #fff; color: var(--fg-navy); font-size: 12px; font-weight: 700; cursor: pointer; }
+
+  @media (max-width: 820px) {
+    .metric-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    .audit-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .report-header-inner { padding: 0 14px; }
+    .report-main { padding: 12px 10px 44px; }
+    .report-controls { align-items: stretch; flex-direction: column; gap: 5px; }
+    .event-select { width: 100%; min-width: 0; }
+    .report-event { padding: 20px 15px; }
+    .report-event h1 { font-size: 18px; }
+    .report-section { padding: 19px 14px 21px; }
+    .section-header { display: block; }
+    .section-side-note { margin-top: 5px; text-align: left; }
+    .metric-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .metric { min-height: 88px; }
+    .attribute-grid { grid-template-columns: 1fr; }
+    .attribute-block-wide { grid-column: auto; }
+  }
+
+  @page { size: A4; margin: 12mm; }
   @media print {
     .no-print { display: none !important; }
-    body { padding: 0; background: #fff; }
-    .card { box-shadow: none; border: 1px solid #ccc; }
+    body { background: #fff; color: #000; }
+    .report-main { max-width: none; padding: 0; }
+    .report-sheet { border: 0; border-radius: 0; box-shadow: none; overflow: visible; }
+    .report-event { padding: 0 0 12px; }
+    .report-event h1 { font-size: 18px; }
+    .report-section { padding: 12px 0 14px; }
+    .metric-grid { grid-template-columns: repeat(5, minmax(0,1fr)); gap: 5px; }
+    .metric { min-height: 68px; padding: 8px 4px; }
+    .metric-value { font-size: 21px; }
+    .table-wrap { overflow: visible; }
+    table.report-table { font-size: 9px; }
+    table.report-table th, table.report-table td, table.report-table tbody th { padding: 5px 6px; }
+    .attendance-table, .booth-table, .attribute-table, .audit-table { min-width: 0; }
+    .booth-table .booth-name-col, .booth-table .booth-total-col { position: static; }
+    .attribute-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .report-details { border: 0; overflow: visible; }
+    .report-details summary { display: none; }
+    .details-body { display: block !important; padding: 0; border-top: 0; }
+    .audit-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .summary-foot, .section-note, .details-copy, .attr-detail { color: #444; }
+    .metric-grid, .rally-metrics, .attribute-block, .audit-block, table.report-table tr { break-inside: avoid; }
+    table.report-table thead { display: table-header-group; }
   }
 </style>
 </head>
 <body>
 
-<div id="state-login" class="wrap" style="display:none">
-  <div class="login-card">
-    <div class="login-hd">FG 開催報告 — ログイン</div>
-    <div class="login-body">
-      <input type="password" id="f-key" placeholder="管理者キー" autocomplete="off">
-      <button id="btn-login">ログイン</button>
-      <p class="login-err" id="login-err">キーが正しくありません</p>
+<div id="state-login" style="display:none">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-hd">
+        <img class="login-logo" src="../assets/logo.png" alt="FORMULA GYMKHANA">
+        <p class="login-sub">開催報告</p>
+      </div>
+      <form class="login-body" id="login-form">
+        <label class="login-label" for="f-key">管理者キー</label>
+        <input class="login-input" type="password" id="f-key" placeholder="管理者キー" autocomplete="current-password">
+        <p class="login-err" id="login-err">キーが正しくありません</p>
+        <button class="login-btn" id="btn-login" type="submit">ログイン</button>
+      </form>
     </div>
   </div>
 </div>
 
-<div id="state-app" class="wrap" style="display:none">
-  <div class="hd no-print">
-    <h1>📊 開催報告</h1>
-    <div style="display:flex;gap:8px;align-items:center">
-      <select id="ev-select" class="ev-select"></select>
-      <button class="print-btn" id="btn-print">🖨 印刷</button>
+<div id="state-app" style="display:none">
+  <header class="report-header no-print">
+    <div class="report-header-inner">
+      <a class="report-back" href="admin.html">管理画面へ</a>
+      <div class="report-header-title">開催報告</div>
+      <button class="print-btn" id="btn-print" type="button">印刷</button>
     </div>
-  </div>
+  </header>
 
-  <div id="report-body">
-    <p class="state-msg">イベントを選択してください</p>
-  </div>
+  <main class="report-main">
+    <div class="report-controls no-print">
+      <label class="event-label" for="ev-select">対象イベント</label>
+      <select id="ev-select" class="event-select"></select>
+    </div>
+
+    <div id="report-body">
+      <p class="state-msg">イベントを選択してください</p>
+    </div>
+  </main>
 </div>
 
 <script src="../js/config.js?v=20260724h"></script>
-<script src="../js/report.js?v=20260825f"></script>
+<script src="../js/report.js?v=20260825g"></script>
 </body>
 </html>
