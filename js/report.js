@@ -60,7 +60,14 @@
     $('ev-select').innerHTML = events_.map(e =>
       `<option value="${e.eventId}">${e.name || e.eventId}（${e.startDate}〜${e.endDate}）</option>`
     ).join('');
-    if (events_.length) loadReport_(events_[0].eventId);
+    if (!events_.length) return;
+    // イベント一覧の「📊 開催結果」から event=<id> 付きで開かれた場合はそれを初期選択にする
+    // （2026-08-25 追加）。無い/該当なしの場合は先頭を初期選択にする（従来どおり）。
+    const params = new URLSearchParams(location.search);
+    const wanted = params.get('event');
+    const initial = (wanted && events_.some(e => e.eventId === wanted)) ? wanted : events_[0].eventId;
+    $('ev-select').value = initial;
+    loadReport_(initial);
   }
   $('ev-select')?.addEventListener('change', e => loadReport_(e.target.value));
 
