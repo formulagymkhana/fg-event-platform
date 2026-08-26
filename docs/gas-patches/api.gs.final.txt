@@ -3470,9 +3470,9 @@ function actionAdminGetAttendanceReport_(p) {
     });
     return res;
   };
-  const stampBySid_ = {}, viewBySid_ = {};   // 学生ごとの件数（大学別集計・CSV用）
+  const stampBySid_ = {};   // 学生ごとのスタンプ取得回数（大学別集計・CSV用）
   const stampAct_ = countActivity_(stampLog_, stampBySid_);
-  const viewAct_  = countActivity_(viewLog_,  viewBySid_);
+  const viewAct_  = countActivity_(viewLog_);
   const actOut_   = a => ({ count: a.count, users: a.users.size });
 
   // ── 学生属性（開催報告書の Student Attribute 相当） ──
@@ -3599,6 +3599,16 @@ function actionAdminGetAttendanceReport_(p) {
       driver:    viewPairs_[cid].driver.size,
       nonDriver: viewPairs_[cid].nonDriver.size,
     };
+  });
+
+  // 学生ごとの「接点企業数」。QR閲覧ログは同一企業×同一学生の行が複数残りうるため、
+  // 行数ではなく企業を一意化して数える（2026-08-26 修正。企業別QRと定義を揃える）。
+  const viewCompaniesBySid_ = {};
+  viewLog_.rows.forEach(r => {
+    const cid = r['companyId'];
+    if (!cid) return;
+    if (!viewCompaniesBySid_[r.sid]) viewCompaniesBySid_[r.sid] = new Set();
+    viewCompaniesBySid_[r.sid].add(cid);
   });
   const viewCompanyRows_ = Object.keys(viewByCompany_).map(cid => {
     const c = viewByCompany_[cid];
@@ -3740,8 +3750,8 @@ function actionAdminGetAttendanceReport_(p) {
           isDriver:  isDriver,
           days:      perDay,
           actedAny:  perDay.some(d => d.acted),
-          stamps:    stampBySid_[sid] || 0,
-          views:     viewBySid_[sid]  || 0,
+          stamps:    stampBySid_[sid] || 0,   // スタンプ取得の回数（1回ごとに別の記録なので行数でよい）
+          views:     viewCompaniesBySid_[sid] ? viewCompaniesBySid_[sid].size : 0, // 接点企業数（企業で重複排除）
           lunchSat:  lunch.sat,
           lunchSun:  lunch.sun,
         });

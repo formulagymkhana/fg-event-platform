@@ -23,6 +23,26 @@
   // 表示用の桁区切り。大きい集計値が読み取りにくいため（2026-08-26 追加）。
   const fmt_ = v => count_(v).toLocaleString('ja-JP');
 
+  // 割合は必ず分子・分母を併記する。分母0のときは 0% ではなく「—」を返す
+  // （0%と「母数が無い」は別の意味なので区別する。2026-08-26 方針）。
+  function rate_(numerator, denominator) {
+    const n = count_(numerator), d = count_(denominator);
+    if (!d) return { text: '—', detail: `${fmt_(n)}/0` };
+    return { text: (n / d * 100).toFixed(1) + '%', detail: `${fmt_(n)}/${fmt_(d)}` };
+  }
+  // 中央値。平均だけだと活動量の多い一部に引っ張られるため併記する。
+  function median_(values) {
+    if (!values.length) return 0;
+    const a = values.slice().sort((x, y) => x - y);
+    const m = Math.floor(a.length / 2);
+    return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+  }
+  function mean_(values) {
+    if (!values.length) return 0;
+    return values.reduce((s, v) => s + v, 0) / values.length;
+  }
+  const dec1_ = v => (Math.round(v * 10) / 10).toLocaleString('ja-JP', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
   let adminKey_ = localStorage.getItem('fg_admin_key') || '';
   let events_ = [];
   let reportRequestId_ = 0;
@@ -124,7 +144,7 @@
     const days = (lastStudents_[0].days || []).map(d => d.day);
     const header = ['studentId', '氏名', '大学名', '学年', '属性', '区分', '登録種別']
       .concat(days.map(d => dayLabel_(d) + 'のアクション記録'))
-      .concat(['アクション記録のある日数', 'スタンプ数', 'QR件数', '弁当_土', '弁当_日']);
+      .concat(['アクション記録のある日数', 'スタンプ数', 'QR接点企業数', '弁当_土', '弁当_日']);
     const lines = [header.map(csvSafe_).join(',')];
     lastStudents_.forEach(s => {
       const dayFlags = (s.days || []).map(d => (d.acted ? 'あり' : 'なし'));
@@ -654,6 +674,126 @@
         </div>`, { foldable: true, open: true });
     })();
 
+    // ── 参加指標（実人数を分母にした記述統計） ──
+    // イベント規模の影響を受けない基準値。延べ人数は開催日数で変わるため主分母に使わない。
+    // ⚠ ここは記述統計のみ。良否の判定・原因の推測・順位付けはしない（2026-08-26 方針）。
+    const allStudents = Array.isArray(data.students) ? data.students : [];
+    const metricsHtml = !allStudents.length ? '' : (() => {
+      // 推定ユニーク参加学生 = 事前登録の出場選手（全員）＋ 記録が1件でもある応援
+      const participants = allStudents.filter(s => s.isDriver || s.actedAny);
+      const drivers   = participants.filter(s => s.isDriver);
+      const supports  = participants.filter(s => !s.isDriver);
+      const N = participants.length;
+
+      const acted   = participants.filter(s => s.actedAny).length;
+      const stamped = participants.filter(s => count_(s.stamps) > 0).length;
+      const viewed  = participants.filter(s => count_(s.views)  > 0).length;
+
+      const rateRow = (label, num, den, note) => {
+        const r = rate_(num, den);
+        return `<tr>
+          <th scope='row'>${esc(label)}${note ? `<span class='cell-note'>${esc(note)}</span>` : ''}</th>
+          <td class='num'>${r.text}</td>
+          <td class='num'>${r.detail}</td>
+        </tr>`;
+      };
+
+      const stampVals = participants.map(s => count_(s.stamps));
+      const viewVals  = participants.map(s => count_(s.views));
+      const stampUsers = stampVals.filter(v => v > 0);
+      const viewUsers  = viewVals.filter(v => v > 0);
+      const statRow = (label, values, note) => `
+        <tr>
+          <th scope='row'>${esc(label)}${note ? `<span class='cell-note'>${esc(note)}</span>` : ''}</th>
+          <td class='num'>${values.length ? dec1_(mean_(values)) : '—'}</td>
+          <td class='num'>${values.length ? dec1_(median_(values)) : '—'}</td>
+          <td class='num'>${values.length ? fmt_(Math.max.apply(null, values)) : '—'}</td>
+          <td class='num'>${fmt_(values.length)}</td>
+        </tr>`;
+
+      // 記録のある日数の分布。選手は来場を一律加算しているので区分を分けて出す。
+      const dayCounts = n => participants.filter(s =>
+        (s.days || []).filter(d => d.acted).length === n).length;
+      const dayCountRows = days.map((_, i) => i + 1).concat([0]).sort((a, b) => a - b)
+        .map(n => {
+          const dv = drivers.filter(s => (s.days || []).filter(d => d.acted).length === n).length;
+          const sv = supports.filter(s => (s.days || []).filter(d => d.acted).length === n).length;
+          return `<tr><th scope='row'>${n}日</th>
+            <td class='num'>${fmt_(dv)}</td><td class='num'>${fmt_(sv)}</td><td class='num'>${fmt_(dayCounts(n))}</td></tr>`;
+        }).join('');
+
+      // 記録件数（スタンプ＋接点企業）の分布
+      const totalActions = s => count_(s.stamps) + count_(s.views);
+      const buckets = [
+        ['0件',     s => totalActions(s) === 0],
+        ['1件',     s => totalActions(s) === 1],
+        ['2〜4件',  s => totalActions(s) >= 2 && totalActions(s) <= 4],
+        ['5件以上', s => totalActions(s) >= 5],
+      ];
+      const bucketRows = buckets.map(([label, fn]) => {
+        const dv = drivers.filter(fn).length, sv = supports.filter(fn).length;
+        return `<tr><th scope='row'>${esc(label)}</th>
+          <td class='num'>${fmt_(dv)}</td><td class='num'>${fmt_(sv)}</td><td class='num'>${fmt_(dv + sv)}</td></tr>`;
+      }).join('');
+
+      return sectionHtml_('参加指標', `
+        <p class='sec-note'>延べではなく実人数を分母にした記述統計です。分母の「推定ユニーク参加学生」は
+        <strong>事前登録の出場選手（全員）＋ いずれかの開催日にアクション記録がある応援学生</strong>で、
+        ${fmt_(N)}人（選手${fmt_(drivers.length)}／応援${fmt_(supports.length)}）です。
+        選手は来場予定日を持たないため記録の有無によらず全員を含めています。</p>
+
+        <div class='sub-block'>
+          <div class='sub-title'>記録あり率</div>
+          <div class='tbl-wrap'>
+            <table class='data-tbl' aria-label='記録あり率'>
+              <thead><tr><th scope='col'>指標</th><th class='num' scope='col'>割合</th><th class='num' scope='col'>分子/分母</th></tr></thead>
+              <tbody>
+                ${rateRow('アクション記録あり', acted, N)}
+                ${rateRow('スタンプ記録あり', stamped, N)}
+                ${rateRow('QR接点記録あり', viewed, N)}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class='sub-block'>
+          <div class='sub-title'>1人あたりの記録件数</div>
+          <p class='sec-note'>平均だけでは活動量の多い一部に引っ張られるため、中央値と最大値を併記しています。</p>
+          <div class='tbl-wrap'>
+            <table class='data-tbl' aria-label='1人あたりの記録件数'>
+              <thead><tr><th scope='col'>対象</th><th class='num' scope='col'>平均</th><th class='num' scope='col'>中央値</th><th class='num' scope='col'>最大</th><th class='num' scope='col'>人数</th></tr></thead>
+              <tbody>
+                ${statRow('スタンプ数', stampVals, '参加学生全員')}
+                ${statRow('スタンプ数', stampUsers, 'スタンプ記録がある学生のみ')}
+                ${statRow('接点企業数', viewVals, '参加学生全員')}
+                ${statRow('接点企業数', viewUsers, 'QR接点記録がある学生のみ')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class='sub-block'>
+          <div class='sub-title'>アクション記録のある日数</div>
+          <div class='tbl-wrap'>
+            <table class='data-tbl' aria-label='アクション記録のある日数'>
+              <thead><tr><th scope='col'>日数</th><th class='num' scope='col'>選手</th><th class='num' scope='col'>応援</th><th class='num' scope='col'>合計</th></tr></thead>
+              <tbody>${dayCountRows}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class='sub-block'>
+          <div class='sub-title'>記録件数の分布</div>
+          <p class='sec-note'>スタンプ数と接点企業数の合計で区切っています。</p>
+          <div class='tbl-wrap'>
+            <table class='data-tbl' aria-label='記録件数の分布'>
+              <thead><tr><th scope='col'>件数</th><th class='num' scope='col'>選手</th><th class='num' scope='col'>応援</th><th class='num' scope='col'>合計</th></tr></thead>
+              <tbody>${bucketRows}</tbody>
+            </table>
+          </div>
+        </div>`, { foldable: true, open: true });
+    })();
+
     // ── 大学別のアクション状況 ──
     // 判断材料として出すだけで、値の良し悪しはここでは述べない。
     const students = Array.isArray(data.students) ? data.students : [];
@@ -692,7 +832,7 @@
               <th class='num' scope='col'>アクション記録あり</th>
               <th class='num' scope='col'>アクション記録なし</th>
               <th class='num' scope='col'>スタンプ<span class='th-sub'>延べ</span></th>
-              <th class='num' scope='col'>QR<span class='th-sub'>件数</span></th>
+              <th class='num' scope='col'>QR接点<span class='th-sub'>企業数計</span></th>
             </tr></thead>
             <tbody>
               ${rows.map(r => `<tr>
@@ -720,7 +860,7 @@
           <button class='act-btn act-btn-ghost' id='btn-csv-students' type='button'>学生ごとの明細をCSVで出力</button>
         </div>
         <p class='sec-note' style='margin-top:8px'>CSVには学生1人1行で、氏名・大学・学年・区分・登録種別・
-        日別のアクション有無・スタンプ数・QR件数・弁当希望が入ります。個人が特定できるデータのため取り扱いに注意してください。</p>`,
+        日別のアクション記録・スタンプ数・QR接点企業数・弁当希望が入ります。個人が特定できるデータのため取り扱いに注意してください。</p>`,
         { foldable: true, open: false });
     })();
 
@@ -757,6 +897,19 @@
         </div>
       </div>`, { foldable: true, open: false });
 
+    // 記録が1件も無いイベントは「集計に失敗した」と見分けがつかないため明示する。
+    // （デジタル化前のイベントを開いた場合など。2026-08-26 追加）
+    const hasAnyRecord = days.some(day => {
+      const s = (byDay[day] || {}).sources || {};
+      return count_(s.registration) + count_(s.stamp) + count_(s.view) > 0;
+    });
+    const emptyHtml = hasAnyRecord ? '' : `
+      <div class='warn-box' role='status'>
+        <div class='warn-title'>このイベントにはアクションの記録がありません</div>
+        <p>開催日（${esc(days.map(dayLabel_).join('・'))}）に、登録・スタンプ・QR読み取りのいずれの記録もありません。
+        集計の失敗ではなく、記録そのものが存在しない状態です。以下の数値はすべて0件になります。</p>
+      </div>`;
+
     // シート・列の欠落は「記録が0件」と見分けがつかないため、必ず画面に出す。
     const warnings = Array.isArray(data.warnings) ? data.warnings : [];
     const warnHtml = !warnings.length ? '' : `
@@ -767,6 +920,7 @@
       </div>`;
 
     body.innerHTML = `
+      ${emptyHtml}
       ${warnHtml}
       <div class='ev-head'>
         <div class='ev-head-name'>${esc(event ? (event.name || eventId) : eventId)}</div>
@@ -780,6 +934,7 @@
       ${attendanceHtml}
       ${rallyHtml}
       ${attributeHtml}
+      ${metricsHtml}
       ${opsHtml}
       ${schoolHtml}
       ${methodologyHtml}`;

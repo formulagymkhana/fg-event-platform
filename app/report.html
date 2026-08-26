@@ -121,6 +121,8 @@
   .data-tbl th.num, .data-tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .data-tbl .th-sub { display: block; font-size: 9px; font-weight: 600; color: rgba(255,255,255,.72); margin-top: 2px; }
   .data-tbl .cell-sub { display: block; font-size: 9px; color: var(--fg-muted); margin-top: 2px; white-space: nowrap; }
+  /* 行見出しの下に付ける集計対象の注記（「参加学生全員」「スタンプ記録がある学生のみ」等） */
+  .data-tbl .cell-note { display: block; font-size: 9px; font-weight: 400; color: var(--fg-muted); margin-top: 2px; }
   .data-tbl .total-row td, .data-tbl .total-row th { background: var(--fg-blue-soft); color: var(--fg-navy);
                                                      font-weight: 700; }
   .empty-msg { text-align: center; color: var(--fg-muted); padding: 20px; font-size: 13px; }
@@ -244,6 +246,6 @@
 
 <script src="../js/config.js?v=20260724h"></script>
 <script src="../js/csv-util.js?v=20260825a"></script>
-<script src="../js/report.js?v=20260826g"></script>
+<script src="../js/report.js?v=20260826h"></script>
 </body>
 </html>
