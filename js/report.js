@@ -21,6 +21,9 @@
     return Number.isFinite(n) ? n : 0;
   };
   // 表示用の桁区切り。大きい集計値が読み取りにくいため（2026-08-26 追加）。
+  // ⚠ 戻り値は文字列。足し算する場合は必ず先に count_ で足してから fmt_ に渡すこと。
+  //   fmt_(a) + count_(b) と書くと文字列連結になり "3" + 0 が "30" になる
+  //   （2026-08-26、合計行で実際に発生）。
   const fmt_ = v => count_(v).toLocaleString('ja-JP');
 
   // 割合は必ず分子・分母を併記する。分母0のときは 0% ではなく「—」を返す
@@ -666,7 +669,7 @@
                 <tr class='total-row'>
                   <th scope='row'>合計</th>
                   <td class='num'>${fmt_(ops.registeredStudents)}</td>
-                  <td class='num'>${fmt_(ops.noRecordStudents) + count_(ops.driversNoRecord)}</td>
+                  <td class='num'>${fmt_(count_(ops.noRecordStudents) + count_(ops.driversNoRecord))}</td>
                 </tr>
               </tbody>
             </table>
@@ -685,16 +688,26 @@
       const supports  = participants.filter(s => !s.isDriver);
       const N = participants.length;
 
-      const acted   = participants.filter(s => s.actedAny).length;
+      // 分母は2種類。登録者基準＝学生マスターの登録者全員、参加者基準＝上の推定ユニーク参加学生。
+      // ⚠ 参加者基準は「記録がある応援」で分母を作っているため、
+      //   アクション記録あり率をこの基準で出すと定義上ほぼ100%になり指標にならない。
+      //   そのため当該行の参加者基準は「—」にしている（2026-08-26 修正）。
+      const R = allStudents.length;                     // 登録者基準の分母
+      const rAll   = allStudents.filter(s => s.actedAny).length;
+      const sAll   = allStudents.filter(s => count_(s.stamps) > 0).length;
+      const vAll   = allStudents.filter(s => count_(s.views)  > 0).length;
       const stamped = participants.filter(s => count_(s.stamps) > 0).length;
       const viewed  = participants.filter(s => count_(s.views)  > 0).length;
 
-      const rateRow = (label, num, den, note) => {
-        const r = rate_(num, den);
+      const rateRow = (label, numAll, numPart, note) => {
+        const a = rate_(numAll, R);
+        const p = numPart === null ? null : rate_(numPart, N);
         return `<tr>
           <th scope='row'>${esc(label)}${note ? `<span class='cell-note'>${esc(note)}</span>` : ''}</th>
-          <td class='num'>${r.text}</td>
-          <td class='num'>${r.detail}</td>
+          <td class='num'>${a.text}</td>
+          <td class='num'>${a.detail}</td>
+          <td class='num'>${p ? p.text : '—'}</td>
+          <td class='num'>${p ? p.detail : '—'}</td>
         </tr>`;
       };
 
@@ -737,20 +750,39 @@
       }).join('');
 
       return sectionHtml_('参加指標', `
-        <p class='sec-note'>延べではなく実人数を分母にした記述統計です。分母の「推定ユニーク参加学生」は
-        <strong>事前登録の出場選手（全員）＋ いずれかの開催日にアクション記録がある応援学生</strong>で、
-        ${fmt_(N)}人（選手${fmt_(drivers.length)}／応援${fmt_(supports.length)}）です。
-        選手は来場予定日を持たないため記録の有無によらず全員を含めています。</p>
+        <p class='sec-note'>延べではなく実人数を分母にした記述統計です。分母は2種類あります。</p>
+        <p class='sec-note'>
+          <strong>登録者基準</strong>… 学生マスターの登録者${fmt_(R)}人。事前登録・当日登録の別を問わず全員。<br>
+          <strong>参加者基準（推定ユニーク参加学生）</strong>… ${fmt_(N)}人
+          （選手${fmt_(drivers.length)}／応援${fmt_(supports.length)}）。
+          事前登録の出場選手（全員）＋ いずれかの開催日にアクション記録がある応援学生。
+          選手は来場予定日を持たないため記録の有無によらず全員を含めています。
+        </p>
 
         <div class='sub-block'>
           <div class='sub-title'>記録あり率</div>
+          <p class='sec-note'>分母が2種類あります。<strong>登録者基準</strong>は学生マスターの登録者
+          ${fmt_(R)}人、<strong>参加者基準</strong>は上の推定ユニーク参加学生${fmt_(N)}人です。</p>
+          <p class='sec-note'>アクション記録あり率の参加者基準を「—」にしているのは、参加者基準の分母が
+          「記録がある応援学生」で作られており、この率を出すと定義上ほぼ100%になって指標にならないためです。
+          記録の有無を見るときは登録者基準を使ってください。</p>
           <div class='tbl-wrap'>
-            <table class='data-tbl' aria-label='記録あり率'>
-              <thead><tr><th scope='col'>指標</th><th class='num' scope='col'>割合</th><th class='num' scope='col'>分子/分母</th></tr></thead>
+            <table class='data-tbl cross-tbl' aria-label='記録あり率'>
+              <thead>
+                <tr>
+                  <th rowspan='2' scope='col'>指標</th>
+                  <th colspan='2' scope='colgroup'>登録者基準</th>
+                  <th colspan='2' scope='colgroup'>参加者基準</th>
+                </tr>
+                <tr>
+                  <th class='num' scope='col'>割合</th><th class='num' scope='col'>分子/分母</th>
+                  <th class='num' scope='col'>割合</th><th class='num' scope='col'>分子/分母</th>
+                </tr>
+              </thead>
               <tbody>
-                ${rateRow('アクション記録あり', acted, N)}
-                ${rateRow('スタンプ記録あり', stamped, N)}
-                ${rateRow('QR接点記録あり', viewed, N)}
+                ${rateRow('アクション記録あり', rAll, null)}
+                ${rateRow('スタンプ記録あり', sAll, stamped)}
+                ${rateRow('QR接点記録あり', vAll, viewed)}
               </tbody>
             </table>
           </div>
