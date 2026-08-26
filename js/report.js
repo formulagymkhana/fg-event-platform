@@ -20,6 +20,8 @@
     const n = Number(v);
     return Number.isFinite(n) ? n : 0;
   };
+  // 表示用の桁区切り。大きい集計値が読み取りにくいため（2026-08-26 追加）。
+  const fmt_ = v => count_(v).toLocaleString('ja-JP');
 
   let adminKey_ = localStorage.getItem('fg_admin_key') || '';
   let events_ = [];
@@ -103,8 +105,11 @@
 
   // ── セクションの折りたたみ（admin.html と同じ挙動） ──
   function toggleSection_(head) {
-    head.closest('.section')?.querySelector('.section-body')?.classList.toggle('open');
-    head.querySelector('.section-toggle')?.classList.toggle('open');
+    const body = head.closest('.section')?.querySelector('.section-body');
+    if (!body) return;
+    const open = body.classList.toggle('open');
+    head.querySelector('.section-toggle')?.classList.toggle('open', open);
+    head.setAttribute('aria-expanded', String(open));
   }
 
   function foldTarget_(target) {
@@ -191,6 +196,11 @@
   }
 
   $('ev-select')?.addEventListener('change', event => {
+    // URL の ?event= も揃えておく。揃えないと、切り替えたあとに共有・再読み込みすると
+    // 元のイベントへ戻ってしまう（2026-08-26 修正）。履歴は増やさず置き換える。
+    const params = new URLSearchParams(location.search);
+    params.set('event', event.target.value);
+    history.replaceState(null, '', location.pathname + '?' + params.toString());
     void loadReport_(event.target.value);
   });
 
@@ -206,23 +216,31 @@
   function statHtml_(label, value, unit, sub) {
     return `
       <div class='stat-card'>
-        <div class='stat-val'>${value == null ? '—' : esc(value)}${unit ? `<span class='stat-unit'>${esc(unit)}</span>` : ''}</div>
+        <div class='stat-val'>${value == null ? '—' : fmt_(value)}${unit ? `<span class='stat-unit'>${esc(unit)}</span>` : ''}</div>
         <div class='stat-lbl'>${esc(label)}</div>
         ${sub ? `<div class='stat-sub'>${esc(sub)}</div>` : ''}
       </div>`;
   }
 
   // ── admin.html の .section と同じパネル ──
+  // 見出しは h2（ページ見出しの h1 は report.html 側の .page-title）。
+  // 折りたためるものは aria-expanded で開閉状態を読み上げに伝える。
+  let sectionSeq_ = 0;
   function sectionHtml_(title, inner, options) {
     const opts = options || {};
     const foldable = !!opts.foldable;
+    const open = foldable ? !!opts.open : true;
+    const bodyId = 'sec-body-' + (++sectionSeq_);
+    const hdAttrs = foldable
+      ? ` role='button' tabindex='0' aria-expanded='${open}' aria-controls='${bodyId}'`
+      : '';
     return `
       <section class='section${foldable ? '' : ' no-fold'}'>
-        <div class='section-hd'${foldable ? " role='button' tabindex='0' aria-label='" + esc(title) + "の開閉'" : ''}>
-          <span class='section-title'>${esc(title)}</span>
-          <span class='section-toggle${foldable && opts.open ? ' open' : ''}'>▼</span>
+        <div class='section-hd'${hdAttrs}>
+          <h2 class='section-title'>${esc(title)}</h2>
+          <span class='section-toggle${foldable && open ? ' open' : ''}' aria-hidden='true'>▼</span>
         </div>
-        <div class='section-body${foldable ? (opts.open ? ' open' : '') : ''}'>${inner}</div>
+        <div class='section-body${foldable && open ? ' open' : ''}' id='${bodyId}'>${inner}</div>
       </section>`;
   }
 
@@ -289,9 +307,9 @@
       return `
         <tr>
           <th scope='row'>${esc(row.label)}${details}</th>
-          <td class='num'>${row.driver}</td>
-          <td class='num'>${row.support}</td>
-          <td class='num'>${row.driver + row.support}</td>
+          <td class='num'>${fmt_(row.driver)}</td>
+          <td class='num'>${fmt_(row.support)}</td>
+          <td class='num'>${fmt_(row.driver + row.support)}</td>
         </tr>`;
     }).join('') : "<tr><td colspan='4' class='empty-msg'>データなし</td></tr>";
 
@@ -348,9 +366,9 @@
       return `
         <tr>
           <th scope='row'>${esc(dayLabel_(day))}</th>
-          <td class='num'>${count_(row.drivers)}</td>
-          <td class='num'>${count_(row.nonDrivers)}</td>
-          <td class='num'>${count_(row.total)}</td>
+          <td class='num'>${fmt_(row.drivers)}</td>
+          <td class='num'>${fmt_(row.nonDrivers)}</td>
+          <td class='num'>${fmt_(row.total)}</td>
         </tr>`;
     }).join('');
 
@@ -363,9 +381,9 @@
       return `
         <tr>
           <th scope='row'>${esc(dayLabel_(day))}</th>
-          <td class='num'>${count_(source.registration)}</td>
-          <td class='num'>${count_(source.stamp)}</td>
-          <td class='num'>${count_(source.view)}</td>
+          <td class='num'>${fmt_(source.registration)}</td>
+          <td class='num'>${fmt_(source.stamp)}</td>
+          <td class='num'>${fmt_(source.view)}</td>
         </tr>`;
     }).join('');
 
@@ -380,8 +398,8 @@
     ].map(([label, stamp, view]) => `
       <tr>
         <th scope='row'>${label}</th>
-        <td class='num'>${stamp.count}<span class='cell-sub'>${stamp.users}人</span></td>
-        <td class='num'>${view.count}<span class='cell-sub'>${view.users}人</span></td>
+        <td class='num'>${fmt_(stamp.count)}<span class='cell-sub'>${fmt_(stamp.users)}人</span></td>
+        <td class='num'>${fmt_(view.count)}<span class='cell-sub'>${fmt_(view.users)}人</span></td>
       </tr>`).join('');
 
     // ── 開催サマリー（KPIはセクションの外に置く＝カードを入れ子にしない） ──
@@ -416,9 +434,9 @@
             ${dayRows}
             <tr class='total-row'>
               <th scope='row'>合計（延べ）</th>
-              <td class='num'>${totalDrivers}</td>
-              <td class='num'>${totalSupport}</td>
-              <td class='num'>${totalVisitors}</td>
+              <td class='num'>${fmt_(totalDrivers)}</td>
+              <td class='num'>${fmt_(totalSupport)}</td>
+              <td class='num'>${fmt_(totalVisitors)}</td>
             </tr>
           </tbody>
         </table>
@@ -447,7 +465,7 @@
                 <th class='col-booth' scope='row'>${esc(row.name)}</th>
                 ${boothDays.map((_, index) => {
                   const cell = cells[index] || {};
-                  return `<td class='num'>${count_(cell.driver)}</td><td class='num'>${count_(cell.nonDriver)}</td>`;
+                  return `<td class='num'>${fmt_(cell.driver)}</td><td class='num'>${fmt_(cell.nonDriver)}</td>`;
                 }).join('')}
                 <td class='num col-total'>${count_(row.total)}</td>
               </tr>`;
@@ -457,7 +475,7 @@
               ${boothDays.map((_, index) => {
                 const driverTotal = boothRows.reduce((sum, row) => sum + count_(((row.days || [])[index] || {}).driver), 0);
                 const supportTotal = boothRows.reduce((sum, row) => sum + count_(((row.days || [])[index] || {}).nonDriver), 0);
-                return `<td class='num'>${driverTotal}</td><td class='num'>${supportTotal}</td>`;
+                return `<td class='num'>${fmt_(driverTotal)}</td><td class='num'>${fmt_(supportTotal)}</td>`;
               }).join('')}
               <td class='num col-total'>${boothRows.reduce((sum, row) => sum + count_(row.total), 0)}</td>
             </tr>
@@ -477,15 +495,15 @@
           <tbody>
             ${viewCompanyRows.map(row => `<tr>
               <th scope='row'>${esc(row.name)}</th>
-              <td class='num'>${count_(row.driver)}</td>
-              <td class='num'>${count_(row.nonDriver)}</td>
-              <td class='num'>${count_(row.total)}</td>
+              <td class='num'>${fmt_(row.driver)}</td>
+              <td class='num'>${fmt_(row.nonDriver)}</td>
+              <td class='num'>${fmt_(row.total)}</td>
             </tr>`).join('')}
             <tr class='total-row'>
               <th scope='row'>合計</th>
-              <td class='num'>${viewCompanyRows.reduce((s, r) => s + count_(r.driver), 0)}</td>
-              <td class='num'>${viewCompanyRows.reduce((s, r) => s + count_(r.nonDriver), 0)}</td>
-              <td class='num'>${viewCompanyRows.reduce((s, r) => s + count_(r.total), 0)}</td>
+              <td class='num'>${fmt_(viewCompanyRows.reduce((s, r) => s + count_(r.driver), 0))}</td>
+              <td class='num'>${fmt_(viewCompanyRows.reduce((s, r) => s + count_(r.nonDriver), 0))}</td>
+              <td class='num'>${fmt_(viewCompanyRows.reduce((s, r) => s + count_(r.total), 0))}</td>
             </tr>
           </tbody>
         </table>
@@ -503,9 +521,10 @@
         ${statHtml_('景品交換', count_(data.prizeExchangeCount), '回', '交換処理回数')}
         ${statHtml_('交換済み景品', count_(data.prizeItemCount), '個', '配布個数')}
         ${statHtml_('記録ブース', boothRows.length, '件', 'スタンプ取得あり')}
+        ${statHtml_('QR読取企業', viewCompanyRows.length, '社', '読み取り記録あり')}
       </div>
-      ${sectionHtml_('ブース別スタンプ取得数', boothTableHtml)}
-      ${sectionHtml_('企業別QR読み取り', viewCompanyHtml)}`;
+      ${sectionHtml_('ブース別スタンプ取得数', boothTableHtml, { foldable: true, open: true })}
+      ${sectionHtml_('企業別QR読み取り', viewCompanyHtml, { foldable: true, open: true })}`;
 
     // ── 学生属性 ──
     const attributes = data.attributes;
@@ -531,7 +550,7 @@
           ${attributeBlockHtml_('学年', yearRows, false)}
           ${attributeBlockHtml_('住所（都道府県）', prefectureRows, false)}
           ${attributeBlockHtml_('学部学科（自動分類）', facultyRows, true)}
-        </div>`);
+        </div>`, { foldable: true, open: false });
     })();
 
     // ── 運用データ（弁当の未消化・記録が無い学生） ──
@@ -548,19 +567,19 @@
                 <th colspan='2' scope='colgroup'>弁当なし</th>
               </tr>
               <tr>
-                <th class='num' scope='col'>操作あり</th>
-                <th class='num' scope='col'>操作なし<span class='th-sub'>弁当が余る</span></th>
-                <th class='num' scope='col'>操作あり<span class='th-sub'>案内未読か</span></th>
-                <th class='num' scope='col'>操作なし</th>
+                <th class='num' scope='col'>アクションあり</th>
+                <th class='num' scope='col'>アクションなし<span class='th-sub'>弁当が余る</span></th>
+                <th class='num' scope='col'>アクションあり<span class='th-sub'>案内未読か</span></th>
+                <th class='num' scope='col'>アクションなし</th>
               </tr>
             </thead>
             <tbody>
               ${lunch.map(row => `<tr>
                 <th scope='row'>${esc(dayLabel_(row.day))}</th>
-                <td class='num'>${count_(row.yesActive)}</td>
-                <td class='num'>${count_(row.yesIdle)}</td>
-                <td class='num'>${count_(row.noActive)}</td>
-                <td class='num'>${count_(row.noIdle)}</td>
+                <td class='num'>${fmt_(row.yesActive)}</td>
+                <td class='num'>${fmt_(row.yesIdle)}</td>
+                <td class='num'>${fmt_(row.noActive)}</td>
+                <td class='num'>${fmt_(row.noIdle)}</td>
               </tr>`).join('')}
             </tbody>
           </table>
@@ -570,17 +589,17 @@
       const driverDayTable = driverDays.length ? `
         <div class='tbl-wrap'>
           <table class='data-tbl' aria-label='選手の日別アクション有無'>
-            <thead><tr><th scope='col'>日程</th><th class='num' scope='col'>操作あり</th><th class='num' scope='col'>操作なし</th></tr></thead>
+            <thead><tr><th scope='col'>日程</th><th class='num' scope='col'>アクションあり</th><th class='num' scope='col'>アクションなし</th></tr></thead>
             <tbody>
               ${driverDays.map(row => `<tr>
                 <th scope='row'>${esc(dayLabel_(row.day))}</th>
-                <td class='num'>${count_(row.active)}</td>
-                <td class='num'>${count_(row.idle)}</td>
+                <td class='num'>${fmt_(row.active)}</td>
+                <td class='num'>${fmt_(row.idle)}</td>
               </tr>`).join('')}
               <tr class='total-row'>
                 <th scope='row'>全日程を通じて</th>
-                <td class='num'>${count_(ops.driversWithRecord)}</td>
-                <td class='num'>${count_(ops.driversNoRecord)}</td>
+                <td class='num'>${fmt_(ops.driversWithRecord)}</td>
+                <td class='num'>${fmt_(ops.driversNoRecord)}</td>
               </tr>
             </tbody>
           </table>
@@ -593,16 +612,16 @@
           （スタンプ開始・当日登録／スタンプ取得／QR読み取り）の記録が残ったかを掛け合わせています。
           読み方は次のとおりです。</p>
           <p class='sec-note'>
-            <strong>弁当あり × 操作なし</strong>… 欠席、または来場したが何も操作しなかった人。用意した弁当が余った可能性がある数です。<br>
-            <strong>弁当なし × 操作あり</strong>… 弁当を申し込まずに来場して操作した人。申込時の案内が読まれていない可能性があります。
+            <strong>弁当あり × アクションなし</strong>… 欠席、または来場したが何もアクションしなかった人。用意した弁当が余った可能性がある数です。<br>
+            <strong>弁当なし × アクションあり</strong>… 弁当を申し込まずに来場して操作した人。申込時の案内が読まれていない可能性があります。
           </p>
           <p class='sec-note'>対象は<strong>事前登録した選手以外</strong>です。当日登録者は弁当の設問自体を通っていないため含めていません。</p>
           ${lunchTable}
         </div>
         <div class='sub-block'>
-          <div class='sub-title'>選手の無操作者（日別）</div>
-          <p class='sec-note'>選手は出走のため必ず来場しています。したがってここでの「操作なし」は
-          <strong>来場したが何も操作しなかった人数</strong>です（欠席ではありません）。
+          <div class='sub-title'>選手のアクションなし（日別）</div>
+          <p class='sec-note'>選手は出走のため必ず来場しています。したがってここでの「アクションなし」は
+          <strong>来場したが何もアクションしなかった人数</strong>です（欠席ではありません）。
           来場者数では選手を一律加算しているため、この人数は来場者数には影響しません。</p>
           ${driverDayTable}
         </div>
@@ -610,7 +629,7 @@
           <div class='sub-title'>全開催日を通じて記録が無い学生</div>
           <p class='sec-note'>上の表が<strong>日ごと</strong>の数え方なのに対し、こちらは
           <strong>どの日にも</strong>1件も記録を残さなかった人だけを数えています。
-          片方の日だけ来場した学生は日別では「操作なし」に入りますが、こちらには入りません。
+          片方の日だけ来場した学生は日別では「アクションなし」に入りますが、こちらには入りません。
           そのため必ずこちらの方が小さい数になります。</p>
           <div class='tbl-wrap'>
             <table class='data-tbl' aria-label='全開催日を通じて記録が無い学生'>
@@ -618,23 +637,23 @@
               <tbody>
                 <tr>
                   <th scope='row'>応援（学生マスター登録者・選手を除く）</th>
-                  <td class='num'>${Math.max(0, count_(ops.registeredStudents) - count_(ops.driverIdCount))}</td>
-                  <td class='num'>${count_(ops.noRecordStudents)}</td>
+                  <td class='num'>${fmt_(Math.max(0, count_(ops.registeredStudents) - count_(ops.driverIdCount)))}</td>
+                  <td class='num'>${fmt_(ops.noRecordStudents)}</td>
                 </tr>
                 <tr>
                   <th scope='row'>選手</th>
-                  <td class='num'>${count_(ops.driverIdCount)}</td>
-                  <td class='num'>${count_(ops.driversNoRecord)}</td>
+                  <td class='num'>${fmt_(ops.driverIdCount)}</td>
+                  <td class='num'>${fmt_(ops.driversNoRecord)}</td>
                 </tr>
                 <tr class='total-row'>
                   <th scope='row'>合計</th>
-                  <td class='num'>${count_(ops.registeredStudents)}</td>
-                  <td class='num'>${count_(ops.noRecordStudents) + count_(ops.driversNoRecord)}</td>
+                  <td class='num'>${fmt_(ops.registeredStudents)}</td>
+                  <td class='num'>${fmt_(ops.noRecordStudents) + count_(ops.driversNoRecord)}</td>
                 </tr>
               </tbody>
             </table>
           </div>
-        </div>`);
+        </div>`, { foldable: true, open: true });
     })();
 
     // ── 大学別のアクション状況 ──
@@ -662,9 +681,9 @@
       return sectionHtml_('大学別のアクション状況', `
         <p class='sec-note'>学生マスターの登録者を大学ごとに集計しています。「アクションあり」は
         スタンプ開始・当日登録／スタンプ取得／企業によるQR読み取りのいずれかの記録が、
-        <strong>いずれかの開催日に</strong>あった人数です。無操作の多い順に並べています。</p>
-        <p class='sec-note'>この表が<strong>含まないもの</strong>: 来場したが何も操作しなかった人と、
-        そもそも来場しなかった人は区別できません。機器の不具合等で記録が残らなかった場合も無操作に入ります。
+        <strong>いずれかの開催日に</strong>あった人数です。アクションなしの多い順に並べています。</p>
+        <p class='sec-note'>この表が<strong>含まないもの</strong>: 来場したが何もアクションしなかった人と、
+        そもそも来場しなかった人は区別できません。機器の不具合等で記録が残らなかった場合もアクションなしに入ります。
         当日登録者は登録と同時に記録が残るため、登録した日は必ずアクションありになります。</p>
         <div class='tbl-wrap'>
           <table class='data-tbl' aria-label='大学別のアクション状況'>
@@ -673,28 +692,28 @@
               <th class='num' scope='col'>登録</th>
               <th class='num' scope='col'>うち選手</th>
               <th class='num' scope='col'>アクションあり</th>
-              <th class='num' scope='col'>無操作</th>
+              <th class='num' scope='col'>アクションなし</th>
               <th class='num' scope='col'>スタンプ<span class='th-sub'>延べ</span></th>
               <th class='num' scope='col'>QR<span class='th-sub'>件数</span></th>
             </tr></thead>
             <tbody>
               ${rows.map(r => `<tr>
                 <th scope='row'>${esc(r.name)}</th>
-                <td class='num'>${r.total}</td>
-                <td class='num'>${r.drivers}</td>
-                <td class='num'>${r.acted}</td>
-                <td class='num'>${r.idle}</td>
-                <td class='num'>${r.stamps}</td>
-                <td class='num'>${r.views}</td>
+                <td class='num'>${fmt_(r.total)}</td>
+                <td class='num'>${fmt_(r.drivers)}</td>
+                <td class='num'>${fmt_(r.acted)}</td>
+                <td class='num'>${fmt_(r.idle)}</td>
+                <td class='num'>${fmt_(r.stamps)}</td>
+                <td class='num'>${fmt_(r.views)}</td>
               </tr>`).join('')}
               <tr class='total-row'>
                 <th scope='row'>合計</th>
-                <td class='num'>${rows.reduce((s, r) => s + r.total, 0)}</td>
-                <td class='num'>${rows.reduce((s, r) => s + r.drivers, 0)}</td>
-                <td class='num'>${rows.reduce((s, r) => s + r.acted, 0)}</td>
-                <td class='num'>${rows.reduce((s, r) => s + r.idle, 0)}</td>
-                <td class='num'>${rows.reduce((s, r) => s + r.stamps, 0)}</td>
-                <td class='num'>${rows.reduce((s, r) => s + r.views, 0)}</td>
+                <td class='num'>${fmt_(rows.reduce((s, r) => s + r.total, 0))}</td>
+                <td class='num'>${fmt_(rows.reduce((s, r) => s + r.drivers, 0))}</td>
+                <td class='num'>${fmt_(rows.reduce((s, r) => s + r.acted, 0))}</td>
+                <td class='num'>${fmt_(rows.reduce((s, r) => s + r.idle, 0))}</td>
+                <td class='num'>${fmt_(rows.reduce((s, r) => s + r.stamps, 0))}</td>
+                <td class='num'>${fmt_(rows.reduce((s, r) => s + r.views, 0))}</td>
               </tr>
             </tbody>
           </table>
@@ -703,7 +722,8 @@
           <button class='act-btn act-btn-ghost' id='btn-csv-students' type='button'>学生ごとの明細をCSVで出力</button>
         </div>
         <p class='sec-note' style='margin-top:8px'>CSVには学生1人1行で、氏名・大学・学年・区分・登録種別・
-        日別のアクション有無・スタンプ数・QR件数・弁当希望が入ります。個人が特定できるデータのため取り扱いに注意してください。</p>`);
+        日別のアクション有無・スタンプ数・QR件数・弁当希望が入ります。個人が特定できるデータのため取り扱いに注意してください。</p>`,
+        { foldable: true, open: false });
     })();
 
     // ── 集計方法（既定は閉じる。印刷時は CSS で必ず展開される） ──
@@ -739,7 +759,17 @@
         </div>
       </div>`, { foldable: true, open: false });
 
+    // シート・列の欠落は「記録が0件」と見分けがつかないため、必ず画面に出す。
+    const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+    const warnHtml = !warnings.length ? '' : `
+      <div class='warn-box' role='alert'>
+        <div class='warn-title'>集計できていない項目があります</div>
+        <ul>${warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>
+        <p>該当箇所の数値は0件として表示されています。記録が無いのか、集計できていないのかを取り違えないでください。</p>
+      </div>`;
+
     body.innerHTML = `
+      ${warnHtml}
       <div class='ev-head'>
         <div class='ev-head-name'>${esc(event ? (event.name || eventId) : eventId)}</div>
         <div class='ev-head-meta'>
@@ -764,13 +794,25 @@
       return;
     }
     const res = await tryLogin_(adminKey_);
-    if (!res.ok) {
+    // ⚠ キーを消してよいのは「キーが違う」と分かったときだけ。
+    //   タイムアウトや通信エラーで消すと、電波が悪いだけで再ログインを強いられる
+    //   （2026-08-26 修正）。通信障害のときはアプリ画面のまま再読み込みを促す。
+    if (!res.ok && res.error === 'invalid_admin_key') {
       adminKey_ = '';
       localStorage.removeItem('fg_admin_key');
       showState('login');
       return;
     }
     showState('app');
+    if (!res.ok) {
+      const body = $('report-body');
+      body.innerHTML = stateHtml_(
+        `接続できませんでした: ${res.message || res.error || '不明なエラー'}`,
+        { retry: true }
+      );
+      $('btn-retry')?.addEventListener('click', () => loadEvents_());
+      return;
+    }
     await loadEvents_(res);
   })();
 })();

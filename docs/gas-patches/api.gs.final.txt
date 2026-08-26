@@ -3335,11 +3335,17 @@ function actionAdminGetAttendanceReport_(p) {
   const preData_ = (preSheet && preSheet.getLastRow() > 1) ? preSheet.getDataRange().getValues() : null;
   let driverCount = 0, fgDrivers = 0, womenDrivers = 0;
   const driverIds = new Set();
+  if (!preSheet) {
+    warnings.push('シート「' + SHEET.PRE_REG + '」が見つかりません。選手数・弁当の集計は0件になります。');
+  }
   if (preData_) {
     const pData = preData_;
     const pHdr  = pData[0].map(String);
     const catCol = pHdr.indexOf('参加区分');
     const sidCol = pHdr.indexOf('studentId');
+    // ⚠ 列が無いと「選手0人」という正常値に見えてしまうため必ず警告する。
+    if (catCol < 0) warnings.push('シート「' + SHEET.PRE_REG + '」に「参加区分」列がありません。選手を判定できないため選手数は0になります。');
+    if (sidCol < 0) warnings.push('シート「' + SHEET.PRE_REG + '」に「studentId」列がありません。選手と来場記録を突き合わせられません。');
     pData.slice(1).forEach(r => {
       const cat = String(r[catCol] || '');
       if (!isCompetingDriverCategory_(cat)) return;
@@ -3365,29 +3371,61 @@ function actionAdminGetAttendanceReport_(p) {
   const driverRecordByDay = {};
   days.forEach(d => { driverRecordByDay[d] = new Set(); });
 
-  const addRows = (sheetName, timeColName, sidColName, key) => {
+  // ⚠ ログシートは1回だけ読んで正規化配列にし、以降の集計で使い回す（2026-08-26 変更）。
+  //   以前は STAMP_LOG / VIEW_LOG を来場判定・活動記録・ブース別/企業別で
+  //   それぞれ読み直しており、1シートあたり3回 getDataRange していた。
+  // ⚠ シートや必須列が欠けている場合、黙って0件にせず warnings に積んで呼び出し元へ返す。
+  //   「本当に記録が無い」のか「集計できていない」のかを画面で区別するため。
+  const warnings = [];
+  const readLog_ = (sheetName, extraCols) => {
+    const out = { rows: [], ok: false };
     const sheet = ss.getSheetByName(sheetName);
-    if (!sheet || sheet.getLastRow() < 2) return;
+    if (!sheet) { warnings.push('シート「' + sheetName + '」が見つかりません。関連する集計は0件として表示されます。'); return out; }
+    out.ok = true;
+    if (sheet.getLastRow() < 2) return out;   // 行が無いのは正常（記録なし）
     const data = sheet.getDataRange().getValues();
     const hdr  = data[0].map(String);
-    const tCol = hdr.indexOf(timeColName);
-    const sCol = hdr.indexOf(sidColName);
-    if (tCol < 0 || sCol < 0) return;
+    const tCol = hdr.indexOf('時刻');
+    const sCol = hdr.indexOf('studentId');
+    if (tCol < 0 || sCol < 0) {
+      out.ok = false;
+      warnings.push('シート「' + sheetName + '」に「時刻」または「studentId」列がありません。関連する集計は0件として表示されます。');
+      return out;
+    }
+    const exIdx = (extraCols || []).map(n => {
+      const i = hdr.indexOf(n);
+      if (i < 0) warnings.push('シート「' + sheetName + '」に「' + n + '」列がありません。この列を使う集計は空欄になります。');
+      return i;
+    });
     data.slice(1).forEach(r => {
       const day = dayOf(r[tCol]);
-      if (!day || !byDay[day]) return; // 開催日外は無視
+      if (!day || !byDay[day]) return;        // 開催日外は無視
       const sid = String(r[sCol] || '');
       if (!sid) return;
+      const row = { day: day, sid: sid };
+      (extraCols || []).forEach((n, i) => {
+        row[n] = exIdx[i] >= 0 ? String(r[exIdx[i]] || '').trim() : '';
+      });
+      out.rows.push(row);
+    });
+    return out;
+  };
+  const participantsLog_ = readLog_(SHEET.STAMP_PARTICIPANTS);
+  const stampLog_        = readLog_(SHEET.STAMP_LOG, ['企業名']);
+  const viewLog_         = readLog_(SHEET.VIEW_LOG,  ['companyId']);
+
+  const addRows = (log, key) => {
+    log.rows.forEach(r => {
       // 選手は一律加算済みなので来場者数には入れない（二重計上を防ぐ）。
       // ただし記録が残っていること自体は控えておく。
-      if (driverIds.has(sid)) { driverRecordByDay[day].add(sid); return; }
-      byDay[day].add(sid);
-      bySource[day][key]++;
+      if (driverIds.has(r.sid)) { driverRecordByDay[r.day].add(r.sid); return; }
+      byDay[r.day].add(r.sid);
+      bySource[r.day][key]++;
     });
   };
-  addRows(SHEET.STAMP_PARTICIPANTS, '時刻',       'studentId', 'registration');
-  addRows(SHEET.STAMP_LOG,          '時刻',       'studentId', 'stamp');
-  addRows(SHEET.VIEW_LOG,           '時刻',       'studentId', 'view');
+  addRows(participantsLog_, 'registration');
+  addRows(stampLog_,        'stamp');
+  addRows(viewLog_,         'view');
 
   // ⚠ 選手（driverCount）は上の3方向の集計に混ざらないよう、対象シートには
   //   selectしていない点に注意。同一学生が選手かつ何らかの理由でスタンプ等に
@@ -3418,34 +3456,23 @@ function actionAdminGetAttendanceReport_(p) {
   // 運用上の分析価値があるため、選手／選手以外を分けて延べ回数と実人数を出す。
   // ⚠ ここでの区分は driverIds（＝事前登録の参加区分が出場選手）による。
   //   補欠ドライバーは選手以外に入る（isCompetingDriverCategory_ が false のため）。
-  // perSid を渡すと、学生ごとの件数も同じ走査で数える（シートの読み直しを避けるため）。
-  const countActivity_ = (sheetName, perSid) => {
+  // perSid を渡すと、学生ごとの件数も同じ走査で数える。
+  const countActivity_ = (log, perSid) => {
     const res = {
       driver:    { count: 0, users: new Set() },
       nonDriver: { count: 0, users: new Set() },
     };
-    const sheet = ss.getSheetByName(sheetName);
-    if (!sheet || sheet.getLastRow() < 2) return res;
-    const data = sheet.getDataRange().getValues();
-    const hdr  = data[0].map(String);
-    const tCol = hdr.indexOf('時刻');
-    const sCol = hdr.indexOf('studentId');
-    if (tCol < 0 || sCol < 0) return res;
-    data.slice(1).forEach(r => {
-      const day = dayOf(r[tCol]);
-      if (!day || !byDay[day]) return; // 開催日外は無視（来場者数の集計と揃える）
-      const sid = String(r[sCol] || '');
-      if (!sid) return;
-      if (perSid) perSid[sid] = (perSid[sid] || 0) + 1;
-      const bucket = driverIds.has(sid) ? res.driver : res.nonDriver;
+    log.rows.forEach(r => {
+      if (perSid) perSid[r.sid] = (perSid[r.sid] || 0) + 1;
+      const bucket = driverIds.has(r.sid) ? res.driver : res.nonDriver;
       bucket.count++;
-      bucket.users.add(sid);
+      bucket.users.add(r.sid);
     });
     return res;
   };
   const stampBySid_ = {}, viewBySid_ = {};   // 学生ごとの件数（大学別集計・CSV用）
-  const stampAct_ = countActivity_(SHEET.STAMP_LOG, stampBySid_);
-  const viewAct_  = countActivity_(SHEET.VIEW_LOG,  viewBySid_);
+  const stampAct_ = countActivity_(stampLog_, stampBySid_);
+  const viewAct_  = countActivity_(viewLog_,  viewBySid_);
   const actOut_   = a => ({ count: a.count, users: a.users.size });
 
   // ── 学生属性（開催報告書の Student Attribute 相当） ──
@@ -3471,6 +3498,11 @@ function actionAdminGetAttendanceReport_(p) {
   const studentSheet2 = ss.getSheetByName(SHEET.STUDENTS);
   const studentData_  = (studentSheet2 && studentSheet2.getLastRow() > 1)
     ? studentSheet2.getDataRange().getValues() : null;
+  if (!studentSheet2) {
+    warnings.push('シート「' + SHEET.STUDENTS + '」が見つかりません。学生属性・大学別集計は空になります。');
+  } else if (studentData_ && studentData_[0].map(String).indexOf('studentId') < 0) {
+    warnings.push('シート「' + SHEET.STUDENTS + '」に「studentId」列がありません。学生属性・大学別集計は空になります。');
+  }
   if (studentData_) {
     const sData = studentData_;
     const sHdr  = sData[0].map(String);
@@ -3500,31 +3532,15 @@ function actionAdminGetAttendanceReport_(p) {
   // docs/スタンプラリー参加学生集計結果.xlsm と同じ切り口:
   // 日別 × 企業ブース別 × 選手／応援 のスタンプ取得数（2026-08-25 追加）。
   const boothMap_ = {};
-  {
-    const sheet = ss.getSheetByName(SHEET.STAMP_LOG);
-    if (sheet && sheet.getLastRow() > 1) {
-      const data = sheet.getDataRange().getValues();
-      const hdr  = data[0].map(String);
-      const tCol = hdr.indexOf('時刻');
-      const sCol = hdr.indexOf('studentId');
-      const cCol = hdr.indexOf('企業名');
-      if (tCol >= 0 && sCol >= 0 && cCol >= 0) {
-        data.slice(1).forEach(r => {
-          const day = dayOf(r[tCol]);
-          if (!day || !byDay[day]) return; // 開催日外は無視
-          const sid = String(r[sCol] || '');
-          if (!sid) return;
-          const booth = String(r[cCol] || '').trim() || '(企業名なし)';
-          if (!boothMap_[booth]) {
-            boothMap_[booth] = {};
-            days.forEach(d => { boothMap_[booth][d] = { driver: 0, nonDriver: 0 }; });
-          }
-          const cell = boothMap_[booth][day];
-          if (driverIds.has(sid)) cell.driver++; else cell.nonDriver++;
-        });
-      }
+  stampLog_.rows.forEach(r => {
+    const booth = r['企業名'] || '(企業名なし)';
+    if (!boothMap_[booth]) {
+      boothMap_[booth] = {};
+      days.forEach(d => { boothMap_[booth][d] = { driver: 0, nonDriver: 0 }; });
     }
-  }
+    const cell = boothMap_[booth][r.day];
+    if (driverIds.has(r.sid)) cell.driver++; else cell.nonDriver++;
+  });
   const boothRows_ = Object.keys(boothMap_).map(name => {
     const perDay = days.map(d => {
       const c = boothMap_[name][d];
@@ -3542,6 +3558,7 @@ function actionAdminGetAttendanceReport_(p) {
   //   「明示的に 'FALSE' のときだけ出店なし」。列が無い・空欄なら出店中として扱う
   //   （stampRally 列を持たない既存イベントとの後方互換）。
   const coSheet2 = ss.getSheetByName(SHEET.COMPANIES);
+  if (!coSheet2) warnings.push('シート「' + SHEET.COMPANIES + '」が見つかりません。出展ブース数は0になります。');
   let companyCount = 0;
   const companyNames_ = {};   // companyId -> 企業名（QR読み取り集計の表示用）
   if (coSheet2 && coSheet2.getLastRow() > 1) {
@@ -3560,35 +3577,29 @@ function actionAdminGetAttendanceReport_(p) {
   }
 
   // ── 企業別のQR読み取り ──────────────────────────────
-  // ⚠ これは「延べ回数」ではなく実質「その企業が読み取った学生の実人数」。
-  //   企業QR経由(source='company_auto')は同一イベント×同一学生×同一企業の行を
-  //   増やさず時刻だけ更新する重複抑制が入っているため（actionSaveViewLog_ 参照）。
-  //   手動メール登録(source='manual_email')にはこの抑制が無いので厳密には混在する。
-  // ⚠ 同じ理由で日別に割ると「最後に読まれた日」に寄ってしまい実態と合わないため、
-  //   日別には割らずイベント通算で返す。
+  // 「その企業が読み取った学生の実人数」。企業×学生の組で重複排除して数える。
+  // ⚠ 行数を数えてはいけない（2026-08-26 修正）。actionSaveViewLog_ の重複抑制は
+  //   source='company_auto' のときだけで、手動メール登録(manual_email)には無い。
+  //   さらに company_auto でも「読んでから追記する」までロックを取らないため、
+  //   同時実行では重複行が残りうる。行数のままだと実人数より多く出て、
+  //   対外報告に使う値が膨らむ。ここで明示的に一意化しておく。
+  // ⚠ 日別には割らない。company_auto は再読み取り時に時刻だけ更新するため、
+  //   日で割ると「最後に読まれた日」に寄って実態と合わない。イベント通算で返す。
+  const viewPairs_ = {};   // companyId -> { driver:Set, nonDriver:Set }
+  viewLog_.rows.forEach(r => {
+    const cid = r['companyId'];
+    if (!cid) return;
+    if (!viewPairs_[cid]) viewPairs_[cid] = { driver: new Set(), nonDriver: new Set() };
+    if (driverIds.has(r.sid)) viewPairs_[cid].driver.add(r.sid);
+    else viewPairs_[cid].nonDriver.add(r.sid);
+  });
   const viewByCompany_ = {};
-  {
-    const sheet = ss.getSheetByName(SHEET.VIEW_LOG);
-    if (sheet && sheet.getLastRow() > 1) {
-      const data = sheet.getDataRange().getValues();
-      const hdr  = data[0].map(String);
-      const tCol = hdr.indexOf('時刻');
-      const sCol = hdr.indexOf('studentId');
-      const cCol = hdr.indexOf('companyId');
-      if (tCol >= 0 && sCol >= 0 && cCol >= 0) {
-        data.slice(1).forEach(r => {
-          const day = dayOf(r[tCol]);
-          if (!day || !byDay[day]) return; // 開催日外は無視
-          const sid = String(r[sCol] || '');
-          const cid = String(r[cCol] || '').trim();
-          if (!sid || !cid) return;
-          if (!viewByCompany_[cid]) viewByCompany_[cid] = { driver: 0, nonDriver: 0 };
-          if (driverIds.has(sid)) viewByCompany_[cid].driver++;
-          else viewByCompany_[cid].nonDriver++;
-        });
-      }
-    }
-  }
+  Object.keys(viewPairs_).forEach(cid => {
+    viewByCompany_[cid] = {
+      driver:    viewPairs_[cid].driver.size,
+      nonDriver: viewPairs_[cid].nonDriver.size,
+    };
+  });
   const viewCompanyRows_ = Object.keys(viewByCompany_).map(cid => {
     const c = viewByCompany_[cid];
     return {
@@ -3791,6 +3802,7 @@ function actionAdminGetAttendanceReport_(p) {
       driverDays:         driverDayRows_,
     },
     students: studentRows_,
+    warnings: warnings,
     prizeItemCount,
     prizeExchangeCount,
   });

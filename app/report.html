@@ -32,7 +32,7 @@
   .login-card { background: #fff; border-radius: var(--radius-card); width: 100%; max-width: 360px;
                 box-shadow: var(--shadow-card); overflow: hidden; }
   .login-hd { background: #fff; padding: 18px 22px; border-bottom: 3px solid var(--fg-blue); }
-  .login-logo { height: 26px; width: auto; display: block; }
+  .login-logo { height: 34px; width: auto; display: block; }
   .login-sub { font-size: 11px; color: var(--fg-muted); margin-top: 3px; }
   .login-body { padding: 24px 22px 28px; }
   .login-label { font-size: 12px; font-weight: 600; display: block; margin-bottom: 5px; }
@@ -91,8 +91,9 @@
              box-shadow: var(--shadow-sm); overflow: hidden; }
   .section-hd { padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;
                 cursor: pointer; user-select: none; }
+  /* h2 を使うが、見た目は admin.html の .section-title（13px）に合わせる */
   .section-title { font-size: 13px; font-weight: 700; color: var(--fg-navy); display: flex;
-                   align-items: center; gap: 6px; }
+                   align-items: center; gap: 6px; margin: 0; }
   .section-toggle { font-size: 14px; color: var(--fg-muted); transition: transform .2s; flex-shrink: 0; }
   .section-toggle.open { transform: rotate(180deg); }
   .section-body { padding: 0 16px 14px; display: none; }
@@ -145,6 +146,14 @@
   .attr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
   .attr-grid .sub-block { margin-top: 0; }
   .attr-wide { grid-column: 1 / -1; }
+
+  /* 集計できていない項目の警告（シート・列の欠落） */
+  .warn-box { background: var(--fg-warning-bg); border: 1px solid var(--fg-warning-border);
+              border-radius: var(--radius-ui); padding: 12px 14px; margin-bottom: 14px; }
+  .warn-title { font-size: 12px; font-weight: 700; color: var(--fg-warning); margin-bottom: 6px; }
+  .warn-box ul { margin: 0 0 8px; padding-left: 18px; }
+  .warn-box li { font-size: 11px; color: var(--fg-warning); line-height: 1.7; }
+  .warn-box p { font-size: 11px; color: var(--fg-warning); line-height: 1.6; }
 
   .state-msg { padding: 48px 20px; color: var(--fg-muted); font-size: 13px; line-height: 1.7; text-align: center; }
   .state-msg .spinner { margin-bottom: 14px; }
@@ -217,14 +226,14 @@
 <div id="state-app" style="display:none">
   <header class="page-hd no-print">
     <a class="page-back" href="admin.html">← 管理画面</a>
-    <div class="page-title">開催報告</div>
+    <h1 class="page-title">開催報告</h1>
     <span class="page-hd-spacer"></span>
   </header>
 
   <main class="app-body">
     <div class="action-row no-print">
       <select id="ev-select" class="ev-select" aria-label="対象イベント"></select>
-      <button class="act-btn act-btn-ghost" id="btn-print" type="button">🖨 印刷</button>
+      <button class="act-btn act-btn-ghost" id="btn-print" type="button">印刷</button>
     </div>
 
     <div id="report-body">
@@ -235,6 +244,6 @@
 
 <script src="../js/config.js?v=20260724h"></script>
 <script src="../js/csv-util.js?v=20260825a"></script>
-<script src="../js/report.js?v=20260826e"></script>
+<script src="../js/report.js?v=20260826f"></script>
 </body>
 </html>
