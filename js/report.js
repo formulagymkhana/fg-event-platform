@@ -719,9 +719,13 @@
         const r = rate_(num, den);
         return `<td class='num'>${r.text}<span class='cell-sub'>${r.detail}</span></td>`;
       };
+      // ⚠ ここに「アクション記録あり（いずれか）」の率を置かないこと（2026-08-26 判断）。
+      //   3ソースのうち「スタンプ開始・当日登録」は activateStamp が MYPASS を開いた
+      //   時点でも呼ばれるため（js/mypass.js の restoreStampCookie_）、受付を通れば
+      //   ほぼ全員に付く。OR判定の率は常に100%近くになり指標として機能しない。
+      //   ブースでの行動はスタンプ取得とQR接点で見る。
       const rateRows = groups.map(([label, g]) => `<tr>
         <th scope='row'>${esc(label)}</th>
-        ${cell(g.filter(s => s.actedAny).length, g.length)}
         ${cell(g.filter(s => count_(s.stamps) > 0).length, g.length)}
         ${cell(g.filter(s => count_(s.views)  > 0).length, g.length)}
       </tr>`).join('');
@@ -766,10 +770,13 @@
 
       return sectionHtml_('アクション記録の集計', `
         <p class='sec-note'>「アクション記録あり」は、スタンプ開始・当日登録／スタンプ取得／
-        企業によるQR読み取りのいずれかの記録が存在することです。記録の有無は来場の有無と同一ではありません。</p>
+        企業によるQR読み取りの<strong>いずれか</strong>の記録が存在することです。記録の有無は来場の有無と同一ではありません。
+        3種類は性質が違うので、下の表では分けて出しています。</p>
         <p class='sec-note'><strong>選手と応援は分けて集計しています。</strong>選手は出走のため来場が確定しており
         「記録なし」は来場したが操作しなかったことを指します。応援は来場自体が記録経由でしか分からないため、
         「記録なし」が未来場なのか無操作なのかを区別できません。同じ率でも意味が違うので合算していません。</p>
+        <p class='sec-note'>下の「記録あり」は3種類のいずれかがあることを指し、受付でパス画面を開いた際に付く
+        「スタンプ開始」を含みます。ブースを回ったかどうかは、その下の表の「スタンプ取得」「QR接点」で見てください。</p>
         <p class='sec-note'>参考値として、選手全員＋記録がある応援を合わせた実人数は
         <strong>${fmt_(uniqueParticipants)}人</strong>です。イベント規模の目安であり、率の分母には使っていません。</p>
 
@@ -784,11 +791,18 @@
         </div>
 
         <div class='sub-block'>
-          <div class='sub-title'>記録あり率（区分別）</div>
+          <div class='sub-title'>ブースでの記録あり率（区分別）</div>
           <p class='sec-note'>分母は各区分の登録者数です。大きい数字が割合、小さい数字が分子/分母です。</p>
+          <p class='sec-note'>3種類の記録のうち<strong>「スタンプ開始・当日登録」はここに含めていません。</strong>
+          学生が自分のパス画面（MYPASS）を開いた時点でも記録が作られる仕組みのため、受付を通ればほぼ全員に付き、
+          率にすると常に100%近くになって指標として機能しないためです。上の「記録あり」はこの記録を含みます。</p>
           <div class='tbl-wrap'>
             <table class='data-tbl' aria-label='区分別の記録あり率'>
-              <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>アクション記録あり</th><th class='num' scope='col'>スタンプ記録あり</th><th class='num' scope='col'>QR接点記録あり</th></tr></thead>
+              <thead><tr>
+                <th scope='col'>区分</th>
+                <th class='num' scope='col'>スタンプ取得</th>
+                <th class='num' scope='col'>QR接点</th>
+              </tr></thead>
               <tbody>${rateRows}</tbody>
             </table>
           </div>
