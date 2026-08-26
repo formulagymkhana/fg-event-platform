@@ -1136,14 +1136,19 @@ async function loadStudents_(gen, ev) {
     filter?.addEventListener('change', renderStudentList_);
   }
   // 統計カードを更新
-  const pre    = studentData_.filter(s => s.regType === '事前').length;
-  const walkin = studentData_.filter(s => s.regType !== '事前').length;
+  // ⚠ `!== '事前'` で当日扱いにしないこと。登録種別が空欄・未知の学生まで当日に
+  //   算入され、開催報告の区分別集計と数が合わなくなる（2026-08-26 修正）。
+  //   GAS の normalizeRegType_ が 事前/当日/不明 の3値に正規化して返す。
+  const pre     = studentData_.filter(s => s.regType === '事前').length;
+  const walkin  = studentData_.filter(s => s.regType === '当日').length;
+  const unknown = studentData_.filter(s => s.regType !== '事前' && s.regType !== '当日').length;
+  const unkSuffix = unknown ? `（区分不明 ${unknown}名）` : '';
   setText_('student-count-step3',  studentData_.length);
   setText_('student-prereg-step3', pre);
   setText_('student-walkin-step3', walkin);
   // アコーディオンバッジを更新
   setText_('prereg-count', pre + '名');
-  setText_('walkin-count', walkin + '名');
+  setText_('walkin-count', walkin + '名' + unkSuffix);
 }
 
 function renderStudentList_() {
@@ -1164,7 +1169,7 @@ function renderStudentList_() {
     <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
       ${rows.map((s, i) => `
         <div style="padding:9px 12px;${i ? 'border-top:1px solid var(--border)' : ''};
-          background:${s.regType === '事前' ? '#fff' : '#EFF6FF'}">
+          background:${s.regType === '事前' ? '#fff' : (s.regType === '当日' ? '#EFF6FF' : '#FFF7E6')}">
           <div style="display:grid;grid-template-columns:1fr auto;align-items:center;margin-bottom:4px">
             <div>
               <div style="font-size:13px;font-weight:600;color:var(--navy)">${esc_(s.name)}
@@ -1175,9 +1180,9 @@ function renderStudentList_() {
             <div style="display:flex;align-items:center;gap:6px">
               <button class="copy-btn stu-edit-btn" data-sid="${esc_(s.studentId)}" style="font-size:10px;padding:2px 8px">編集</button>
               <span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;
-                background:${s.regType === '事前' ? '#F3F4F6' : '#DBEAFE'};
-                color:${s.regType === '事前' ? '#6B7280' : '#1E40AF'}">
-                ${s.regType === '事前' ? '事前登録' : '当日'}
+                background:${s.regType === '事前' ? '#F3F4F6' : (s.regType === '当日' ? '#DBEAFE' : '#FFE0A3')};
+                color:${s.regType === '事前' ? '#6B7280' : (s.regType === '当日' ? '#1E40AF' : '#8A5A00')}">
+                ${s.regType === '事前' ? '事前登録' : (s.regType === '当日' ? '当日' : '区分不明')}
               </span>
             </div>
           </div>
@@ -2173,7 +2178,7 @@ function renderUniList_(res) {
     if (cat === '補欠ドライバー') r.spectator++;
     else if (cat.includes('ドライバー')) r.driver++;
     else if (s.regType === '当日') r.walkin++;
-    else r.spectator++; // メカニック・応援学生 とその他事前 → 見学枠でまとめる
+    else r.spectator++; // メカニック・応援学生・区分不明 → 見学枠でまとめる
   });
   const sorted = [...uniMap.entries()].sort((a, b) =>
     a[0].localeCompare(b[0], 'ja-JP', { sensitivity: 'base' }));

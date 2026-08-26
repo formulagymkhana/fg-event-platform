@@ -687,18 +687,27 @@
     //   よって 選手 / 応援(事前登録) / 応援(当日登録) の3区分で出す。
     const allStudents = Array.isArray(data.students) ? data.students : [];
     const metricsHtml = !allStudents.length ? '' : (() => {
+      // ⚠ 登録種別は GAS の normalizeRegType_ で 事前/当日/不明 の3値に正規化済み。
+      //   ここで `!== '事前'` のような判定をしないこと。空欄を当日登録に寄せると、
+      //   当日登録の率（定義上100%）が汚れて読めなくなる（2026-08-26 修正）。
       const drivers = allStudents.filter(s => s.isDriver);
-      const supPre  = allStudents.filter(s => !s.isDriver && String(s.regType) === '事前');
-      const supDay  = allStudents.filter(s => !s.isDriver && String(s.regType) !== '事前');
+      const supPre  = allStudents.filter(s => !s.isDriver && s.regType === '事前');
+      const supDay  = allStudents.filter(s => !s.isDriver && s.regType === '当日');
+      const supUnk  = allStudents.filter(s => !s.isDriver && s.regType !== '事前' && s.regType !== '当日');
+      // ⚠ supports は下の perPersonRows / dayCountRows / bucketRows から参照するので、
+      //   必ずここで宣言しておくこと（const の TDZ で ReferenceError になる）。
+      const supports = supPre.concat(supDay).concat(supUnk);
       const groups = [
         ['選手', drivers, '事前登録の出場選手。出走のため来場は確定'],
         ['応援・事前登録', supPre, '記録なしは未来場と無操作を区別できない'],
         ['応援・当日登録', supDay, '登録と同時に記録が付くため定義上100%'],
+        ['区分不明', supUnk, '登録種別が事前・当日のどちらでもない'],
       ];
       // 規模の目安。率の分母には使わない（区分ごとに分母が異なるため）。
       const uniqueParticipants = drivers.length
         + supPre.filter(s => s.actedAny).length
-        + supDay.filter(s => s.actedAny).length;
+        + supDay.filter(s => s.actedAny).length
+        + supUnk.filter(s => s.actedAny).length;
 
       const countRows = groups.map(([label, g, note]) => {
         const a = g.filter(s => s.actedAny).length;
@@ -740,13 +749,12 @@
           <td class='num'>${values.length ? fmt_(Math.max.apply(null, values)) : '—'}</td>
           <td class='num'>${fmt_(values.length)}</td>
         </tr>`;
-      const perPersonRows = [['選手', drivers], ['応援', supPre.concat(supDay)]]
+      const perPersonRows = [['選手', drivers], ['応援', supports]]
         .map(([label, g]) =>
           statRow(label, 'スタンプ数', g.map(s => count_(s.stamps)).filter(v => v > 0)) +
           statRow(label, '接点企業数', g.map(s => count_(s.views)).filter(v => v > 0))
         ).join('');
 
-      const supports = supPre.concat(supDay);
       const dayCountRows = days.map((_, i) => i + 1).concat([0]).sort((a, b) => a - b)
         .map(n => {
           const dv = drivers.filter(s => (s.days || []).filter(d => d.acted).length === n).length;

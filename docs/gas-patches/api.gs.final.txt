@@ -3301,6 +3301,18 @@ function classifyFaculty_(raw) {
   return 'その他';
 }
 
+// 登録種別を 事前 / 当日 / 不明 の3値に正規化する（2026-08-26 追加）。
+// ⚠ 空欄や未知の値を「当日」に寄せないこと。以前は開催報告・学生管理・大学別内訳で
+//   判定がばらばら（'' のまま / 既定値'当日' / !== '事前' で当日 / === '当日' のみ当日）で、
+//   同じ学生が画面ごとに別区分に見えていた。判定はこの関数に集約する。
+// ⚠ 「不明」は当日登録の記録あり率（定義上100%）を汚すため、必ず独立した区分として扱う。
+function normalizeRegType_(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (s === '事前') return '事前';
+  if (s === '当日') return '当日';
+  return '不明';
+}
+
 function actionAdminGetAttendanceReport_(p) {
   const e = validateAdmin_(p);
   if (e) return e;
@@ -3323,6 +3335,13 @@ function actionAdminGetAttendanceReport_(p) {
   for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
     days.push(Utilities.formatDate(d, tz, 'yyyy/MM/dd'));
   }
+
+  // ⚠ warnings は関数の最初の方で宣言すること（2026-08-26 修正）。
+  //   以前はログ読み込みの直前で宣言していたが、その前にある事前登録シートの
+  //   欠落チェックから push しており、実際に欠落すると const の TDZ で
+  //   ReferenceError になっていた。dispatch_ の catch に落ちて server_error になり、
+  //   「警告を出したい場面でだけ機能しない」状態だった。
+  const warnings = [];
 
   // ── 選手（確定・両日一律加算） ──────────────────────
   // driverIds は「選手以外」の集計から選手を除外するために使う。
@@ -3376,7 +3395,6 @@ function actionAdminGetAttendanceReport_(p) {
   //   それぞれ読み直しており、1シートあたり3回 getDataRange していた。
   // ⚠ シートや必須列が欠けている場合、黙って0件にせず warnings に積んで呼び出し元へ返す。
   //   「本当に記録が無い」のか「集計できていない」のかを画面で区別するため。
-  const warnings = [];
   const readLog_ = (sheetName, extraCols) => {
     const out = { rows: [], ok: false };
     const sheet = ss.getSheetByName(sheetName);
@@ -3720,6 +3738,7 @@ function actionAdminGetAttendanceReport_(p) {
     }
   }
 
+  let unknownRegCount_ = 0;   // 登録種別が 事前/当日 のどちらでもない学生
   const studentRows_ = [];
   if (studentData_) {
     const sHdr   = studentData_[0].map(String);
@@ -3740,13 +3759,15 @@ function actionAdminGetAttendanceReport_(p) {
           acted: isDriver ? driverRecordByDay[day].has(sid) : byDay[day].has(sid),
         }));
         const lunch = lunchBySid_[sid] || { sat: '', sun: '' };
+        const regType = normalizeRegType_(regCol >= 0 ? r[regCol] : '');
+        if (!isDriver && regType === '不明') unknownRegCount_++;
         studentRows_.push({
           studentId: sid,
           name:      nameCol >= 0 ? String(r[nameCol] || '') : '',
           school:    schCol  >= 0 ? String(r[schCol]  || '') : '',
           year:      yrCol   >= 0 ? String(r[yrCol]   || '') : '',
           attribute: attrCol >= 0 ? String(r[attrCol] || '') : '',
-          regType:   regCol  >= 0 ? String(r[regCol]  || '') : '',
+          regType:   regType,
           isDriver:  isDriver,
           days:      perDay,
           actedAny:  perDay.some(d => d.acted),
@@ -3780,6 +3801,11 @@ function actionAdminGetAttendanceReport_(p) {
     const pRows    = pData.slice(1).filter(r => String(r[pEvCol]) === String(p.event));
     prizeExchangeCount = pRows.length;
     prizeItemCount = pRows.reduce((sum, r) => sum + (pCntCol >= 0 ? Number(r[pCntCol]) || 1 : 1), 0);
+  }
+
+  if (unknownRegCount_ > 0) {
+    warnings.push('登録種別が「事前」「当日」のどちらでもない学生が' + unknownRegCount_ +
+      '名います。区分不明として独立集計しており、当日登録には含めていません。');
   }
 
   return ok_({
@@ -3840,7 +3866,7 @@ function actionAdminGetStudents_(p) {
       school:     g(r, '大学名'),
       year:       g(r, '学年'),
       category:   g(r, '属性'),
-      regType:    String(g(r, '登録種別') || '当日'),
+      regType:    normalizeRegType_(g(r, '登録種別')),
       email:      g(r, 'メールアドレス'),
     }));
   return ok_({ students });
