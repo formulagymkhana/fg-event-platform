@@ -516,35 +516,80 @@
       const lunch = Array.isArray(ops.lunch) ? ops.lunch : [];
       const lunchTable = lunch.length ? `
         <div class='tbl-wrap'>
-          <table class='data-tbl' aria-label='弁当希望と来場記録の突き合わせ'>
-            <thead><tr><th scope='col'>日程</th><th class='num' scope='col'>弁当を希望</th><th class='num' scope='col'>うち来場記録なし</th></tr></thead>
+          <table class='data-tbl cross-tbl' aria-label='弁当希望とアクション有無のクロス集計'>
+            <thead>
+              <tr>
+                <th rowspan='2' scope='col'>日程</th>
+                <th colspan='2' scope='colgroup'>弁当あり</th>
+                <th colspan='2' scope='colgroup'>弁当なし</th>
+              </tr>
+              <tr>
+                <th class='num' scope='col'>操作あり</th>
+                <th class='num' scope='col'>操作なし<span class='th-sub'>弁当が余る</span></th>
+                <th class='num' scope='col'>操作あり<span class='th-sub'>案内未読か</span></th>
+                <th class='num' scope='col'>操作なし</th>
+              </tr>
+            </thead>
             <tbody>
               ${lunch.map(row => `<tr>
                 <th scope='row'>${esc(dayLabel_(row.day))}</th>
-                <td class='num'>${count_(row.requested)}</td>
-                <td class='num'>${count_(row.absent)}</td>
+                <td class='num'>${count_(row.yesActive)}</td>
+                <td class='num'>${count_(row.yesIdle)}</td>
+                <td class='num'>${count_(row.noActive)}</td>
+                <td class='num'>${count_(row.noIdle)}</td>
               </tr>`).join('')}
             </tbody>
           </table>
         </div>` : "<p class='empty-msg'>弁当希望の記録はありません</p>";
 
+      const driverDays = Array.isArray(ops.driverDays) ? ops.driverDays : [];
+      const driverDayTable = driverDays.length ? `
+        <div class='tbl-wrap'>
+          <table class='data-tbl' aria-label='選手の日別アクション有無'>
+            <thead><tr><th scope='col'>日程</th><th class='num' scope='col'>操作あり</th><th class='num' scope='col'>操作なし</th></tr></thead>
+            <tbody>
+              ${driverDays.map(row => `<tr>
+                <th scope='row'>${esc(dayLabel_(row.day))}</th>
+                <td class='num'>${count_(row.active)}</td>
+                <td class='num'>${count_(row.idle)}</td>
+              </tr>`).join('')}
+              <tr class='total-row'>
+                <th scope='row'>全日程を通じて</th>
+                <td class='num'>${count_(ops.driversWithRecord)}</td>
+                <td class='num'>${count_(ops.driversNoRecord)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>` : "<p class='empty-msg'>選手の記録はありません</p>";
+
       return sectionHtml_('運用データ', `
         <div class='sub-block'>
-          <div class='sub-title'>弁当の未消化（応援のみ）</div>
-          <p class='sec-note'>事前登録で弁当を希望したのに、<strong>その日の</strong>来場記録が無かった学生の数です。
-          用意した弁当が余るリスクの目安になります。選手は弁当希望を取らず来場も一律扱いのため対象外です。</p>
+          <div class='sub-title'>弁当希望 × アクションの有無（応援・日別）</div>
+          <p class='sec-note'>事前登録で弁当を希望したかどうかと、<strong>その日に</strong>何らかの操作
+          （スタンプ開始・当日登録／スタンプ取得／QR読み取り）の記録が残ったかを掛け合わせています。
+          読み方は次のとおりです。</p>
+          <p class='sec-note'>
+            <strong>弁当あり × 操作なし</strong>… 欠席、または来場したが何も操作しなかった人。用意した弁当が余った可能性がある数です。<br>
+            <strong>弁当なし × 操作あり</strong>… 弁当を申し込まずに来場して操作した人。申込時の案内が読まれていない可能性があります。
+          </p>
+          <p class='sec-note'>対象は<strong>事前登録した選手以外</strong>です。当日登録者は弁当の設問自体を通っていないため含めていません。</p>
           ${lunchTable}
-          <p class='sec-note' style='margin-top:8px'>※これは<strong>日ごと</strong>の数え方です。片方の日だけ来場した学生は、
-          来なかった日の「来場記録なし」に入ります。下の「記録が無い学生」は全開催日を通じて1件も記録が無い人だけなので、
-          こちらより小さい数になります。</p>
         </div>
         <div class='sub-block'>
-          <div class='sub-title'>記録が無い学生（全開催日を通じて）</div>
-          <p class='sec-note'>スタンプ開始・当日登録・スタンプ取得・QR読み取りの
-          いずれの記録も、<strong>どの日にも</strong>残さなかった学生です。実際に来場していても判別できないため、
-          応援については来場者数に含めていません。選手は一律加算しているため、選手の人数は来場者数には影響しません。</p>
+          <div class='sub-title'>選手の無操作者（日別）</div>
+          <p class='sec-note'>選手は出走のため必ず来場しています。したがってここでの「操作なし」は
+          <strong>来場したが何も操作しなかった人数</strong>です（欠席ではありません）。
+          来場者数では選手を一律加算しているため、この人数は来場者数には影響しません。</p>
+          ${driverDayTable}
+        </div>
+        <div class='sub-block'>
+          <div class='sub-title'>全開催日を通じて記録が無い学生</div>
+          <p class='sec-note'>上の表が<strong>日ごと</strong>の数え方なのに対し、こちらは
+          <strong>どの日にも</strong>1件も記録を残さなかった人だけを数えています。
+          片方の日だけ来場した学生は日別では「操作なし」に入りますが、こちらには入りません。
+          そのため必ずこちらの方が小さい数になります。</p>
           <div class='tbl-wrap'>
-            <table class='data-tbl' aria-label='記録が無い学生'>
+            <table class='data-tbl' aria-label='全開催日を通じて記録が無い学生'>
               <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>対象</th><th class='num' scope='col'>記録なし</th></tr></thead>
               <tbody>
                 <tr>

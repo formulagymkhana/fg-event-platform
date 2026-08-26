@@ -3359,9 +3359,11 @@ function actionAdminGetAttendanceReport_(p) {
   days.forEach(d => { bySource[d] = { registration: 0, stamp: 0, view: 0 }; });
 
   // 選手のうち、実際に何らかの記録（スタンプ開始・当日登録／スタンプ／QR読み取り）が
-  // 残っている人の studentId。来場者数の集計には使わない（選手は一律加算のまま）が、
-  // 「選手で何も操作しなかった人数」を出すために別途ためておく（2026-08-26 追加）。
-  const driverRecordIds = new Set();
+  // 残っている人の studentId を日別にためておく（2026-08-26 追加）。
+  // 来場者数の集計には使わない（選手は一律加算のまま）。
+  // ⚠ 選手は必ず来場している前提なので、ここで記録が無い＝「来場したが何も操作しなかった」。
+  const driverRecordByDay = {};
+  days.forEach(d => { driverRecordByDay[d] = new Set(); });
 
   const addRows = (sheetName, timeColName, sidColName, key) => {
     const sheet = ss.getSheetByName(sheetName);
@@ -3378,7 +3380,7 @@ function actionAdminGetAttendanceReport_(p) {
       if (!sid) return;
       // 選手は一律加算済みなので来場者数には入れない（二重計上を防ぐ）。
       // ただし記録が残っていること自体は控えておく。
-      if (driverIds.has(sid)) { driverRecordIds.add(sid); return; }
+      if (driverIds.has(sid)) { driverRecordByDay[day].add(sid); return; }
       byDay[day].add(sid);
       bySource[day][key]++;
     });
@@ -3606,6 +3608,11 @@ function actionAdminGetAttendanceReport_(p) {
     if (w === 0) return '弁当_日';
     return null;
   };
+  // 弁当希望(はい/いいえ) × その日のアクション有無 のクロス集計（2026-08-26 変更）。
+  //   lunchYesIdle … 弁当ありなのに無操作 ＝ 欠席、または来場したが何も操作しなかった人
+  //   lunchNoActive … 弁当なしなのに来場して操作している ＝ 申込時の案内を読んでいない可能性
+  // ⚠ 母集団は「事前登録シートにいる選手以外」。当日登録者は弁当の設問自体を通っていないため
+  //   含めない（含めると lunchNoActive が当日登録者で埋まって意味をなさなくなる）。
   const lunchRows_ = [];
   if (preData_) {
     const pHdr   = preData_[0].map(String);
@@ -3614,17 +3621,34 @@ function actionAdminGetAttendanceReport_(p) {
       const colName = lunchColOfDay_(day);
       const col = colName ? pHdr.indexOf(colName) : -1;
       if (col < 0 || sidCol < 0) return;
-      let requested = 0, absent = 0;
+      let yesActive = 0, yesIdle = 0, noActive = 0, noIdle = 0;
       preData_.slice(1).forEach(r => {
         const sid = String(r[sidCol] || '');
-        if (!sid || driverIds.has(sid)) return;              // 選手は対象外
-        if (String(r[col]).trim() !== 'はい') return;         // 弁当を希望していない
-        requested++;
-        if (!byDay[day].has(sid)) absent++;                  // その日の来場記録なし
+        if (!sid || driverIds.has(sid)) return;              // 選手は別枠で数える
+        const wantsLunch = String(r[col]).trim() === 'はい';
+        const acted      = byDay[day].has(sid);              // その日の記録の有無
+        if (wantsLunch && acted)  yesActive++;
+        else if (wantsLunch)      yesIdle++;
+        else if (acted)           noActive++;
+        else                      noIdle++;
       });
-      lunchRows_.push({ day: day, column: colName, requested: requested, absent: absent });
+      lunchRows_.push({
+        day: day, column: colName,
+        yesActive: yesActive, yesIdle: yesIdle,
+        noActive: noActive,   noIdle: noIdle,
+        requested: yesActive + yesIdle,   // 弁当を希望した人数
+        absent:    yesIdle,               // うち無操作（従来の「うち来場記録なし」）
+      });
     });
   }
+
+  // 選手の日別アクション有無。選手は必ず来場している前提なので、
+  // idle は「来場したが何も操作しなかった人数」として読める。
+  const driverDayRows_ = days.map(day => ({
+    day:    day,
+    active: driverRecordByDay[day].size,
+    idle:   Math.max(0, driverIds.size - driverRecordByDay[day].size),
+  }));
 
   // 登録はあるが、全開催日を通じて記録が一切ない学生（＝来場者数に計上されない人数）。
   // ⚠ 上の「弁当の未消化」は日別（その日に記録が無い）なのに対し、こちらは
@@ -3652,8 +3676,10 @@ function actionAdminGetAttendanceReport_(p) {
   // 来場者数では選手を一律加算しているため、この人数は来場者数には影響しない。
   // 分母は driverIds（＝studentId を持つ選手）。事前登録行に studentId が無い選手は
   // 突き合わせようがないため、driverCount ではなく driverIds.size を分母にしている。
-  const driverIdCount     = driverIds.size;
-  const driversWithRecord = driverRecordIds.size;
+  const driverIdCount = driverIds.size;
+  const driversAllDays = new Set();
+  days.forEach(d => driverRecordByDay[d].forEach(sid => driversAllDays.add(sid)));
+  const driversWithRecord = driversAllDays.size;
   const driversNoRecord   = Math.max(0, driverIdCount - driversWithRecord);
 
   // ── 景品（交換済み個数・交換回数） ──────────────────
@@ -3696,6 +3722,7 @@ function actionAdminGetAttendanceReport_(p) {
       driversWithRecord:  driversWithRecord,
       driversNoRecord:    driversNoRecord,
       lunch:              lunchRows_,
+      driverDays:         driverDayRows_,
     },
     prizeItemCount,
     prizeExchangeCount,

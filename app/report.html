@@ -136,6 +136,8 @@
   .booth-tbl thead .col-total { z-index: 4; background: var(--fg-navy); }
   .booth-tbl .total-row .col-booth, .booth-tbl .total-row .col-total { background: var(--fg-blue-soft); }
 
+  /* 2段ヘッダのクロス集計は狭い画面で潰れるので、最小幅を与えて横スクロールさせる */
+  .cross-tbl { min-width: 520px; }
   .attr-tbl { min-width: 340px; }
   .attr-detail { display: block; font-size: 9px; font-weight: 400; color: var(--fg-muted);
                  line-height: 1.55; margin-top: 4px; }
@@ -184,7 +186,7 @@
     .tbl-wrap { overflow: visible; }
     .data-tbl { font-size: 9px; }
     .data-tbl th, .data-tbl td, .data-tbl tbody th { padding: 5px 6px; }
-    .booth-tbl, .attr-tbl { min-width: 0; }
+    .booth-tbl, .attr-tbl, .cross-tbl { min-width: 0; }
     .booth-tbl .col-booth, .booth-tbl .col-total { position: static; }
     .attr-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
     .sec-note, .stat-sub, .attr-detail { color: #444; }
@@ -232,6 +234,6 @@
 </div>
 
 <script src="../js/config.js?v=20260724h"></script>
-<script src="../js/report.js?v=20260826c"></script>
+<script src="../js/report.js?v=20260826d"></script>
 </body>
 </html>
