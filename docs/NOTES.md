@@ -16,6 +16,35 @@
 
 ---
 
+## [確定] 開催報告（report.html）のデザイン方針と、画面・印刷の役割分担（2026-08-26 決定）
+
+**開催報告は「独立した帳票UI」ではなく、FG管理画面の一機能として見せる。**
+2026-08-25 に一度「運用レポート形式」（1枚の大きな `.report-sheet` に全集計を載せ、
+罫線で区切る帳票レイアウト）へ再構成したが、管理画面から開いたときに別アプリのように
+見えるため差し戻した。**情報設計（集計項目・区分・並び順）は維持し、外観だけを寄せている。**
+
+- **画面**: admin.html のサブページ。クラス構成・寸法・色を admin.html と揃える。
+  `.page-hd`(48px) / `.app-body`(max-width 960・padding 16px 24px 60px) /
+  `.action-row` / `.area-label` / `.stat-grid`+`.stat-card` / `.section` / `.data-tbl`。
+  イベント名は大見出しにせず、admin の `.ev-card-name` と同じ 15px。
+  イベント選択と印刷は上部の `.action-row` にまとめる。
+- **印刷**: 配布用の帳票。並び順・表・KPIはそのまま活かし、**影と面の背景だけを外す**。
+  折りたたみセクションは `@media print` で強制展開し、トグルと操作系は隠す。
+  そのため JS 側で開閉状態を触る必要はない（旧実装の `expandPrintDetails_` は撤去済み）。
+
+守るべき制約:
+
+- **カードを入れ子にしない。** KPI(`.stat-card`)は `.section` の外に直接置く
+  （admin.html のダッシュボードと同じ並べ方）。`.section` の中の小見出しは
+  `.sub-title`（admin の `.cfg-group-title` と同値）を使う。
+- **表は `.data-tbl` 準拠。** 縞模様・外枠・角丸は付けない。
+- **共通CSS(`js/style.css`)には手を入れない。** admin.html は `--navy`/`--gray`/`--border`
+  等のローカル別名を定義しているが実体は `--fg-*` なので、report.html では実体名を直接使う。
+  変更は report.html / report.js 内で完結させる。
+- **ブース表の固定列（`.col-booth` / `.col-total` の sticky）は維持する。**
+  列が多く横スクロールが前提のため、見やすさに直結する。印刷時のみ `position:static`。
+- **API・集計条件・入出力データを表示都合で変えない。**
+
 ## [却下] NFCラミネート裏へのスタンプ用QR追加（2026-08-25 検討・同日却下）
 - 提案: NFCの反応が悪いときの代替手段として、ブースのNFCタグのラミネート裏に
   スタンプ用QR（`stamp.html?ct=<stampKey>` のURL）を印刷する。

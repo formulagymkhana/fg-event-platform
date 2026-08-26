@@ -1,9 +1,15 @@
 /**
- * 開催報告ページ（2026-08-25 新設）。
+ * 開催報告ページ（2026-08-25 新設 / 2026-08-26 UIを管理画面へ寄せて再構成）。
  *
  * admin.html とは独立したページ。localStorage の fg_admin_key を共有するため、
  * admin.html でログイン済みならそのまま使える（未ログインならここでも入力できる）。
  * このページは書き込みを一切行わない（adminGetAttendanceReport は読み取り専用）。
+ *
+ * ⚠ 見た目の方針: 開催報告は「独立した帳票UI」ではなく admin.html の一機能として見せる。
+ *   マークアップは admin.html と同じクラス構成（.area-label / .stat-grid / .stat-card /
+ *   .section / .data-tbl）に揃えること。KPI は .section の外に置き、カードを入れ子にしない。
+ *   印刷だけは配布用の帳票として扱い、影と面の背景を落とす（CSS は app/report.html 側）。
+ * ⚠ API・集計条件・入出力データはこのファイルの表示都合で変えないこと。
  */
 (function () {
   const $ = id => document.getElementById(id);
@@ -18,7 +24,6 @@
   let adminKey_ = localStorage.getItem('fg_admin_key') || '';
   let events_ = [];
   let reportRequestId_ = 0;
-  let printDetailsState_ = null;
 
   async function call_(action, params) {
     const body = JSON.stringify({ action, adminKey: adminKey_, ...params });
@@ -90,25 +95,33 @@
     button.textContent = 'ログイン';
   });
 
-  function expandPrintDetails_() {
-    if (printDetailsState_) return;
-    const details = Array.from(document.querySelectorAll('.report-details'));
-    printDetailsState_ = details.map(item => ({ item, open: item.open }));
-    details.forEach(item => { item.open = true; });
+  // 印刷時の展開は CSS (@media print の .section-body{display:block}) が担当するので、
+  // ここでは開閉状態を触らずにそのまま印刷する。
+  $('btn-print')?.addEventListener('click', () => window.print());
+
+  // ── セクションの折りたたみ（admin.html と同じ挙動） ──
+  function toggleSection_(head) {
+    head.closest('.section')?.querySelector('.section-body')?.classList.toggle('open');
+    head.querySelector('.section-toggle')?.classList.toggle('open');
   }
 
-  function restorePrintDetails_() {
-    if (!printDetailsState_) return;
-    printDetailsState_.forEach(state => { state.item.open = state.open; });
-    printDetailsState_ = null;
+  function foldTarget_(target) {
+    const head = target.closest && target.closest('.section-hd');
+    if (!head) return null;
+    return head.closest('.section')?.classList.contains('no-fold') ? null : head;
   }
 
-  window.addEventListener('beforeprint', expandPrintDetails_);
-  window.addEventListener('afterprint', restorePrintDetails_);
-  $('btn-print')?.addEventListener('click', () => {
-    expandPrintDetails_();
-    window.print();
-    setTimeout(restorePrintDetails_, 0);
+  $('report-body')?.addEventListener('click', event => {
+    const head = foldTarget_(event.target);
+    if (head) toggleSection_(head);
+  });
+
+  $('report-body')?.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const head = foldTarget_(event.target);
+    if (!head) return;
+    event.preventDefault();
+    toggleSection_(head);
   });
 
   async function loadEvents_(prefetchedResponse) {
@@ -165,13 +178,28 @@
     return `${dt.getMonth() + 1}/${dt.getDate()}（${weekdays[dt.getDay()]}）`;
   }
 
-  function metricHtml_(label, value, unit, detail, primary) {
+  // ── admin.html の .stat-card と同じ表情のKPI ──
+  function statHtml_(label, value, unit, sub) {
     return `
-      <div class='metric${primary ? ' metric-primary' : ''}'>
-        <div class='metric-value'>${value == null ? '—' : esc(value)}<span class='metric-unit'>${esc(unit || '')}</span></div>
-        <div class='metric-label'>${esc(label)}</div>
-        ${detail ? `<div class='metric-detail'>${esc(detail)}</div>` : ''}
+      <div class='stat-card'>
+        <div class='stat-val'>${value == null ? '—' : esc(value)}${unit ? `<span class='stat-unit'>${esc(unit)}</span>` : ''}</div>
+        <div class='stat-lbl'>${esc(label)}</div>
+        ${sub ? `<div class='stat-sub'>${esc(sub)}</div>` : ''}
       </div>`;
+  }
+
+  // ── admin.html の .section と同じパネル ──
+  function sectionHtml_(title, inner, options) {
+    const opts = options || {};
+    const foldable = !!opts.foldable;
+    return `
+      <section class='section${foldable ? '' : ' no-fold'}'>
+        <div class='section-hd'${foldable ? " role='button' tabindex='0' aria-label='" + esc(title) + "の開閉'" : ''}>
+          <span class='section-title'>${esc(title)}</span>
+          <span class='section-toggle${foldable && opts.open ? ' open' : ''}'>▼</span>
+        </div>
+        <div class='section-body${foldable ? (opts.open ? ' open' : '') : ''}'>${inner}</div>
+      </section>`;
   }
 
   function activityCell_(activity, kind, group) {
@@ -226,13 +254,13 @@
     return visible;
   }
 
-  function comparisonTableHtml_(title, rows, wide) {
+  function attributeBlockHtml_(title, rows, wide) {
     const bodyRows = rows.length ? rows.map(row => {
       const details = row.driverDetail || row.supportDetail
-        ? `<div class='attr-detail'>
+        ? `<span class='attr-detail'>
             ${row.driverDetail ? `<span>選手：${esc(row.driverDetail)}</span>` : ''}
             ${row.supportDetail ? `<span>応援：${esc(row.supportDetail)}</span>` : ''}
-          </div>`
+          </span>`
         : '';
       return `
         <tr>
@@ -241,13 +269,13 @@
           <td class='num'>${row.support}</td>
           <td class='num'>${row.driver + row.support}</td>
         </tr>`;
-    }).join('') : "<tr><td colspan='4' class='empty-cell'>データなし</td></tr>";
+    }).join('') : "<tr><td colspan='4' class='empty-msg'>データなし</td></tr>";
 
     return `
-      <div class='attribute-block${wide ? ' attribute-block-wide' : ''}'>
-        <h3 class='attribute-title'>${esc(title)}</h3>
-        <div class='table-wrap'>
-          <table class='report-table attribute-table' aria-label='${esc(title)}の学生属性'>
+      <div class='sub-block${wide ? ' attr-wide' : ''}'>
+        <div class='sub-title'>${esc(title)}</div>
+        <div class='tbl-wrap'>
+          <table class='data-tbl attr-tbl' aria-label='${esc(title)}'>
             <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>選手</th><th class='num' scope='col'>応援</th><th class='num' scope='col'>合計</th></tr></thead>
             <tbody>${bodyRows}</tbody>
           </table>
@@ -290,6 +318,7 @@
 
     const byDay = data.byDay || {};
     const event = events_.find(item => String(item.eventId) === String(eventId));
+
     const dayRows = days.map(day => {
       const row = byDay[day] || {};
       return `
@@ -297,7 +326,7 @@
           <th scope='row'>${esc(dayLabel_(day))}</th>
           <td class='num'>${count_(row.drivers)}</td>
           <td class='num'>${count_(row.nonDrivers)}</td>
-          <td class='num'><strong>${count_(row.total)}</strong></td>
+          <td class='num'>${count_(row.total)}</td>
         </tr>`;
     }).join('');
 
@@ -327,46 +356,63 @@
     ].map(([label, stamp, view]) => `
       <tr>
         <th scope='row'>${label}</th>
-        <td class='num'>${stamp.count}<span class='sub'>${stamp.users}人</span></td>
-        <td class='num'>${view.count}<span class='sub'>${view.users}人</span></td>
+        <td class='num'>${stamp.count}<span class='cell-sub'>${stamp.users}人</span></td>
+        <td class='num'>${view.count}<span class='cell-sub'>${view.users}人</span></td>
       </tr>`).join('');
 
+    // ── 開催サマリー（KPIはセクションの外に置く＝カードを入れ子にしない） ──
     const summary = data.summary;
     const summaryHtml = !summary ? '' : (() => {
       const registeredDrivers = count_(summary.fgDrivers) + count_(summary.womenDrivers);
       return `
-        <section class='report-section'>
-          <div class='section-header'>
-            <div>
-              <h2>開催サマリー</h2>
-              <p class='section-note'>主要な成果を同じ基準で比較できるようにまとめています。</p>
-            </div>
-          </div>
-          <div class='metric-grid'>
-            ${metricHtml_('学生来場（延べ）', totalVisitors, '名', '概算', true)}
-            ${metricHtml_('出場選手', registeredDrivers, '名', `FG ${count_(summary.fgDrivers)} / 女子 ${count_(summary.womenDrivers)}`)}
-            ${metricHtml_('応援来場（延べ）', totalSupport, '名', '来場記録ベース')}
-            ${metricHtml_('出場校', count_(summary.schoolEntryCount), '校', '出場校エントリー')}
-            ${metricHtml_('出展ブース', count_(summary.companyCount), '社', '企業マスター')}
-          </div>
-          <div class='summary-foot'>
-            <span>来場学生の所属大学：${count_(summary.attendeeSchoolCount)}校</span>
-            <span>開催日数：${count_(summary.dayCount) || days.length}日間</span>
-          </div>
-        </section>`;
+        <div class='area-label'>開催サマリー</div>
+        <div class='stat-grid'>
+          ${statHtml_('学生来場（延べ）', totalVisitors, '名', '選手込みの概算')}
+          ${statHtml_('出場選手', registeredDrivers, '名', `FG ${count_(summary.fgDrivers)} / 女子 ${count_(summary.womenDrivers)}`)}
+          ${statHtml_('応援来場（延べ）', totalSupport, '名', '来場記録ベース')}
+          ${statHtml_('出場校', count_(summary.schoolEntryCount), '校', '出場校エントリー')}
+          ${statHtml_('出展ブース', count_(summary.companyCount), '社', '企業マスター')}
+          ${statHtml_('来場学生の所属大学', count_(summary.attendeeSchoolCount), '校', '応援のみの大学を含む')}
+        </div>`;
     })();
 
+    const attendanceHtml = sectionHtml_('来場状況', `
+      <p class='sec-note'>選手は登録ベース、応援は会場で確認できた来場記録ベースです。学生のみの日別の延べ人数で、企業スタッフ・一般来場者は含みません。</p>
+      <div class='tbl-wrap'>
+        <table class='data-tbl' aria-label='日別の学生来場者数'>
+          <thead>
+            <tr>
+              <th scope='col'>日程</th>
+              <th class='num' scope='col'>選手<span class='th-sub'>登録</span></th>
+              <th class='num' scope='col'>応援<span class='th-sub'>来場記録</span></th>
+              <th class='num' scope='col'>合計<span class='th-sub'>概算</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${dayRows}
+            <tr class='total-row'>
+              <th scope='row'>合計（延べ）</th>
+              <td class='num'>${totalDrivers}</td>
+              <td class='num'>${totalSupport}</td>
+              <td class='num'>${totalVisitors}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>`);
+
+    // ── スタンプラリー ──
     const booth = data.booth || {};
     const boothDays = Array.isArray(booth.days) && booth.days.length ? booth.days : days;
     const boothRows = Array.isArray(booth.rows) ? booth.rows : [];
     const boothTableHtml = boothRows.length ? `
-      <div class='table-wrap'>
-        <table class='report-table booth-table' aria-label='ブース別スタンプ取得数'>
+      <p class='sec-note'>企業ブースごとのスタンプ取得数です（取得数の多い順）。横にスクロールできます。</p>
+      <div class='tbl-wrap'>
+        <table class='data-tbl booth-tbl' aria-label='ブース別スタンプ取得数'>
           <thead>
             <tr>
-              <th rowspan='2' class='booth-name-col' scope='col'>ブース</th>
+              <th rowspan='2' class='col-booth' scope='col'>ブース</th>
               ${boothDays.map(day => `<th colspan='2' scope='colgroup'>${esc(dayLabel_(day))}</th>`).join('')}
-              <th rowspan='2' class='num booth-total-col' scope='col'>合計</th>
+              <th rowspan='2' class='num col-total' scope='col'>合計</th>
             </tr>
             <tr>${boothDays.map(() => "<th class='num' scope='col'>選手</th><th class='num' scope='col'>応援</th>").join('')}</tr>
           </thead>
@@ -374,50 +420,43 @@
             ${boothRows.map(row => {
               const cells = Array.isArray(row.days) ? row.days : [];
               return `<tr>
-                <th class='booth-name-col' scope='row'>${esc(row.name)}</th>
+                <th class='col-booth' scope='row'>${esc(row.name)}</th>
                 ${boothDays.map((_, index) => {
                   const cell = cells[index] || {};
                   return `<td class='num'>${count_(cell.driver)}</td><td class='num'>${count_(cell.nonDriver)}</td>`;
                 }).join('')}
-                <td class='num booth-total-col'><strong>${count_(row.total)}</strong></td>
+                <td class='num col-total'>${count_(row.total)}</td>
               </tr>`;
             }).join('')}
             <tr class='total-row'>
-              <th class='booth-name-col' scope='row'>合計</th>
+              <th class='col-booth' scope='row'>合計</th>
               ${boothDays.map((_, index) => {
                 const driverTotal = boothRows.reduce((sum, row) => sum + count_(((row.days || [])[index] || {}).driver), 0);
                 const supportTotal = boothRows.reduce((sum, row) => sum + count_(((row.days || [])[index] || {}).nonDriver), 0);
                 return `<td class='num'>${driverTotal}</td><td class='num'>${supportTotal}</td>`;
               }).join('')}
-              <td class='num booth-total-col'>${boothRows.reduce((sum, row) => sum + count_(row.total), 0)}</td>
+              <td class='num col-total'>${boothRows.reduce((sum, row) => sum + count_(row.total), 0)}</td>
             </tr>
           </tbody>
         </table>
-      </div>` : "<p class='empty-inline'>ブース別スタンプの記録はありません</p>";
+      </div>` : "<p class='empty-msg'>ブース別スタンプの記録はありません</p>";
 
     const stampCount = stampDriver.count + stampSupport.count;
     const stampUsers = stampDriver.users + stampSupport.users;
     const viewCount = viewDriver.count + viewSupport.count;
     const viewUsers = viewDriver.users + viewSupport.users;
     const rallyHtml = `
-      <section class='report-section'>
-        <div class='section-header'>
-          <div>
-            <h2>スタンプラリー</h2>
-            <p class='section-note'>取得状況、企業ブースごとの接点、景品交換をまとめて確認できます。</p>
-          </div>
-          <p class='section-side-note'>回数は延べ<br>人数は重複なし</p>
-        </div>
-        <div class='metric-grid rally-metrics'>
-          ${metricHtml_('スタンプ取得', stampCount, '回', `${stampUsers}人`, true)}
-          ${metricHtml_('QR読み取り', viewCount, '回', `${viewUsers}人`)}
-          ${metricHtml_('景品交換', count_(data.prizeExchangeCount), '回', '交換処理回数')}
-          ${metricHtml_('交換済み景品', count_(data.prizeItemCount), '個', '配布個数')}
-          ${metricHtml_('記録ブース', boothRows.length, '件', 'スタンプ取得あり')}
-        </div>
-        ${boothTableHtml}
-      </section>`;
+      <div class='area-label'>スタンプラリー</div>
+      <div class='stat-grid'>
+        ${statHtml_('スタンプ取得', stampCount, '回', `${stampUsers}人`)}
+        ${statHtml_('QR読み取り', viewCount, '回', `${viewUsers}人`)}
+        ${statHtml_('景品交換', count_(data.prizeExchangeCount), '回', '交換処理回数')}
+        ${statHtml_('交換済み景品', count_(data.prizeItemCount), '個', '配布個数')}
+        ${statHtml_('記録ブース', boothRows.length, '件', 'スタンプ取得あり')}
+      </div>
+      ${sectionHtml_('ブース別スタンプ取得数', boothTableHtml)}`;
 
+    // ── 学生属性 ──
     const attributes = data.attributes;
     const YEAR_ORDER = ['大学1年生', '大学2年生', '大学3年生', '大学4年生', '大学院生', 'その他', '未回答'];
     const FACULTY_ORDER = ['理工学系', '人文・社会経済系', 'その他', '未回答'];
@@ -435,110 +474,62 @@
         supportDetails: support.facultiesDetail,
       });
 
-      return `
-        <section class='report-section'>
-          <div class='section-header'>
-            <div>
-              <h2>学生属性</h2>
-              <p class='section-note'>選手と、来場記録のある応援学生を同じ区分で比較しています。</p>
-            </div>
-            <p class='section-side-note'>住所は登録フォームの<br>住所（都道府県）</p>
-          </div>
-          <div class='attribute-grid'>
-            ${comparisonTableHtml_('学年', yearRows, false)}
-            ${comparisonTableHtml_('住所（都道府県）', prefectureRows, false)}
-            ${comparisonTableHtml_('学部学科（自動分類）', facultyRows, true)}
-          </div>
-        </section>`;
+      return sectionHtml_('学生属性', `
+        <p class='sec-note'>選手と、来場記録のある応援学生を同じ区分で比較しています。区分と並び順は開催報告書に合わせています。学部学科は自由入力をキーワード分類した参考値で、入力内訳を併記しています。</p>
+        <div class='attr-grid'>
+          ${attributeBlockHtml_('学年', yearRows, false)}
+          ${attributeBlockHtml_('住所（都道府県）', prefectureRows, false)}
+          ${attributeBlockHtml_('学部学科（自動分類）', facultyRows, true)}
+        </div>`);
     })();
 
-    const methodologyHtml = `
-      <section class='report-section'>
-        <details class='report-details'>
-          <summary>集計方法・注意事項</summary>
-          <div class='details-body'>
-            <div class='details-copy'>
-              <p><strong>来場者数:</strong> 学生のみの概算で、企業スタッフ・一般来場者は含みません。
-              選手は来場予定日を取得していないため開催日すべてに一律加算し、応援はスタンプ開始・当日登録、
-              スタンプ取得、企業によるQR読み取りのいずれかがある学生を日別に重複なく数えます。
-              補欠ドライバーは選手への入れ替わりがない限り応援として扱います。</p>
-              <p><strong>延べ人数:</strong> 同じ学生が複数日来場した場合、日別合計では日数分を数えます。
-              来場記録が一切ない応援学生は、実際に来場していても判別できないため含みません。</p>
-              <p><strong>学生属性:</strong> 選手と来場記録のある応援学生が対象です。学年は自由記述から
-              大学院生を補正し、短期大学・専門学校・自動車大学校は「その他」に含めます。
-              学部学科は自由入力をキーワード分類した参考値で、入力内訳を併記しています。</p>
-            </div>
-            <div class='audit-grid'>
-              <div class='audit-block'>
-                <h3>応援の来場判定に使用した記録</h3>
-                <div class='table-wrap'>
-                  <table class='report-table audit-table' aria-label='応援の来場判定に使用した記録'>
-                    <thead><tr><th scope='col'>日程</th><th class='num' scope='col'>開始・当日登録</th><th class='num' scope='col'>スタンプ</th><th class='num' scope='col'>QR読み取り</th></tr></thead>
-                    <tbody>${sourceRows}</tbody>
-                  </table>
-                </div>
-                <p class='section-note'>同じ学生が複数列に入るため、列の合計は応援来場者数と一致しません。</p>
-              </div>
-              <div class='audit-block'>
-                <h3>活動記録の選手・応援内訳</h3>
-                <div class='table-wrap'>
-                  <table class='report-table audit-table' aria-label='活動記録の選手と応援の内訳'>
-                    <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>スタンプ取得</th><th class='num' scope='col'>QR読み取り</th></tr></thead>
-                    <tbody>${activityRows}</tbody>
-                  </table>
-                </div>
-                <p class='section-note'>大きい数字は延べ回数、小さい数字はその記録を持つ実人数です。</p>
-              </div>
-            </div>
-          </div>
-        </details>
-      </section>`;
-
-    body.innerHTML = `
-      <article class='report-sheet'>
-        <header class='report-event'>
-          <h1>${esc(event ? (event.name || eventId) : eventId)}</h1>
-          <div class='report-event-meta'>
-            <span>${days.map(dayLabel_).map(esc).join('・')}</span>
-            <span>全${days.length}日間</span>
-            <span class='report-badge'>概算値を含む</span>
-          </div>
-        </header>
-        ${summaryHtml}
-        <section class='report-section'>
-          <div class='section-header'>
-            <div>
-              <h2>来場状況</h2>
-              <p class='section-note'>選手は登録ベース、応援は会場で確認できた来場記録ベースです。</p>
-            </div>
-            <p class='section-side-note'>学生のみ<br>日別の延べ人数</p>
-          </div>
-          <div class='table-wrap'>
-            <table class='report-table attendance-table' aria-label='日別の学生来場者数'>
-              <thead>
-                <tr>
-                  <th scope='col'>日程</th>
-                  <th class='num' scope='col'>選手<span class='th-sub'>登録</span></th>
-                  <th class='num' scope='col'>応援<span class='th-sub'>来場記録</span></th>
-                  <th class='num' scope='col'>合計<span class='th-sub'>概算</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                ${dayRows}
-                <tr class='total-row'>
-                  <th scope='row'>合計（延べ）</th>
-                  <td class='num'>${totalDrivers}</td>
-                  <td class='num'>${totalSupport}</td>
-                  <td class='num'>${totalVisitors}</td>
-                </tr>
-              </tbody>
+    // ── 集計方法（既定は閉じる。印刷時は CSS で必ず展開される） ──
+    const methodologyHtml = sectionHtml_('集計方法・注意事項', `
+      <p class='sec-note'><strong>来場者数:</strong> 学生のみの概算で、企業スタッフ・一般来場者は含みません。
+      選手は来場予定日を取得していないため開催日すべてに一律加算し、応援はスタンプ開始・当日登録、
+      スタンプ取得、企業によるQR読み取りのいずれかがある学生を日別に重複なく数えます。
+      補欠ドライバーは応援として扱います。</p>
+      <p class='sec-note'><strong>延べ人数:</strong> 同じ学生が複数日来場した場合、日別合計では日数分を数えます。
+      来場記録が一切ない応援学生は、実際に来場していても判別できないため含みません。</p>
+      <p class='sec-note'><strong>学生属性:</strong> 選手と来場記録のある応援学生が対象です。学年は自由記述から
+      大学院生を補正し、短期大学・専門学校・自動車大学校は「その他」に含めます。</p>
+      <div class='attr-grid'>
+        <div class='sub-block'>
+          <div class='sub-title'>応援の来場判定に使用した記録</div>
+          <div class='tbl-wrap'>
+            <table class='data-tbl' aria-label='応援の来場判定に使用した記録'>
+              <thead><tr><th scope='col'>日程</th><th class='num' scope='col'>開始・当日登録</th><th class='num' scope='col'>スタンプ</th><th class='num' scope='col'>QR読み取り</th></tr></thead>
+              <tbody>${sourceRows}</tbody>
             </table>
           </div>
-        </section>
-        ${rallyHtml}
-        ${attributeHtml}
-        ${methodologyHtml}
-      </article>`;
+          <p class='sec-note' style='margin-top:8px'>同じ学生が複数列に入るため、列の合計は応援来場者数と一致しません。</p>
+        </div>
+        <div class='sub-block'>
+          <div class='sub-title'>活動記録の選手・応援内訳</div>
+          <div class='tbl-wrap'>
+            <table class='data-tbl' aria-label='活動記録の選手と応援の内訳'>
+              <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>スタンプ取得</th><th class='num' scope='col'>QR読み取り</th></tr></thead>
+              <tbody>${activityRows}</tbody>
+            </table>
+          </div>
+          <p class='sec-note' style='margin-top:8px'>大きい数字は延べ回数、小さい数字はその記録を持つ実人数です。</p>
+        </div>
+      </div>`, { foldable: true, open: false });
+
+    body.innerHTML = `
+      <div class='ev-head'>
+        <div class='ev-head-name'>${esc(event ? (event.name || eventId) : eventId)}</div>
+        <div class='ev-head-meta'>
+          <span>${days.map(dayLabel_).map(esc).join('・')}</span>
+          <span>全${days.length}日間</span>
+          <span>概算値を含む</span>
+        </div>
+      </div>
+      ${summaryHtml}
+      ${attendanceHtml}
+      ${rallyHtml}
+      ${attributeHtml}
+      ${methodologyHtml}`;
     body.setAttribute('aria-busy', 'false');
   }
 

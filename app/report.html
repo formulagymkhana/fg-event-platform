@@ -14,190 +14,182 @@
 <title>開催報告 — FORMULA GYMKHANA</title>
 <link rel="stylesheet" href="../js/style.css?v=20260724h">
 <style>
+  /* ──────────────────────────────────────────────────────────
+     開催報告は「独立した帳票」ではなく admin.html のサブページとして扱う。
+     寸法・色・角丸・影は admin.html の同名クラスと同じ値を使うこと
+     （admin.html は --navy/--gray/--border 等のローカル別名を定義しているが、
+     実体は style.css の --fg-* なので、ここでは実体名を直接使っている）。
+     ⚠ 共通CSS(js/style.css)には手を入れない。変更はこのファイル内で完結させる。
+     ⚠ 画面はカードを入れ子にしない。KPI(.stat-card)は .section の外に直接置く。
+     ────────────────────────────────────────────────────────── */
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;
-         background: var(--fg-bg); color: var(--fg-text); font-size: 14px; min-height: 100vh; }
+         background: var(--fg-bg); min-height: 100vh; color: var(--fg-text); font-size: 14px; }
   button, input, select { font: inherit; }
 
-  /* ログイン（admin.html と同じ鍵。localStorage を共有する） */
+  /* ── ログイン（admin.html の LOGIN と同じ寸法） ── */
   .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
-  .login-card { width: 100%; max-width: 360px; background: #fff; border-radius: var(--radius-card);
+  .login-card { background: #fff; border-radius: var(--radius-card); width: 100%; max-width: 360px;
                 box-shadow: var(--shadow-card); overflow: hidden; }
-  .login-hd { padding: 18px 22px 15px; border-bottom: 3px solid var(--fg-blue); }
-  .login-logo { height: 34px; width: auto; display: block; }
-  .login-sub { color: var(--fg-muted); font-size: 11px; margin-top: 5px; }
+  .login-hd { background: #fff; padding: 18px 22px; border-bottom: 3px solid var(--fg-blue); }
+  .login-logo { height: 26px; width: auto; display: block; }
+  .login-sub { font-size: 11px; color: var(--fg-muted); margin-top: 3px; }
   .login-body { padding: 24px 22px 28px; }
-  .login-label { display: block; color: var(--fg-text); font-size: 12px; font-weight: 700; margin-bottom: 6px; }
-  .login-input { width: 100%; padding: 12px 14px; border: 1.5px solid var(--fg-line); border-radius: var(--radius-ui);
-                 color: var(--fg-text); font-size: 15px; margin-bottom: 12px; }
-  .login-input:focus, .event-select:focus { outline: none; border-color: var(--fg-blue); }
-  .login-btn { width: 100%; padding: 13px; background: var(--fg-blue); color: #fff; border: 0;
-               border-radius: var(--radius-ui); font-size: 14px; font-weight: 700; cursor: pointer; }
-  .login-btn:disabled { background: var(--fg-disabled); cursor: wait; }
-  .login-err { display: none; color: var(--fg-error); font-size: 12px; line-height: 1.5; margin-bottom: 10px; }
+  .login-label { font-size: 12px; font-weight: 600; display: block; margin-bottom: 5px; }
+  .login-input { width: 100%; padding: 12px 14px; border: 1.5px solid var(--fg-line); border-radius: 8px;
+                 font-size: 15px; margin-bottom: 14px; transition: border-color .15s; }
+  .login-input:focus { outline: none; border-color: var(--fg-blue); }
+  .login-err { font-size: 12px; color: var(--fg-error); margin-bottom: 12px; display: none; }
+  .login-btn { width: 100%; padding: 14px; background: var(--fg-blue); color: #fff; border: none;
+               border-radius: var(--radius-ui); font-size: 15px; font-weight: 600; cursor: pointer; }
+  .login-btn:disabled { background: var(--fg-disabled); cursor: not-allowed; }
 
-  /* 管理画面のサブページと揃えた固定ヘッダー */
-  .report-header { height: 48px; background: #fff; border-bottom: 3px solid var(--fg-blue);
-                   position: sticky; top: 0; z-index: 100; }
-  .report-header-inner { width: 100%; max-width: 960px; height: 100%; margin: 0 auto; padding: 0 24px;
-                         display: grid; grid-template-columns: minmax(64px,1fr) auto minmax(64px,1fr);
-                         align-items: center; gap: 10px; }
-  .report-back { justify-self: start; color: var(--fg-blue); font-size: 12px; font-weight: 600;
-                 text-decoration: none; white-space: nowrap; }
-  .report-header-title { color: var(--fg-navy); font-size: 13px; font-weight: 700; text-align: center; }
-  .print-btn { justify-self: end; padding: 6px 12px; background: #fff; color: var(--fg-navy);
-               border: 1px solid var(--fg-line); border-radius: 5px; font-size: 11px; font-weight: 700; cursor: pointer; }
-  .report-back:focus-visible, .print-btn:focus-visible, .login-btn:focus-visible,
-  .retry-btn:focus-visible, .report-details summary:focus-visible {
+  /* ── サブページヘッダ（admin.html の .page-hd と同じ） ── */
+  .page-hd { background: #fff; border-bottom: 3px solid var(--fg-blue); padding: 0 14px;
+             display: flex; align-items: center; height: 48px; position: sticky; top: 0; z-index: 100; gap: 10px; }
+  .page-back { color: var(--fg-blue); font-size: 12px; text-decoration: none; white-space: nowrap;
+               flex-shrink: 0; padding: 6px 0; }
+  .page-title { flex: 1; font-size: 13px; font-weight: 700; color: var(--fg-navy); text-align: center;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .page-hd-spacer { flex-shrink: 0; width: 64px; }
+
+  /* ── ページ共通ボディ（admin.html の .app-body と同じ） ── */
+  .app-body { max-width: 960px; margin: 0 auto; padding: 16px 24px 60px; }
+
+  /* ── アクション行（admin.html の .action-row / .act-btn と同じ） ── */
+  .action-row { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+  .act-btn { padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+             border: none; display: flex; align-items: center; gap: 5px; }
+  .act-btn-ghost { background: #fff; border: 1.5px solid var(--fg-line); color: var(--fg-navy);
+                   box-shadow: var(--shadow-sm); }
+  .ev-select { flex: 1; min-width: 240px; padding: 9px 11px; border: 1.5px solid var(--fg-line);
+               border-radius: 7px; font-size: 13px; color: var(--fg-text); background: #fff; }
+  .ev-select:focus { outline: none; border-color: var(--fg-navy); }
+
+  /* ── イベント名（大見出しにしない。admin の .ev-card-name と同じ 15px） ── */
+  .ev-head { margin-bottom: 4px; }
+  .ev-head-name { font-size: 15px; font-weight: 700; color: var(--fg-navy); margin-bottom: 4px; }
+  .ev-head-meta { font-size: 12px; color: var(--fg-muted); display: flex; flex-wrap: wrap; gap: 4px 10px; }
+
+  /* ── エリアラベル（admin.html の .area-label と同じ） ── */
+  .area-label { font-size: 11px; font-weight: 700; color: var(--fg-muted); letter-spacing: .1em;
+                margin: 20px 0 8px 2px; display: flex; align-items: center; gap: 8px; }
+  .area-label::after { content: ''; flex: 1; height: 1px; background: var(--fg-line); }
+
+  /* ── KPI（admin.html の .stat-grid / .stat-card と同じ表情。列数だけ3列） ── */
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+  .stat-card { background: #fff; border-radius: 10px; padding: 14px; text-align: center;
+               box-shadow: var(--shadow-sm); }
+  .stat-val { font-size: 30px; font-weight: 700; color: var(--fg-navy); line-height: 1; margin-bottom: 3px;
+              font-variant-numeric: tabular-nums; }
+  .stat-unit { font-size: 11px; font-weight: 600; color: var(--fg-muted); margin-left: 2px; }
+  .stat-lbl { font-size: 11px; color: var(--fg-muted); font-weight: 600; }
+  .stat-sub { font-size: 10px; color: var(--fg-muted); margin-top: 4px; line-height: 1.4; }
+
+  /* ── セクション（admin.html の .section と同じ） ── */
+  .section { background: #fff; border-radius: var(--radius-ui); margin-bottom: 10px;
+             box-shadow: var(--shadow-sm); overflow: hidden; }
+  .section-hd { padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;
+                cursor: pointer; user-select: none; }
+  .section-title { font-size: 13px; font-weight: 700; color: var(--fg-navy); display: flex;
+                   align-items: center; gap: 6px; }
+  .section-toggle { font-size: 14px; color: var(--fg-muted); transition: transform .2s; flex-shrink: 0; }
+  .section-toggle.open { transform: rotate(180deg); }
+  .section-body { padding: 0 16px 14px; display: none; }
+  .section-body.open { display: block; }
+  .section.no-fold .section-hd { cursor: default; }
+  .section.no-fold .section-toggle { display: none; }
+  .section.no-fold .section-body { display: block; }
+
+  /* セクション内の補足文（admin.html の .cfg-hint 相当） */
+  .sec-note { font-size: 11px; color: var(--fg-muted); line-height: 1.7; margin-bottom: 10px; }
+  .sec-note + .sec-note { margin-top: -4px; }
+  /* セクション内の小見出し（admin.html の .cfg-group-title と同じ） */
+  .sub-title { font-size: 11px; font-weight: 700; color: var(--fg-muted); letter-spacing: .08em;
+               margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--fg-line); }
+  .sub-block + .sub-block { margin-top: 18px; }
+
+  /* ── 表（admin.html の .data-tbl と同じ。縞模様・外枠は付けない） ── */
+  .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .data-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .data-tbl th { background: var(--fg-navy); color: #fff; padding: 7px 10px; text-align: left; font-weight: 600; }
+  .data-tbl td { padding: 8px 10px; border-bottom: 1px solid var(--fg-line); color: var(--fg-text); }
+  .data-tbl tbody th { background: #fff; color: var(--fg-text); font-weight: 600;
+                       border-bottom: 1px solid var(--fg-line); }
+  .data-tbl tbody tr:last-child td, .data-tbl tbody tr:last-child th { border-bottom: none; }
+  .data-tbl th.num, .data-tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .data-tbl .th-sub { display: block; font-size: 9px; font-weight: 600; color: rgba(255,255,255,.72); margin-top: 2px; }
+  .data-tbl .cell-sub { display: block; font-size: 9px; color: var(--fg-muted); margin-top: 2px; white-space: nowrap; }
+  .data-tbl .total-row td, .data-tbl .total-row th { background: var(--fg-blue-soft); color: var(--fg-navy);
+                                                     font-weight: 700; }
+  .empty-msg { text-align: center; color: var(--fg-muted); padding: 20px; font-size: 13px; }
+
+  /* ブース表は列が多いので、ブース名と合計だけ固定して横スクロールさせる（維持する機能） */
+  .booth-tbl { min-width: 720px; }
+  .booth-tbl thead th { text-align: center; }
+  .booth-tbl thead .col-booth { text-align: left; }
+  .booth-tbl .col-booth { position: sticky; left: 0; z-index: 2; background: #fff;
+                          min-width: 150px; max-width: 220px; overflow-wrap: anywhere; }
+  .booth-tbl thead .col-booth { z-index: 4; background: var(--fg-navy); }
+  .booth-tbl .col-total { position: sticky; right: 0; z-index: 2; background: #fff;
+                          border-left: 1px solid var(--fg-line); }
+  .booth-tbl thead .col-total { z-index: 4; background: var(--fg-navy); }
+  .booth-tbl .total-row .col-booth, .booth-tbl .total-row .col-total { background: var(--fg-blue-soft); }
+
+  .attr-tbl { min-width: 340px; }
+  .attr-detail { display: block; font-size: 9px; font-weight: 400; color: var(--fg-muted);
+                 line-height: 1.55; margin-top: 4px; }
+  .attr-detail span { display: block; }
+  .attr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .attr-grid .sub-block { margin-top: 0; }
+  .attr-wide { grid-column: 1 / -1; }
+
+  .state-msg { padding: 48px 20px; color: var(--fg-muted); font-size: 13px; line-height: 1.7; text-align: center; }
+  .state-msg .spinner { margin-bottom: 14px; }
+  .retry-btn { margin-top: 12px; padding: 8px 14px; border: 1px solid var(--fg-line); border-radius: var(--radius-ui);
+               background: #fff; color: var(--fg-navy); font-size: 12px; font-weight: 700; cursor: pointer; }
+  .page-back:focus-visible, .act-btn:focus-visible, .login-btn:focus-visible,
+  .retry-btn:focus-visible, .section-hd:focus-visible {
     outline: 3px solid rgba(53,32,208,.2); outline-offset: 2px;
   }
 
-  .report-main { width: 100%; max-width: 960px; margin: 0 auto; padding: 16px 24px 60px; }
-  .report-controls { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-bottom: 12px; }
-  .event-label { color: var(--fg-muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
-  .event-select { width: min(100%, 440px); min-width: 280px; padding: 9px 32px 9px 11px;
-                  border: 1.5px solid var(--fg-line); border-radius: var(--radius-ui);
-                  background: #fff; color: var(--fg-text); font-size: 13px; }
-
-  /* 報告全体を1つの作業面として扱い、各セクションは罫線で区切る */
-  .report-sheet { background: #fff; border: 1px solid var(--fg-line); border-radius: var(--radius-ui);
-                  box-shadow: var(--shadow-sm); overflow: hidden; }
-  .report-event { padding: 24px; border-bottom: 1px solid var(--fg-line); }
-  .report-event h1 { color: var(--fg-navy); font-size: 21px; line-height: 1.35; overflow-wrap: anywhere; }
-  .report-event-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 7px;
-                       color: var(--fg-muted); font-size: 12px; }
-  .report-badge { display: inline-flex; align-items: center; min-height: 22px; padding: 2px 8px;
-                  border: 1px solid var(--fg-warning-border); border-radius: 100px;
-                  background: var(--fg-warning-bg); color: var(--fg-warning); font-size: 10px; font-weight: 700; }
-  .report-section { padding: 22px 24px 24px; border-bottom: 1px solid var(--fg-line); }
-  .report-section:last-child { border-bottom: 0; }
-  .section-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
-  .section-header h2 { color: var(--fg-navy); font-size: 16px; line-height: 1.4; }
-  .section-note { color: var(--fg-muted); font-size: 11px; line-height: 1.7; margin-top: 3px; }
-  .section-side-note { flex-shrink: 0; color: var(--fg-muted); font-size: 10px; line-height: 1.5; text-align: right; }
-
-  /* サマリー */
-  .metric-grid { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 9px; }
-  .metric { min-width: 0; min-height: 92px; padding: 13px 9px 11px; border: 1px solid var(--fg-line);
-            border-radius: 6px; background: var(--fg-bg-soft); text-align: center;
-            display: flex; flex-direction: column; align-items: center; justify-content: center; }
-  .metric-primary { border-color: var(--fg-blue-border); background: var(--fg-blue-soft); }
-  .metric-value { color: var(--fg-navy); font-size: 27px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-  .metric-unit { color: var(--fg-muted); font-size: 10px; font-weight: 700; margin-left: 2px; }
-  .metric-label { color: var(--fg-muted); font-size: 10px; font-weight: 700; line-height: 1.35; margin-top: 7px; }
-  .metric-detail { color: var(--fg-muted); font-size: 9px; line-height: 1.4; margin-top: 3px; }
-  .summary-foot { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 11px;
-                  color: var(--fg-muted); font-size: 10px; line-height: 1.6; }
-
-  /* 表 */
-  .table-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--fg-line); border-radius: 6px;
-                -webkit-overflow-scrolling: touch; }
-  table.report-table { width: 100%; border-collapse: separate; border-spacing: 0; color: var(--fg-text); font-size: 12px; }
-  table.report-table th { padding: 8px 10px; background: var(--fg-navy); color: #fff;
-                          font-size: 10px; font-weight: 700; line-height: 1.35; text-align: left; vertical-align: middle; }
-  table.report-table th.num, table.report-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  table.report-table td, table.report-table tbody th { padding: 9px 10px; border-bottom: 1px solid var(--fg-line);
-                                                       background: #fff; vertical-align: top; }
-  table.report-table tbody th { color: var(--fg-text); font-size: 12px; font-weight: 600; text-align: left; }
-  table.report-table tbody tr:nth-child(even):not(.total-row) td,
-  table.report-table tbody tr:nth-child(even):not(.total-row) th { background: var(--fg-bg-soft); }
-  table.report-table tbody tr:last-child td, table.report-table tbody tr:last-child th { border-bottom: 0; }
-  table.report-table .total-row td, table.report-table .total-row th {
-    background: var(--fg-blue-soft); color: var(--fg-navy); font-weight: 700; border-top: 1px solid var(--fg-blue-border);
-  }
-  .th-sub { display: block; color: rgba(255,255,255,.72); font-size: 9px; font-weight: 600; margin-top: 2px; }
-  .num .sub { display: block; color: var(--fg-muted); font-size: 9px; margin-top: 2px; white-space: nowrap; }
-  .attendance-table { min-width: 520px; }
-
-  /* スタンプラリー */
-  .rally-metrics { margin-bottom: 16px; }
-  .booth-table { min-width: 720px; }
-  .booth-table thead th { text-align: center; }
-  .booth-table thead .booth-name-col { text-align: left; }
-  .booth-table .booth-name-col { position: sticky; left: 0; z-index: 2;
-                                 min-width: 150px; max-width: 220px; overflow-wrap: anywhere; }
-  .booth-table thead .booth-name-col { z-index: 4; }
-  .booth-table .booth-total-col { position: sticky; right: 0; z-index: 2;
-                                  border-left: 1px solid var(--fg-line); }
-  .booth-table thead .booth-total-col { z-index: 4; }
-  .empty-inline { padding: 22px; border: 1px dashed var(--fg-line); border-radius: 6px;
-                  color: var(--fg-muted); font-size: 12px; text-align: center; }
-
-  /* 学生属性 */
-  .attribute-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .attribute-block-wide { grid-column: 1 / -1; }
-  .attribute-title { color: var(--fg-navy); font-size: 12px; font-weight: 700; margin-bottom: 7px; }
-  .attribute-table { min-width: 360px; }
-  .attr-detail { color: var(--fg-muted); font-size: 9px; font-weight: 400; line-height: 1.55; margin-top: 4px; }
-  .attr-detail span { display: block; }
-  .empty-cell { color: var(--fg-muted); text-align: center !important; }
-
-  /* 集計根拠は画面上では折りたたみ、印刷時は展開する */
-  .report-details { border: 1px solid var(--fg-line); border-radius: 6px; overflow: hidden; }
-  .report-details summary { position: relative; padding: 12px 38px 12px 14px; cursor: pointer;
-                            color: var(--fg-navy); font-size: 12px; font-weight: 700; list-style: none; }
-  .report-details summary::-webkit-details-marker { display: none; }
-  .report-details summary::after { content: '+'; position: absolute; top: 50%; right: 14px;
-                                   color: var(--fg-muted); font-size: 18px; font-weight: 400; transform: translateY(-50%); }
-  .report-details[open] summary::after { content: '\2212'; }
-  .details-body { padding: 0 14px 15px; border-top: 1px solid var(--fg-line); }
-  .details-copy { color: var(--fg-muted); font-size: 11px; line-height: 1.75; padding-top: 13px; }
-  .details-copy strong { color: var(--fg-text); }
-  .details-copy p + p { margin-top: 8px; }
-  .audit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
-  .audit-block h3 { color: var(--fg-navy); font-size: 11px; margin-bottom: 6px; }
-  .audit-table { min-width: 400px; }
-
-  .state-msg { padding: 64px 20px; color: var(--fg-muted); font-size: 13px; line-height: 1.7; text-align: center; }
-  .state-msg .spinner { margin-bottom: 14px; }
-  .retry-btn { margin-top: 12px; padding: 8px 14px; border: 1px solid var(--fg-line);
-               border-radius: var(--radius-ui); background: #fff; color: var(--fg-navy); font-size: 12px; font-weight: 700; cursor: pointer; }
-
-  @media (max-width: 820px) {
-    .metric-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
-    .audit-grid { grid-template-columns: 1fr; }
-  }
   @media (max-width: 640px) {
-    .report-header-inner { padding: 0 14px; }
-    .report-main { padding: 12px 10px 44px; }
-    .report-controls { align-items: stretch; flex-direction: column; gap: 5px; }
-    .event-select { width: 100%; min-width: 0; }
-    .report-event { padding: 20px 15px; }
-    .report-event h1 { font-size: 18px; }
-    .report-section { padding: 19px 14px 21px; }
-    .section-header { display: block; }
-    .section-side-note { margin-top: 5px; text-align: left; }
-    .metric-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
-    .metric { min-height: 88px; }
-    .attribute-grid { grid-template-columns: 1fr; }
-    .attribute-block-wide { grid-column: auto; }
+    .app-body { padding: 12px 12px 44px; }
+    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    .attr-grid { grid-template-columns: 1fr; }
+    .attr-wide { grid-column: auto; }
+    .ev-select { min-width: 0; flex-basis: 100%; }
   }
 
+  /* ──────────────────────────────────────────────────────────
+     印刷は画面と役割が違う。画面＝管理画面の一機能、印刷＝配布用の帳票。
+     レイアウト（並び順・表・KPI）はそのまま活かし、画面用の装飾
+     （影・面の背景・折りたたみ・操作系）だけを外す。
+     ────────────────────────────────────────────────────────── */
   @page { size: A4; margin: 12mm; }
   @media print {
     .no-print { display: none !important; }
     body { background: #fff; color: #000; }
-    .report-main { max-width: none; padding: 0; }
-    .report-sheet { border: 0; border-radius: 0; box-shadow: none; overflow: visible; }
-    .report-event { padding: 0 0 12px; }
-    .report-event h1 { font-size: 18px; }
-    .report-section { padding: 12px 0 14px; }
-    .metric-grid { grid-template-columns: repeat(5, minmax(0,1fr)); gap: 5px; }
-    .metric { min-height: 68px; padding: 8px 4px; }
-    .metric-value { font-size: 21px; }
-    .table-wrap { overflow: visible; }
-    table.report-table { font-size: 9px; }
-    table.report-table th, table.report-table td, table.report-table tbody th { padding: 5px 6px; }
-    .attendance-table, .booth-table, .attribute-table, .audit-table { min-width: 0; }
-    .booth-table .booth-name-col, .booth-table .booth-total-col { position: static; }
-    .attribute-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
-    .report-details { border: 0; overflow: visible; }
-    .report-details summary { display: none; }
-    .details-body { display: block !important; padding: 0; border-top: 0; }
-    .audit-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
-    .summary-foot, .section-note, .details-copy, .attr-detail { color: #444; }
-    .metric-grid, .rally-metrics, .attribute-block, .audit-block, table.report-table tr { break-inside: avoid; }
-    table.report-table thead { display: table-header-group; }
+    .app-body { max-width: none; padding: 0; }
+    .area-label { margin: 14px 0 6px; }
+    /* 影と面の背景を落として帳票の紙面に寄せる */
+    .section { box-shadow: none; border: 1px solid var(--fg-line); border-radius: 0; margin-bottom: 10px; }
+    .section-hd { padding: 8px 10px; border-bottom: 1px solid var(--fg-line); }
+    .section-toggle { display: none !important; }
+    .section-body { display: block !important; padding: 10px; }
+    .stat-card { box-shadow: none; border: 1px solid var(--fg-line); border-radius: 0; padding: 8px 4px; }
+    /* 画面と同じ3列を保つ。5列にすると6枚目だけが次行に落ちて紙面が崩れる */
+    .stat-grid { grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 10px; }
+    .stat-val { font-size: 20px; }
+    .tbl-wrap { overflow: visible; }
+    .data-tbl { font-size: 9px; }
+    .data-tbl th, .data-tbl td, .data-tbl tbody th { padding: 5px 6px; }
+    .booth-tbl, .attr-tbl { min-width: 0; }
+    .booth-tbl .col-booth, .booth-tbl .col-total { position: static; }
+    .attr-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .sec-note, .stat-sub, .attr-detail { color: #444; }
+    .stat-grid, .section, .sub-block, .data-tbl tr { break-inside: avoid; }
+    .data-tbl thead { display: table-header-group; }
   }
 </style>
 </head>
@@ -221,18 +213,16 @@
 </div>
 
 <div id="state-app" style="display:none">
-  <header class="report-header no-print">
-    <div class="report-header-inner">
-      <a class="report-back" href="admin.html">管理画面へ</a>
-      <div class="report-header-title">開催報告</div>
-      <button class="print-btn" id="btn-print" type="button">印刷</button>
-    </div>
+  <header class="page-hd no-print">
+    <a class="page-back" href="admin.html">← 管理画面</a>
+    <div class="page-title">開催報告</div>
+    <span class="page-hd-spacer"></span>
   </header>
 
-  <main class="report-main">
-    <div class="report-controls no-print">
-      <label class="event-label" for="ev-select">対象イベント</label>
-      <select id="ev-select" class="event-select"></select>
+  <main class="app-body">
+    <div class="action-row no-print">
+      <select id="ev-select" class="ev-select" aria-label="対象イベント"></select>
+      <button class="act-btn act-btn-ghost" id="btn-print" type="button">🖨 印刷</button>
     </div>
 
     <div id="report-body">
@@ -242,6 +232,6 @@
 </div>
 
 <script src="../js/config.js?v=20260724h"></script>
-<script src="../js/report.js?v=20260825g"></script>
+<script src="../js/report.js?v=20260826a"></script>
 </body>
 </html>
