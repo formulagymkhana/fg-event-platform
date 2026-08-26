@@ -441,6 +441,32 @@
         </table>
       </div>` : "<p class='empty-msg'>ブース別スタンプの記録はありません</p>";
 
+    // 企業別のQR読み取り。GAS 側が「延べ回数」ではなく実人数を返す点に注意（重複抑制のため）。
+    const viewCompanyRows = Array.isArray((data.viewByCompany || {}).rows) ? data.viewByCompany.rows : [];
+    const viewCompanyHtml = viewCompanyRows.length ? `
+      <p class='sec-note'>企業が学生QRを読み取った件数です（多い順）。
+      同じ企業が同じ学生を何度読み取っても1件として記録される仕様のため、
+      <strong>延べ回数ではなく読み取った学生の実人数</strong>に相当します。</p>
+      <div class='tbl-wrap'>
+        <table class='data-tbl' aria-label='企業別のQR読み取り'>
+          <thead><tr><th scope='col'>企業</th><th class='num' scope='col'>選手</th><th class='num' scope='col'>応援</th><th class='num' scope='col'>合計</th></tr></thead>
+          <tbody>
+            ${viewCompanyRows.map(row => `<tr>
+              <th scope='row'>${esc(row.name)}</th>
+              <td class='num'>${count_(row.driver)}</td>
+              <td class='num'>${count_(row.nonDriver)}</td>
+              <td class='num'>${count_(row.total)}</td>
+            </tr>`).join('')}
+            <tr class='total-row'>
+              <th scope='row'>合計</th>
+              <td class='num'>${viewCompanyRows.reduce((s, r) => s + count_(r.driver), 0)}</td>
+              <td class='num'>${viewCompanyRows.reduce((s, r) => s + count_(r.nonDriver), 0)}</td>
+              <td class='num'>${viewCompanyRows.reduce((s, r) => s + count_(r.total), 0)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>` : "<p class='empty-msg'>QR読み取りの記録はありません</p>";
+
     const stampCount = stampDriver.count + stampSupport.count;
     const stampUsers = stampDriver.users + stampSupport.users;
     const viewCount = viewDriver.count + viewSupport.count;
@@ -454,7 +480,8 @@
         ${statHtml_('交換済み景品', count_(data.prizeItemCount), '個', '配布個数')}
         ${statHtml_('記録ブース', boothRows.length, '件', 'スタンプ取得あり')}
       </div>
-      ${sectionHtml_('ブース別スタンプ取得数', boothTableHtml)}`;
+      ${sectionHtml_('ブース別スタンプ取得数', boothTableHtml)}
+      ${sectionHtml_('企業別QR読み取り', viewCompanyHtml)}`;
 
     // ── 学生属性 ──
     const attributes = data.attributes;
@@ -480,6 +507,47 @@
           ${attributeBlockHtml_('学年', yearRows, false)}
           ${attributeBlockHtml_('住所（都道府県）', prefectureRows, false)}
           ${attributeBlockHtml_('学部学科（自動分類）', facultyRows, true)}
+        </div>`);
+    })();
+
+    // ── 運用データ（弁当の未消化・記録が無い学生） ──
+    const ops = data.ops;
+    const opsHtml = !ops ? '' : (() => {
+      const lunch = Array.isArray(ops.lunch) ? ops.lunch : [];
+      const lunchTable = lunch.length ? `
+        <div class='tbl-wrap'>
+          <table class='data-tbl' aria-label='弁当希望と来場記録の突き合わせ'>
+            <thead><tr><th scope='col'>日程</th><th class='num' scope='col'>弁当を希望</th><th class='num' scope='col'>うち来場記録なし</th></tr></thead>
+            <tbody>
+              ${lunch.map(row => `<tr>
+                <th scope='row'>${esc(dayLabel_(row.day))}</th>
+                <td class='num'>${count_(row.requested)}</td>
+                <td class='num'>${count_(row.absent)}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>` : "<p class='empty-msg'>弁当希望の記録はありません</p>";
+
+      return sectionHtml_('運用データ', `
+        <div class='sub-block'>
+          <div class='sub-title'>弁当の未消化（応援のみ）</div>
+          <p class='sec-note'>事前登録で弁当を希望したのに、その日の来場記録が無かった学生の数です。
+          用意した弁当が余るリスクの目安になります。選手は弁当希望を取らず来場も一律扱いのため対象外です。</p>
+          ${lunchTable}
+        </div>
+        <div class='sub-block'>
+          <div class='sub-title'>記録が無い学生</div>
+          <p class='sec-note'>登録はあるものの、スタンプ開始・当日登録・スタンプ取得・QR読み取りの
+          いずれの記録も無かった学生です。実際に来場していても判別できないため、来場者数には含めていません。</p>
+          <div class='tbl-wrap'>
+            <table class='data-tbl' aria-label='記録が無い学生'>
+              <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>人数</th></tr></thead>
+              <tbody>
+                <tr><th scope='row'>学生マスターの登録者</th><td class='num'>${count_(ops.registeredStudents)}</td></tr>
+                <tr><th scope='row'>うち記録が一切ない（選手を除く）</th><td class='num'>${count_(ops.noRecordStudents)}</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>`);
     })();
 
@@ -529,6 +597,7 @@
       ${attendanceHtml}
       ${rallyHtml}
       ${attributeHtml}
+      ${opsHtml}
       ${methodologyHtml}`;
     body.setAttribute('aria-busy', 'false');
   }

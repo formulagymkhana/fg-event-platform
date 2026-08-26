@@ -3330,11 +3330,13 @@ function actionAdminGetAttendanceReport_(p) {
   // 「選手」（一律加算）と「選手以外」（来場実績）の両方へ計上され、
   // 合計が実人数より多く出る（2026-08-25 修正。上のコメントにある
   // 「来場実績の集計には含めない」という設計意図に実装を合わせた）。
+  // ⚠ 事前登録シートは弁当の集計でも使うので、読み込みは1回だけにして使い回す。
   const preSheet = ss.getSheetByName(SHEET.PRE_REG);
+  const preData_ = (preSheet && preSheet.getLastRow() > 1) ? preSheet.getDataRange().getValues() : null;
   let driverCount = 0, fgDrivers = 0, womenDrivers = 0;
   const driverIds = new Set();
-  if (preSheet && preSheet.getLastRow() > 1) {
-    const pData = preSheet.getDataRange().getValues();
+  if (preData_) {
+    const pData = preData_;
     const pHdr  = pData[0].map(String);
     const catCol = pHdr.indexOf('参加区分');
     const sidCol = pHdr.indexOf('studentId');
@@ -3526,16 +3528,114 @@ function actionAdminGetAttendanceReport_(p) {
   //   （stampRally 列を持たない既存イベントとの後方互換）。
   const coSheet2 = ss.getSheetByName(SHEET.COMPANIES);
   let companyCount = 0;
+  const companyNames_ = {};   // companyId -> 企業名（QR読み取り集計の表示用）
   if (coSheet2 && coSheet2.getLastRow() > 1) {
     const cData    = coSheet2.getDataRange().getValues();
     const cHeaders = cData[0].map(String);
     const cIdCol   = cHeaders.indexOf('companyId');
+    const cNameCol = cHeaders.indexOf('企業名');
     const cRallyCol = cHeaders.indexOf('stampRally');
-    companyCount = cData.slice(1).filter(r => {
-      if (cIdCol >= 0 && !String(r[cIdCol] || '').trim()) return false; // 空行は数えない
-      if (cRallyCol < 0) return true;                                   // 列が無ければ全て出店中
-      return String(r[cRallyCol]).toUpperCase() !== 'FALSE';
-    }).length;
+    cData.slice(1).forEach(r => {
+      const cid = cIdCol >= 0 ? String(r[cIdCol] || '').trim() : '';
+      if (cIdCol >= 0 && !cid) return;                                     // 空行は数えない
+      if (cid && cNameCol >= 0) companyNames_[cid] = String(r[cNameCol] || '').trim();
+      if (cRallyCol >= 0 && String(r[cRallyCol]).toUpperCase() === 'FALSE') return; // 出店なし
+      companyCount++;
+    });
+  }
+
+  // ── 企業別のQR読み取り ──────────────────────────────
+  // ⚠ これは「延べ回数」ではなく実質「その企業が読み取った学生の実人数」。
+  //   企業QR経由(source='company_auto')は同一イベント×同一学生×同一企業の行を
+  //   増やさず時刻だけ更新する重複抑制が入っているため（actionSaveViewLog_ 参照）。
+  //   手動メール登録(source='manual_email')にはこの抑制が無いので厳密には混在する。
+  // ⚠ 同じ理由で日別に割ると「最後に読まれた日」に寄ってしまい実態と合わないため、
+  //   日別には割らずイベント通算で返す。
+  const viewByCompany_ = {};
+  {
+    const sheet = ss.getSheetByName(SHEET.VIEW_LOG);
+    if (sheet && sheet.getLastRow() > 1) {
+      const data = sheet.getDataRange().getValues();
+      const hdr  = data[0].map(String);
+      const tCol = hdr.indexOf('時刻');
+      const sCol = hdr.indexOf('studentId');
+      const cCol = hdr.indexOf('companyId');
+      if (tCol >= 0 && sCol >= 0 && cCol >= 0) {
+        data.slice(1).forEach(r => {
+          const day = dayOf(r[tCol]);
+          if (!day || !byDay[day]) return; // 開催日外は無視
+          const sid = String(r[sCol] || '');
+          const cid = String(r[cCol] || '').trim();
+          if (!sid || !cid) return;
+          if (!viewByCompany_[cid]) viewByCompany_[cid] = { driver: 0, nonDriver: 0 };
+          if (driverIds.has(sid)) viewByCompany_[cid].driver++;
+          else viewByCompany_[cid].nonDriver++;
+        });
+      }
+    }
+  }
+  const viewCompanyRows_ = Object.keys(viewByCompany_).map(cid => {
+    const c = viewByCompany_[cid];
+    return {
+      companyId: cid,
+      name: companyNames_[cid] || cid,
+      driver: c.driver,
+      nonDriver: c.nonDriver,
+      total: c.driver + c.nonDriver,
+    };
+  }).sort((a, b) => b.total - a.total);
+
+  // ── 記録が無い学生・弁当の未消化 ──────────────────────
+  // ⚠ 対象は選手以外のみ。選手は弁当希望を聞かず無条件で加算される運用
+  //   （actionAdminGetStats_ の AUTO_LUNCH_ATTRS）かつ来場も一律扱いのため、
+  //   「弁当ありなのに来ていない」という指標が成立しない。
+  // 弁当_土 / 弁当_日 は曜日で対応付ける（開催日が土日固定でない場合に備え、
+  // 日付の曜日を見て割り当てる。該当曜日が無い日は弁当の判定対象外）。
+  const lunchColOfDay_ = day => {
+    const m = String(day).match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+    if (!m) return null;
+    const w = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getDay();
+    if (w === 6) return '弁当_土';
+    if (w === 0) return '弁当_日';
+    return null;
+  };
+  const lunchRows_ = [];
+  if (preData_) {
+    const pHdr   = preData_[0].map(String);
+    const sidCol = pHdr.indexOf('studentId');
+    days.forEach(day => {
+      const colName = lunchColOfDay_(day);
+      const col = colName ? pHdr.indexOf(colName) : -1;
+      if (col < 0 || sidCol < 0) return;
+      let requested = 0, absent = 0;
+      preData_.slice(1).forEach(r => {
+        const sid = String(r[sidCol] || '');
+        if (!sid || driverIds.has(sid)) return;              // 選手は対象外
+        if (String(r[col]).trim() !== 'はい') return;         // 弁当を希望していない
+        requested++;
+        if (!byDay[day].has(sid)) absent++;                  // その日の来場記録なし
+      });
+      lunchRows_.push({ day: day, column: colName, requested: requested, absent: absent });
+    });
+  }
+
+  // 登録はあるが、全開催日を通じて記録が一切ない学生（＝来場者数に計上されない人数）
+  let registeredStudents = 0, noRecordStudents = 0;
+  {
+    const sheet = ss.getSheetByName(SHEET.STUDENTS);
+    if (sheet && sheet.getLastRow() > 1) {
+      const data = sheet.getDataRange().getValues();
+      const sidCol = data[0].map(String).indexOf('studentId');
+      if (sidCol >= 0) {
+        data.slice(1).forEach(r => {
+          const sid = String(r[sidCol] || '').trim();
+          if (!sid) return;
+          registeredStudents++;
+          if (driverIds.has(sid)) return;                    // 選手は一律来場扱い
+          if (!attendedNonDrivers.has(sid)) noRecordStudents++;
+        });
+      }
+    }
   }
 
   // ── 景品（交換済み個数・交換回数） ──────────────────
@@ -3570,6 +3670,12 @@ function actionAdminGetAttendanceReport_(p) {
     },
     attributes: attrs_,
     booth: { days: days, rows: boothRows_ },
+    viewByCompany: { rows: viewCompanyRows_ },
+    ops: {
+      registeredStudents: registeredStudents,
+      noRecordStudents:   noRecordStudents,
+      lunch:              lunchRows_,
+    },
     prizeItemCount,
     prizeExchangeCount,
   });
