@@ -3418,7 +3418,8 @@ function actionAdminGetAttendanceReport_(p) {
   // 運用上の分析価値があるため、選手／選手以外を分けて延べ回数と実人数を出す。
   // ⚠ ここでの区分は driverIds（＝事前登録の参加区分が出場選手）による。
   //   補欠ドライバーは選手以外に入る（isCompetingDriverCategory_ が false のため）。
-  const countActivity_ = (sheetName) => {
+  // perSid を渡すと、学生ごとの件数も同じ走査で数える（シートの読み直しを避けるため）。
+  const countActivity_ = (sheetName, perSid) => {
     const res = {
       driver:    { count: 0, users: new Set() },
       nonDriver: { count: 0, users: new Set() },
@@ -3435,14 +3436,16 @@ function actionAdminGetAttendanceReport_(p) {
       if (!day || !byDay[day]) return; // 開催日外は無視（来場者数の集計と揃える）
       const sid = String(r[sCol] || '');
       if (!sid) return;
+      if (perSid) perSid[sid] = (perSid[sid] || 0) + 1;
       const bucket = driverIds.has(sid) ? res.driver : res.nonDriver;
       bucket.count++;
       bucket.users.add(sid);
     });
     return res;
   };
-  const stampAct_ = countActivity_(SHEET.STAMP_LOG);
-  const viewAct_  = countActivity_(SHEET.VIEW_LOG);
+  const stampBySid_ = {}, viewBySid_ = {};   // 学生ごとの件数（大学別集計・CSV用）
+  const stampAct_ = countActivity_(SHEET.STAMP_LOG, stampBySid_);
+  const viewAct_  = countActivity_(SHEET.VIEW_LOG,  viewBySid_);
   const actOut_   = a => ({ count: a.count, users: a.users.size });
 
   // ── 学生属性（開催報告書の Student Attribute 相当） ──
@@ -3464,9 +3467,12 @@ function actionAdminGetAttendanceReport_(p) {
   const attrs_   = { driver: mkDist_(), nonDriver: mkDist_() };
   const bump_    = (obj, v) => { const k = String(v == null ? '' : v).trim() || '未回答'; obj[k] = (obj[k] || 0) + 1; };
   const schoolSet = new Set();
+  // ⚠ 学生マスターは属性集計・無記録者・学生ごとの明細で使うため、読み込みは1回だけ。
   const studentSheet2 = ss.getSheetByName(SHEET.STUDENTS);
-  if (studentSheet2 && studentSheet2.getLastRow() > 1) {
-    const sData = studentSheet2.getDataRange().getValues();
+  const studentData_  = (studentSheet2 && studentSheet2.getLastRow() > 1)
+    ? studentSheet2.getDataRange().getValues() : null;
+  if (studentData_) {
+    const sData = studentData_;
     const sHdr  = sData[0].map(String);
     const sidC  = sHdr.indexOf('studentId');
     const yrC   = sHdr.indexOf('学年');
@@ -3655,20 +3661,80 @@ function actionAdminGetAttendanceReport_(p) {
   //   全開催日を通じて1件も記録が無い人だけを数える。片方の日しか来ていない学生は
   //   弁当側では未消化に入るが、こちらには入らない。数字がずれるのはこのため。
   let registeredStudents = 0, noRecordStudents = 0;
-  {
-    const sheet = ss.getSheetByName(SHEET.STUDENTS);
-    if (sheet && sheet.getLastRow() > 1) {
-      const data = sheet.getDataRange().getValues();
-      const sidCol = data[0].map(String).indexOf('studentId');
-      if (sidCol >= 0) {
-        data.slice(1).forEach(r => {
-          const sid = String(r[sidCol] || '').trim();
-          if (!sid) return;
-          registeredStudents++;
-          if (driverIds.has(sid)) return;                    // 選手は別枠で数える
-          if (!attendedNonDrivers.has(sid)) noRecordStudents++;
+  if (studentData_) {
+    const sidCol = studentData_[0].map(String).indexOf('studentId');
+    if (sidCol >= 0) {
+      studentData_.slice(1).forEach(r => {
+        const sid = String(r[sidCol] || '').trim();
+        if (!sid) return;
+        registeredStudents++;
+        if (driverIds.has(sid)) return;                      // 選手は別枠で数える
+        if (!attendedNonDrivers.has(sid)) noRecordStudents++;
+      });
+    }
+  }
+
+  // ── 学生ごとのアクション明細（大学別集計とCSV出力の元データ） ──
+  // 2026-08-26 追加。判断材料として出すだけで、この値による評価はしない。
+  // ⚠ 「アクションあり」の定義は来場者数の集計と同じ（スタンプ開始・当日登録／
+  //   スタンプ取得／企業によるQR読み取りのいずれかの記録が、その日に存在する）。
+  // ⚠ 当日登録は登録と同時にスタンプ参加者行が作られるため、当日登録者は
+  //   登録した日が必ず「アクションあり」になる。他の日は他の記録次第。
+  // ⚠ 会場に来たが何も操作しなかった人と、そもそも来ていない人は区別できない。
+  const lunchBySid_ = {};
+  if (preData_) {
+    const pHdr = preData_[0].map(String);
+    const sidC = pHdr.indexOf('studentId');
+    const satC = pHdr.indexOf('弁当_土');
+    const sunC = pHdr.indexOf('弁当_日');
+    if (sidC >= 0) {
+      preData_.slice(1).forEach(r => {
+        const sid = String(r[sidC] || '').trim();
+        if (!sid) return;
+        lunchBySid_[sid] = {
+          sat: satC >= 0 ? String(r[satC]).trim() : '',
+          sun: sunC >= 0 ? String(r[sunC]).trim() : '',
+        };
+      });
+    }
+  }
+
+  const studentRows_ = [];
+  if (studentData_) {
+    const sHdr   = studentData_[0].map(String);
+    const gi     = name => sHdr.indexOf(name);
+    const sidCol = gi('studentId');
+    const nameCol = gi('氏名');
+    const schCol  = gi('大学名');
+    const yrCol   = gi('学年');
+    const attrCol = gi('属性');
+    const regCol  = gi('登録種別');
+    if (sidCol >= 0) {
+      studentData_.slice(1).forEach(r => {
+        const sid = String(r[sidCol] || '').trim();
+        if (!sid) return;
+        const isDriver = driverIds.has(sid);
+        const perDay = days.map(day => ({
+          day: day,
+          acted: isDriver ? driverRecordByDay[day].has(sid) : byDay[day].has(sid),
+        }));
+        const lunch = lunchBySid_[sid] || { sat: '', sun: '' };
+        studentRows_.push({
+          studentId: sid,
+          name:      nameCol >= 0 ? String(r[nameCol] || '') : '',
+          school:    schCol  >= 0 ? String(r[schCol]  || '') : '',
+          year:      yrCol   >= 0 ? String(r[yrCol]   || '') : '',
+          attribute: attrCol >= 0 ? String(r[attrCol] || '') : '',
+          regType:   regCol  >= 0 ? String(r[regCol]  || '') : '',
+          isDriver:  isDriver,
+          days:      perDay,
+          actedAny:  perDay.some(d => d.acted),
+          stamps:    stampBySid_[sid] || 0,
+          views:     viewBySid_[sid]  || 0,
+          lunchSat:  lunch.sat,
+          lunchSun:  lunch.sun,
         });
-      }
+      });
     }
   }
 
@@ -3724,6 +3790,7 @@ function actionAdminGetAttendanceReport_(p) {
       lunch:              lunchRows_,
       driverDays:         driverDayRows_,
     },
+    students: studentRows_,
     prizeItemCount,
     prizeExchangeCount,
   });

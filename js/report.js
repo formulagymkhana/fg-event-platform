@@ -24,6 +24,8 @@
   let adminKey_ = localStorage.getItem('fg_admin_key') || '';
   let events_ = [];
   let reportRequestId_ = 0;
+  let lastStudents_ = [];   // 直近に描画した学生ごとの明細（CSV出力用）
+  let lastEventId_ = '';
 
   async function call_(action, params) {
     const body = JSON.stringify({ action, adminKey: adminKey_, ...params });
@@ -111,7 +113,29 @@
     return head.closest('.section')?.classList.contains('no-fold') ? null : head;
   }
 
+  // 学生ごとの明細をCSVで出す（1人1行）。集計ではなく生の判断材料として渡す。
+  function exportStudentsCsv_() {
+    if (!lastStudents_.length) return;
+    const days = (lastStudents_[0].days || []).map(d => d.day);
+    const header = ['studentId', '氏名', '大学名', '学年', '属性', '区分', '登録種別']
+      .concat(days.map(d => dayLabel_(d) + 'のアクション'))
+      .concat(['アクションのある日数', 'スタンプ数', 'QR件数', '弁当_土', '弁当_日']);
+    const lines = [header.map(csvSafe_).join(',')];
+    lastStudents_.forEach(s => {
+      const dayFlags = (s.days || []).map(d => (d.acted ? 'あり' : 'なし'));
+      const actedDays = (s.days || []).filter(d => d.acted).length;
+      lines.push([
+        s.studentId, s.name, s.school, s.year, s.attribute,
+        s.isDriver ? '選手' : '応援', s.regType,
+      ].concat(dayFlags)
+       .concat([actedDays, s.stamps, s.views, s.lunchSat, s.lunchSun])
+       .map(csvSafe_).join(','));
+    });
+    downloadCsv_(`学生アクション明細_${lastEventId_ || 'event'}.csv`, lines.join('\r\n'));
+  }
+
   $('report-body')?.addEventListener('click', event => {
+    if (event.target.id === 'btn-csv-students') { exportStudentsCsv_(); return; }
     const head = foldTarget_(event.target);
     if (head) toggleSection_(head);
   });
@@ -613,6 +637,75 @@
         </div>`);
     })();
 
+    // ── 大学別のアクション状況 ──
+    // 判断材料として出すだけで、値の良し悪しはここでは述べない。
+    const students = Array.isArray(data.students) ? data.students : [];
+    lastStudents_ = students;
+    lastEventId_ = eventId;
+    const schoolHtml = !students.length ? '' : (() => {
+      const bySchool = {};
+      students.forEach(s => {
+        const key = String(s.school || '（大学名なし）');
+        if (!bySchool[key]) bySchool[key] = { total: 0, acted: 0, drivers: 0, stamps: 0, views: 0 };
+        const b = bySchool[key];
+        b.total++;
+        if (s.actedAny) b.acted++;
+        if (s.isDriver) b.drivers++;
+        b.stamps += count_(s.stamps);
+        b.views  += count_(s.views);
+      });
+      const rows = Object.keys(bySchool).map(name => {
+        const b = bySchool[name];
+        return { name, ...b, idle: b.total - b.acted };
+      }).sort((a, b) => b.idle - a.idle || b.total - a.total);
+
+      return sectionHtml_('大学別のアクション状況', `
+        <p class='sec-note'>学生マスターの登録者を大学ごとに集計しています。「アクションあり」は
+        スタンプ開始・当日登録／スタンプ取得／企業によるQR読み取りのいずれかの記録が、
+        <strong>いずれかの開催日に</strong>あった人数です。無操作の多い順に並べています。</p>
+        <p class='sec-note'>この表が<strong>含まないもの</strong>: 来場したが何も操作しなかった人と、
+        そもそも来場しなかった人は区別できません。機器の不具合等で記録が残らなかった場合も無操作に入ります。
+        当日登録者は登録と同時に記録が残るため、登録した日は必ずアクションありになります。</p>
+        <div class='tbl-wrap'>
+          <table class='data-tbl' aria-label='大学別のアクション状況'>
+            <thead><tr>
+              <th scope='col'>大学</th>
+              <th class='num' scope='col'>登録</th>
+              <th class='num' scope='col'>うち選手</th>
+              <th class='num' scope='col'>アクションあり</th>
+              <th class='num' scope='col'>無操作</th>
+              <th class='num' scope='col'>スタンプ<span class='th-sub'>延べ</span></th>
+              <th class='num' scope='col'>QR<span class='th-sub'>件数</span></th>
+            </tr></thead>
+            <tbody>
+              ${rows.map(r => `<tr>
+                <th scope='row'>${esc(r.name)}</th>
+                <td class='num'>${r.total}</td>
+                <td class='num'>${r.drivers}</td>
+                <td class='num'>${r.acted}</td>
+                <td class='num'>${r.idle}</td>
+                <td class='num'>${r.stamps}</td>
+                <td class='num'>${r.views}</td>
+              </tr>`).join('')}
+              <tr class='total-row'>
+                <th scope='row'>合計</th>
+                <td class='num'>${rows.reduce((s, r) => s + r.total, 0)}</td>
+                <td class='num'>${rows.reduce((s, r) => s + r.drivers, 0)}</td>
+                <td class='num'>${rows.reduce((s, r) => s + r.acted, 0)}</td>
+                <td class='num'>${rows.reduce((s, r) => s + r.idle, 0)}</td>
+                <td class='num'>${rows.reduce((s, r) => s + r.stamps, 0)}</td>
+                <td class='num'>${rows.reduce((s, r) => s + r.views, 0)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class='action-row no-print' style='margin:12px 0 0'>
+          <button class='act-btn act-btn-ghost' id='btn-csv-students' type='button'>学生ごとの明細をCSVで出力</button>
+        </div>
+        <p class='sec-note' style='margin-top:8px'>CSVには学生1人1行で、氏名・大学・学年・区分・登録種別・
+        日別のアクション有無・スタンプ数・QR件数・弁当希望が入ります。個人が特定できるデータのため取り扱いに注意してください。</p>`);
+    })();
+
     // ── 集計方法（既定は閉じる。印刷時は CSS で必ず展開される） ──
     const methodologyHtml = sectionHtml_('集計方法・注意事項', `
       <p class='sec-note'><strong>来場者数:</strong> 学生のみの概算で、企業スタッフ・一般来場者は含みません。
@@ -660,6 +753,7 @@
       ${rallyHtml}
       ${attributeHtml}
       ${opsHtml}
+      ${schoolHtml}
       ${methodologyHtml}`;
     body.setAttribute('aria-busy', 'false');
   }
