@@ -3519,8 +3519,24 @@ function actionAdminGetAttendanceReport_(p) {
   // 出場校エントリー数（＝報告書の「参加校数」）／出展企業数（＝ブース出展数）
   const schoolSheet2 = ss.getSheetByName(SHEET.SCHOOL_ENTRIES);
   const schoolEntryCount = (schoolSheet2 && schoolSheet2.getLastRow() > 1) ? schoolSheet2.getLastRow() - 1 : 0;
+  // ⚠ 企業マスターの全行ではなく「出店中」の企業だけを数える（2026-08-26 修正）。
+  //   管理画面の企業一覧にある「ブース出店」トグル（出店中／出店なし）が stampRally 列。
+  //   判定は他の参照箇所（actionGetEventCompanies_ 等）と同じく
+  //   「明示的に 'FALSE' のときだけ出店なし」。列が無い・空欄なら出店中として扱う
+  //   （stampRally 列を持たない既存イベントとの後方互換）。
   const coSheet2 = ss.getSheetByName(SHEET.COMPANIES);
-  const companyCount = (coSheet2 && coSheet2.getLastRow() > 1) ? coSheet2.getLastRow() - 1 : 0;
+  let companyCount = 0;
+  if (coSheet2 && coSheet2.getLastRow() > 1) {
+    const cData    = coSheet2.getDataRange().getValues();
+    const cHeaders = cData[0].map(String);
+    const cIdCol   = cHeaders.indexOf('companyId');
+    const cRallyCol = cHeaders.indexOf('stampRally');
+    companyCount = cData.slice(1).filter(r => {
+      if (cIdCol >= 0 && !String(r[cIdCol] || '').trim()) return false; // 空行は数えない
+      if (cRallyCol < 0) return true;                                   // 列が無ければ全て出店中
+      return String(r[cRallyCol]).toUpperCase() !== 'FALSE';
+    }).length;
+  }
 
   // ── 景品（交換済み個数・交換回数） ──────────────────
   const prizeSheet = ss.getSheetByName(SHEET.PRIZE_LOG);
