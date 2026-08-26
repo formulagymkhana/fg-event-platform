@@ -31,6 +31,37 @@ GAS はリポジトリ管理外のため、push しても自動反映されま�
 
 ---
 
+## 2026-08-26 Step2 開催報告APIに正規化済みの事実を追加（後方互換）
+
+- 変更ファイル: `docs/gas-patches/api.gs.final.txt`
+- 変更内容:
+  - **責務分担を「正規化はGAS、集計はフロント」に定めた。** GAS は期間別（土曜/日曜/合計）の
+    集計値を返さず、正規化した事実だけを返す。集計はフロントが `students` から導出する
+    （集計の出所を1つにし、人数・属性・大学別・期間別が構造的に一致するようにするため）。
+  - `students[]` に正規化済みの区分を追加: `cohort`（選手/応援・事前/応援・当日/区分不明）、
+    `yearGroup`、`prefecture`、`facultyGroup`。**フロントで再判定しないこと。**
+  - `students[].days[]` に `attended` / `acted` / `stampCount` /
+    `prizeExchangeCount` / `prizeItemCount` を追加。
+  - `students[].qrCompanyCount` を追加（旧 `views` も当面残す）。
+  - `eventSummary` / `qrOverall` / `boothByDay` / `sourceTotals` / `unmatchedLogs` を追加。
+  - **既存フィールドは全て維持**（`byDay` / `activity` / `summary` / `attributes` /
+    `booth` / `viewByCompany` / `ops` / `students`）。Step3 のUI切替が終わるまで旧画面が動く。
+- 理由/背景: 期間×学生区分を共通の集計軸にするための土台。段階的に進めて、
+  数字がずれたときに原因を切り分けられるようにしている。
+- GAS: **再デプロイ必須**
+- 申し送り/注意点:
+  - **`days[].attended` は事実ではなく規則による推定。** 選手は記録の有無によらず常に true
+    （来場予定日を取得していないための一律加算）。実際に欠場していても true になる。
+    同じ `days[]` に事実（`acted`）と推定（`attended`）が並ぶので取り違えないこと。
+  - **`sourceTotals` / `unmatchedLogs` は集計の二重管理ではなく検算。** `students` から導出すると
+    学生マスターに存在しない studentId のログが黙って消える。大学統合
+    （`applyUniMergeToSheet_`）が途中で失敗するとログ側にだけ古いIDが残るため、
+    元ログの件数と突き合わせて欠落を検知する。未照合があれば警告を出す。
+  - `prizeItemCount` / `prizeExchangeCount`（従来フィールド）は eventId 一致のみで数えており
+    開催日で絞っていない。日別集計は `days[].prizeItemCount` を使うこと。両者は開催日外の
+    行の分だけずれる。差がある場合は警告を出す。
+  - Rd.2 に区分不明は**存在しない**（2026-08-26 実データで確認）。表示は0のまま残している。
+
 ## 2026-08-26 参加指標（実人数を分母にした記述統計）を追加
 
 - 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `app/report.html`, `js/report.js`

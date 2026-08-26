@@ -3313,6 +3313,16 @@ function normalizeRegType_(raw) {
   return '不明';
 }
 
+// 学生区分（cohort）を4値で返す（2026-08-26 追加）。
+// ⚠ 区分判定は業務規則であり、管理画面と開催報告で一致していなければならない。
+//   フロント側で独自に判定しないこと。GAS が返す cohort をそのまま使う。
+function studentCohort_(isDriver, regType) {
+  if (isDriver) return '選手';
+  if (regType === '事前') return '応援・事前';
+  if (regType === '当日') return '応援・当日';
+  return '区分不明';
+}
+
 function actionAdminGetAttendanceReport_(p) {
   const e = validateAdmin_(p);
   if (e) return e;
@@ -3738,7 +3748,56 @@ function actionAdminGetAttendanceReport_(p) {
     }
   }
 
+  // ── 景品（交換済み個数・交換回数） ──────────────────
+  // ⚠ prizeItemCount / prizeExchangeCount は従来どおり eventId 一致のみで数える
+  //   （開催日で絞っていない）。既存フィールドの値を変えないため維持している。
+  //   日別の集計は下の prizeByDaySid_ を使うこと。両者は開催日外の行の分だけずれる。
+  const prizeSheet = ss.getSheetByName(SHEET.PRIZE_LOG);
+  let prizeItemCount = 0, prizeExchangeCount = 0;
+  const prizeByDaySid_ = {};   // day -> sid -> { exchanges, items }
+  days.forEach(d => { prizeByDaySid_[d] = {}; });
+  let prizeRowsInDays_ = 0, prizeRowsTotal_ = 0;
+  if (prizeSheet && prizeSheet.getLastRow() > 1) {
+    const pData    = prizeSheet.getDataRange().getValues();
+    const pHeaders = pData[0].map(String);
+    const pEvCol   = pHeaders.indexOf('eventId');
+    const pCntCol  = pHeaders.indexOf('claimedCount');
+    const pTimeCol = pHeaders.indexOf('時刻');
+    const pSidCol  = pHeaders.indexOf('studentId');
+    const pRows    = pData.slice(1).filter(r => String(r[pEvCol]) === String(p.event));
+    prizeExchangeCount = pRows.length;
+    prizeItemCount = pRows.reduce((sum, r) => sum + (pCntCol >= 0 ? Number(r[pCntCol]) || 1 : 1), 0);
+    prizeRowsTotal_ = pRows.length;
+    if (pTimeCol >= 0 && pSidCol >= 0) {
+      pRows.forEach(r => {
+        const day = dayOf(r[pTimeCol]);
+        if (!day || !prizeByDaySid_[day]) return;   // 開催日外は日別集計に入れない
+        const sid = String(r[pSidCol] || '');
+        if (!sid) return;
+        const items = pCntCol >= 0 ? (Number(r[pCntCol]) || 1) : 1;
+        const cell = prizeByDaySid_[day][sid] || (prizeByDaySid_[day][sid] = { exchanges: 0, items: 0 });
+        cell.exchanges++;
+        cell.items += items;
+        prizeRowsInDays_++;
+      });
+    } else {
+      warnings.push('シート「' + SHEET.PRIZE_LOG + '」に「時刻」または「studentId」列がありません。景品の日別集計はできません。');
+    }
+    if (prizeRowsTotal_ > prizeRowsInDays_) {
+      warnings.push('景品交換ログに開催日以外の日付の行が' + (prizeRowsTotal_ - prizeRowsInDays_) +
+        '件あります。日別集計には含めていません。');
+    }
+  }
+
+  // 日別×学生別のスタンプ数（既に読み込んだ stampLog_ から作るので追加の読み込みは無い）
+  const stampByDaySid_ = {};
+  days.forEach(d => { stampByDaySid_[d] = {}; });
+  stampLog_.rows.forEach(r => {
+    stampByDaySid_[r.day][r.sid] = (stampByDaySid_[r.day][r.sid] || 0) + 1;
+  });
+
   let unknownRegCount_ = 0;   // 登録種別が 事前/当日 のどちらでもない学生
+  const studentIdSet_ = new Set();   // 学生マスターに実在する studentId（ログ照合用）
   const studentRows_ = [];
   if (studentData_) {
     const sHdr   = studentData_[0].map(String);
@@ -3749,18 +3808,35 @@ function actionAdminGetAttendanceReport_(p) {
     const yrCol   = gi('学年');
     const attrCol = gi('属性');
     const regCol  = gi('登録種別');
+    const prefCol = gi('住所(都道府県)');
+    const facCol  = gi('学部学科');
     if (sidCol >= 0) {
       studentData_.slice(1).forEach(r => {
         const sid = String(r[sidCol] || '').trim();
         if (!sid) return;
+        studentIdSet_.add(sid);
         const isDriver = driverIds.has(sid);
-        const perDay = days.map(day => ({
-          day: day,
-          acted: isDriver ? driverRecordByDay[day].has(sid) : byDay[day].has(sid),
-        }));
-        const lunch = lunchBySid_[sid] || { sat: '', sun: '' };
         const regType = normalizeRegType_(regCol >= 0 ? r[regCol] : '');
         if (!isDriver && regType === '不明') unknownRegCount_++;
+        // ⚠ days[] には「事実」と「規則による推定」が混在する。取り違えないこと。
+        //   acted    … その日に記録がある（事実）
+        //   attended … 来場として数えるか（選手は記録の有無によらず常に true。
+        //              来場予定日を取得していないための一律加算であり実測ではない。
+        //              実際に欠場していても true になる）
+        const perDay = days.map(day => {
+          const acted = isDriver ? driverRecordByDay[day].has(sid) : byDay[day].has(sid);
+          const pz = (prizeByDaySid_[day] || {})[sid];
+          return {
+            day: day,
+            acted: acted,
+            attended: isDriver ? true : acted,
+            stampCount: (stampByDaySid_[day] || {})[sid] || 0,
+            prizeExchangeCount: pz ? pz.exchanges : 0,
+            prizeItemCount:     pz ? pz.items : 0,
+          };
+        });
+        const lunch = lunchBySid_[sid] || { sat: '', sun: '' };
+        const qrCompanyCount = viewCompaniesBySid_[sid] ? viewCompaniesBySid_[sid].size : 0;
         studentRows_.push({
           studentId: sid,
           name:      nameCol >= 0 ? String(r[nameCol] || '') : '',
@@ -3769,10 +3845,16 @@ function actionAdminGetAttendanceReport_(p) {
           attribute: attrCol >= 0 ? String(r[attrCol] || '') : '',
           regType:   regType,
           isDriver:  isDriver,
+          // ── 正規化済みの区分（フロントで再判定しないこと） ──
+          cohort:       studentCohort_(isDriver, regType),
+          yearGroup:    normalizeYear_(yrCol >= 0 ? r[yrCol] : ''),
+          prefecture:   prefCol >= 0 ? (String(r[prefCol] || '').trim() || '未回答') : '未回答',
+          facultyGroup: classifyFaculty_(facCol >= 0 ? r[facCol] : ''),
           days:      perDay,
           actedAny:  perDay.some(d => d.acted),
           stamps:    stampBySid_[sid] || 0,   // スタンプ取得の回数（1回ごとに別の記録なので行数でよい）
-          views:     viewCompaniesBySid_[sid] ? viewCompaniesBySid_[sid].size : 0, // 接点企業数（企業で重複排除）
+          views:     qrCompanyCount,          // 旧名。Step4 で整理するまで残す
+          qrCompanyCount: qrCompanyCount,     // 接点企業数（企業で重複排除・イベント通算）
           lunchSat:  lunch.sat,
           lunchSun:  lunch.sun,
         });
@@ -3790,23 +3872,81 @@ function actionAdminGetAttendanceReport_(p) {
   const driversWithRecord = driversAllDays.size;
   const driversNoRecord   = Math.max(0, driverIdCount - driversWithRecord);
 
-  // ── 景品（交換済み個数・交換回数） ──────────────────
-  const prizeSheet = ss.getSheetByName(SHEET.PRIZE_LOG);
-  let prizeItemCount = 0, prizeExchangeCount = 0;
-  if (prizeSheet && prizeSheet.getLastRow() > 1) {
-    const pData    = prizeSheet.getDataRange().getValues();
-    const pHeaders = pData[0].map(String);
-    const pEvCol   = pHeaders.indexOf('eventId');
-    const pCntCol  = pHeaders.indexOf('claimedCount');
-    const pRows    = pData.slice(1).filter(r => String(r[pEvCol]) === String(p.event));
-    prizeExchangeCount = pRows.length;
-    prizeItemCount = pRows.reduce((sum, r) => sum + (pCntCol >= 0 ? Number(r[pCntCol]) || 1 : 1), 0);
-  }
-
   if (unknownRegCount_ > 0) {
     warnings.push('登録種別が「事前」「当日」のどちらでもない学生が' + unknownRegCount_ +
       '名います。区分不明として独立集計しており、当日登録には含めていません。');
   }
+
+  // ── 照合値（sourceTotals / unmatchedLogs） ──────────
+  // ⚠ これは集計の二重管理ではなく検算。フロントは students から期間別の値を導出するが、
+  //   学生マスターに存在しない studentId のログはその導出で黙って消える。
+  //   大学統合（applyUniMergeToSheet_）が途中で失敗するとログ側にだけ古いIDが残るため、
+  //   元ログの件数と突き合わせて欠落を検知できるようにしておく（2026-08-26 追加）。
+  const countUnmatched_ = log => log.rows.filter(r => !studentIdSet_.has(r.sid)).length;
+  let prizeUnmatched_ = 0;
+  days.forEach(d => {
+    Object.keys(prizeByDaySid_[d] || {}).forEach(sid => {
+      if (!studentIdSet_.has(sid)) prizeUnmatched_ += prizeByDaySid_[d][sid].exchanges;
+    });
+  });
+  const unmatchedLogs = {
+    participants: countUnmatched_(participantsLog_),
+    stamp:        countUnmatched_(stampLog_),
+    view:         countUnmatched_(viewLog_),
+    prize:        prizeUnmatched_,
+  };
+  const unmatchedTotal_ = unmatchedLogs.participants + unmatchedLogs.stamp
+    + unmatchedLogs.view + unmatchedLogs.prize;
+  if (unmatchedTotal_ > 0) {
+    warnings.push('学生マスターに存在しない studentId の記録が' + unmatchedTotal_ +
+      '件あります（スタンプ開始' + unmatchedLogs.participants + '／スタンプ' + unmatchedLogs.stamp +
+      '／QR' + unmatchedLogs.view + '／景品' + unmatchedLogs.prize +
+      '）。学生ごとの集計には含まれないため、合計が元のログ件数と一致しません。');
+  }
+
+  const sourceTotals = {
+    studentRows:      studentIdSet_.size,
+    participantRows:  participantsLog_.rows.length,
+    stampRows:        stampLog_.rows.length,
+    viewRows:         viewLog_.rows.length,
+    prizeRows:        prizeRowsInDays_,
+    prizeRowsAllDays: prizeRowsTotal_,
+  };
+
+  // ── QRのイベント通算（日別に割らない） ──────────────
+  // ⚠ 企業QR経由は再読み取り時に時刻だけ更新されるため、日で割ると最後に読まれた日に
+  //   寄って実態と合わない。期間切替の対象外とし、通算値だけを返す。
+  const qrContactStudents_ = new Set();
+  const qrContactCompanies_ = new Set();
+  viewLog_.rows.forEach(r => {
+    qrContactStudents_.add(r.sid);
+    if (r['companyId']) qrContactCompanies_.add(r['companyId']);
+  });
+  const qrByCohort_ = {};
+  studentRows_.forEach(st => {
+    if (qrContactStudents_.has(st.studentId)) {
+      qrByCohort_[st.cohort] = (qrByCohort_[st.cohort] || 0) + 1;
+    }
+  });
+  const qrOverall = {
+    contactStudents:  qrContactStudents_.size,
+    contactCompanies: qrContactCompanies_.size,
+    byCohort:         qrByCohort_,
+    byCompany:        viewCompanyRows_,
+  };
+
+  const eventSummary = {
+    eventId:             p.event,
+    days:                days,
+    dayCount:            days.length,
+    schoolEntryCount:    schoolEntryCount,
+    companyCount:        companyCount,
+    fgDrivers:           fgDrivers,
+    womenDrivers:        womenDrivers,
+    driverCount:         driverCount,
+    registeredStudents:  registeredStudents,
+    attendeeSchoolCount: schoolSet.size,
+  };
 
   return ok_({
     eventId: p.event,
@@ -3839,6 +3979,14 @@ function actionAdminGetAttendanceReport_(p) {
     },
     students: studentRows_,
     warnings: warnings,
+    // ── Step2 で追加（2026-08-26）。旧フィールドは Step4 で整理するまで残す ──
+    // ⚠ 期間別（土曜/日曜/合計）の集計は GAS では持たない。フロントの derivePeriods_ が
+    //   students から導出する。GAS は「正規化した事実」だけを返し、集計は1箇所に置く。
+    eventSummary: eventSummary,
+    qrOverall:    qrOverall,
+    boothByDay:   { days: days, rows: boothRows_ },
+    sourceTotals: sourceTotals,
+    unmatchedLogs: unmatchedLogs,
     prizeItemCount,
     prizeExchangeCount,
   });
