@@ -677,65 +677,80 @@
         </div>`, { foldable: true, open: true });
     })();
 
-    // ── 参加指標（実人数を分母にした記述統計） ──
-    // イベント規模の影響を受けない基準値。延べ人数は開催日数で変わるため主分母に使わない。
-    // ⚠ ここは記述統計のみ。良否の判定・原因の推測・順位付けはしない（2026-08-26 方針）。
+    // ── アクション記録の集計（選手／応援を分けた記述統計） ──
+    // ⚠ 選手と応援を混ぜて率を出してはいけない（2026-08-26 修正）。データの性質が違う。
+    //   選手: 出走するので来場は確定。分母（事前登録の出場選手）が確定しており、
+    //         「記録なし」は「来たが操作しなかった」を意味する。
+    //   応援: 来場そのものが記録経由でしか分からない。「記録なし」は「来ていない」のか
+    //         「来たが操作しなかった」のか区別できない。
+    //   さらに当日登録は登録と同時に記録が付くため定義上100%になる。応援に混ぜると率が上がる。
+    //   よって 選手 / 応援(事前登録) / 応援(当日登録) の3区分で出す。
     const allStudents = Array.isArray(data.students) ? data.students : [];
     const metricsHtml = !allStudents.length ? '' : (() => {
-      // 推定ユニーク参加学生 = 事前登録の出場選手（全員）＋ 記録が1件でもある応援
-      const participants = allStudents.filter(s => s.isDriver || s.actedAny);
-      const drivers   = participants.filter(s => s.isDriver);
-      const supports  = participants.filter(s => !s.isDriver);
-      const N = participants.length;
+      const drivers = allStudents.filter(s => s.isDriver);
+      const supPre  = allStudents.filter(s => !s.isDriver && String(s.regType) === '事前');
+      const supDay  = allStudents.filter(s => !s.isDriver && String(s.regType) !== '事前');
+      const groups = [
+        ['選手', drivers, '事前登録の出場選手。出走のため来場は確定'],
+        ['応援・事前登録', supPre, '記録なしは未来場と無操作を区別できない'],
+        ['応援・当日登録', supDay, '登録と同時に記録が付くため定義上100%'],
+      ];
+      // 規模の目安。率の分母には使わない（区分ごとに分母が異なるため）。
+      const uniqueParticipants = drivers.length
+        + supPre.filter(s => s.actedAny).length
+        + supDay.filter(s => s.actedAny).length;
 
-      // 分母は2種類。登録者基準＝学生マスターの登録者全員、参加者基準＝上の推定ユニーク参加学生。
-      // ⚠ 参加者基準は「記録がある応援」で分母を作っているため、
-      //   アクション記録あり率をこの基準で出すと定義上ほぼ100%になり指標にならない。
-      //   そのため当該行の参加者基準は「—」にしている（2026-08-26 修正）。
-      const R = allStudents.length;                     // 登録者基準の分母
-      const rAll   = allStudents.filter(s => s.actedAny).length;
-      const sAll   = allStudents.filter(s => count_(s.stamps) > 0).length;
-      const vAll   = allStudents.filter(s => count_(s.views)  > 0).length;
-      const stamped = participants.filter(s => count_(s.stamps) > 0).length;
-      const viewed  = participants.filter(s => count_(s.views)  > 0).length;
-
-      const rateRow = (label, numAll, numPart, note) => {
-        const a = rate_(numAll, R);
-        const p = numPart === null ? null : rate_(numPart, N);
+      const countRows = groups.map(([label, g, note]) => {
+        const a = g.filter(s => s.actedAny).length;
         return `<tr>
-          <th scope='row'>${esc(label)}${note ? `<span class='cell-note'>${esc(note)}</span>` : ''}</th>
-          <td class='num'>${a.text}</td>
-          <td class='num'>${a.detail}</td>
-          <td class='num'>${p ? p.text : '—'}</td>
-          <td class='num'>${p ? p.detail : '—'}</td>
+          <th scope='row'>${esc(label)}<span class='cell-note'>${esc(note)}</span></th>
+          <td class='num'>${fmt_(g.length)}</td>
+          <td class='num'>${fmt_(a)}</td>
+          <td class='num'>${fmt_(g.length - a)}</td>
         </tr>`;
-      };
+      }).join('') + `<tr class='total-row'>
+        <th scope='row'>合計</th>
+        <td class='num'>${fmt_(allStudents.length)}</td>
+        <td class='num'>${fmt_(allStudents.filter(s => s.actedAny).length)}</td>
+        <td class='num'>${fmt_(allStudents.filter(s => !s.actedAny).length)}</td>
+      </tr>`;
 
-      const stampVals = participants.map(s => count_(s.stamps));
-      const viewVals  = participants.map(s => count_(s.views));
-      const stampUsers = stampVals.filter(v => v > 0);
-      const viewUsers  = viewVals.filter(v => v > 0);
-      const statRow = (label, values, note) => `
+      const cell = (num, den) => {
+        const r = rate_(num, den);
+        return `<td class='num'>${r.text}<span class='cell-sub'>${r.detail}</span></td>`;
+      };
+      const rateRows = groups.map(([label, g]) => `<tr>
+        <th scope='row'>${esc(label)}</th>
+        ${cell(g.filter(s => s.actedAny).length, g.length)}
+        ${cell(g.filter(s => count_(s.stamps) > 0).length, g.length)}
+        ${cell(g.filter(s => count_(s.views)  > 0).length, g.length)}
+      </tr>`).join('');
+
+      // 1人あたりは「その区分で記録がある人」だけを母集団にする。
+      // 記録が無い人を含めると、区分によって0の意味が変わって比較できなくなる。
+      const statRow = (label, metric, values) => `
         <tr>
-          <th scope='row'>${esc(label)}${note ? `<span class='cell-note'>${esc(note)}</span>` : ''}</th>
+          <th scope='row'>${esc(label)}<span class='cell-note'>${esc(metric)}</span></th>
           <td class='num'>${values.length ? dec1_(mean_(values)) : '—'}</td>
           <td class='num'>${values.length ? dec1_(median_(values)) : '—'}</td>
           <td class='num'>${values.length ? fmt_(Math.max.apply(null, values)) : '—'}</td>
           <td class='num'>${fmt_(values.length)}</td>
         </tr>`;
+      const perPersonRows = [['選手', drivers], ['応援', supPre.concat(supDay)]]
+        .map(([label, g]) =>
+          statRow(label, 'スタンプ数', g.map(s => count_(s.stamps)).filter(v => v > 0)) +
+          statRow(label, '接点企業数', g.map(s => count_(s.views)).filter(v => v > 0))
+        ).join('');
 
-      // 記録のある日数の分布。選手は来場を一律加算しているので区分を分けて出す。
-      const dayCounts = n => participants.filter(s =>
-        (s.days || []).filter(d => d.acted).length === n).length;
+      const supports = supPre.concat(supDay);
       const dayCountRows = days.map((_, i) => i + 1).concat([0]).sort((a, b) => a - b)
         .map(n => {
           const dv = drivers.filter(s => (s.days || []).filter(d => d.acted).length === n).length;
           const sv = supports.filter(s => (s.days || []).filter(d => d.acted).length === n).length;
           return `<tr><th scope='row'>${n}日</th>
-            <td class='num'>${fmt_(dv)}</td><td class='num'>${fmt_(sv)}</td><td class='num'>${fmt_(dayCounts(n))}</td></tr>`;
+            <td class='num'>${fmt_(dv)}</td><td class='num'>${fmt_(sv)}</td><td class='num'>${fmt_(dv + sv)}</td></tr>`;
         }).join('');
 
-      // 記録件数（スタンプ＋接点企業）の分布
       const totalActions = s => count_(s.stamps) + count_(s.views);
       const buckets = [
         ['0件',     s => totalActions(s) === 0],
@@ -749,57 +764,45 @@
           <td class='num'>${fmt_(dv)}</td><td class='num'>${fmt_(sv)}</td><td class='num'>${fmt_(dv + sv)}</td></tr>`;
       }).join('');
 
-      return sectionHtml_('参加指標', `
-        <p class='sec-note'>延べではなく実人数を分母にした記述統計です。分母は2種類あります。</p>
-        <p class='sec-note'>
-          <strong>登録者基準</strong>… 学生マスターの登録者${fmt_(R)}人。事前登録・当日登録の別を問わず全員。<br>
-          <strong>参加者基準（推定ユニーク参加学生）</strong>… ${fmt_(N)}人
-          （選手${fmt_(drivers.length)}／応援${fmt_(supports.length)}）。
-          事前登録の出場選手（全員）＋ いずれかの開催日にアクション記録がある応援学生。
-          選手は来場予定日を持たないため記録の有無によらず全員を含めています。
-        </p>
+      return sectionHtml_('アクション記録の集計', `
+        <p class='sec-note'>「アクション記録あり」は、スタンプ開始・当日登録／スタンプ取得／
+        企業によるQR読み取りのいずれかの記録が存在することです。記録の有無は来場の有無と同一ではありません。</p>
+        <p class='sec-note'><strong>選手と応援は分けて集計しています。</strong>選手は出走のため来場が確定しており
+        「記録なし」は来場したが操作しなかったことを指します。応援は来場自体が記録経由でしか分からないため、
+        「記録なし」が未来場なのか無操作なのかを区別できません。同じ率でも意味が違うので合算していません。</p>
+        <p class='sec-note'>参考値として、選手全員＋記録がある応援を合わせた実人数は
+        <strong>${fmt_(uniqueParticipants)}人</strong>です。イベント規模の目安であり、率の分母には使っていません。</p>
 
         <div class='sub-block'>
-          <div class='sub-title'>記録あり率</div>
-          <p class='sec-note'>分母が2種類あります。<strong>登録者基準</strong>は学生マスターの登録者
-          ${fmt_(R)}人、<strong>参加者基準</strong>は上の推定ユニーク参加学生${fmt_(N)}人です。</p>
-          <p class='sec-note'>アクション記録あり率の参加者基準を「—」にしているのは、参加者基準の分母が
-          「記録がある応援学生」で作られており、この率を出すと定義上ほぼ100%になって指標にならないためです。
-          記録の有無を見るときは登録者基準を使ってください。</p>
+          <div class='sub-title'>人数の内訳</div>
           <div class='tbl-wrap'>
-            <table class='data-tbl cross-tbl' aria-label='記録あり率'>
-              <thead>
-                <tr>
-                  <th rowspan='2' scope='col'>指標</th>
-                  <th colspan='2' scope='colgroup'>登録者基準</th>
-                  <th colspan='2' scope='colgroup'>参加者基準</th>
-                </tr>
-                <tr>
-                  <th class='num' scope='col'>割合</th><th class='num' scope='col'>分子/分母</th>
-                  <th class='num' scope='col'>割合</th><th class='num' scope='col'>分子/分母</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rateRow('アクション記録あり', rAll, null)}
-                ${rateRow('スタンプ記録あり', sAll, stamped)}
-                ${rateRow('QR接点記録あり', vAll, viewed)}
-              </tbody>
+            <table class='data-tbl' aria-label='区分別の人数'>
+              <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>登録者</th><th class='num' scope='col'>記録あり</th><th class='num' scope='col'>記録なし</th></tr></thead>
+              <tbody>${countRows}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class='sub-block'>
+          <div class='sub-title'>記録あり率（区分別）</div>
+          <p class='sec-note'>分母は各区分の登録者数です。大きい数字が割合、小さい数字が分子/分母です。</p>
+          <div class='tbl-wrap'>
+            <table class='data-tbl' aria-label='区分別の記録あり率'>
+              <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>アクション記録あり</th><th class='num' scope='col'>スタンプ記録あり</th><th class='num' scope='col'>QR接点記録あり</th></tr></thead>
+              <tbody>${rateRows}</tbody>
             </table>
           </div>
         </div>
 
         <div class='sub-block'>
           <div class='sub-title'>1人あたりの記録件数</div>
-          <p class='sec-note'>平均だけでは活動量の多い一部に引っ張られるため、中央値と最大値を併記しています。</p>
+          <p class='sec-note'>母集団はその区分で<strong>記録がある人だけ</strong>です。記録が無い人を含めると
+          区分によって0の意味が変わり比較できなくなるため除いています。平均だけでは活動量の多い一部に
+          引っ張られるので、中央値と最大値を併記しています。</p>
           <div class='tbl-wrap'>
             <table class='data-tbl' aria-label='1人あたりの記録件数'>
-              <thead><tr><th scope='col'>対象</th><th class='num' scope='col'>平均</th><th class='num' scope='col'>中央値</th><th class='num' scope='col'>最大</th><th class='num' scope='col'>人数</th></tr></thead>
-              <tbody>
-                ${statRow('スタンプ数', stampVals, '参加学生全員')}
-                ${statRow('スタンプ数', stampUsers, 'スタンプ記録がある学生のみ')}
-                ${statRow('接点企業数', viewVals, '参加学生全員')}
-                ${statRow('接点企業数', viewUsers, 'QR接点記録がある学生のみ')}
-              </tbody>
+              <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>平均</th><th class='num' scope='col'>中央値</th><th class='num' scope='col'>最大</th><th class='num' scope='col'>人数</th></tr></thead>
+              <tbody>${perPersonRows}</tbody>
             </table>
           </div>
         </div>
