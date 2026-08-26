@@ -531,20 +531,37 @@
       return sectionHtml_('運用データ', `
         <div class='sub-block'>
           <div class='sub-title'>弁当の未消化（応援のみ）</div>
-          <p class='sec-note'>事前登録で弁当を希望したのに、その日の来場記録が無かった学生の数です。
+          <p class='sec-note'>事前登録で弁当を希望したのに、<strong>その日の</strong>来場記録が無かった学生の数です。
           用意した弁当が余るリスクの目安になります。選手は弁当希望を取らず来場も一律扱いのため対象外です。</p>
           ${lunchTable}
+          <p class='sec-note' style='margin-top:8px'>※これは<strong>日ごと</strong>の数え方です。片方の日だけ来場した学生は、
+          来なかった日の「来場記録なし」に入ります。下の「記録が無い学生」は全開催日を通じて1件も記録が無い人だけなので、
+          こちらより小さい数になります。</p>
         </div>
         <div class='sub-block'>
-          <div class='sub-title'>記録が無い学生</div>
-          <p class='sec-note'>登録はあるものの、スタンプ開始・当日登録・スタンプ取得・QR読み取りの
-          いずれの記録も無かった学生です。実際に来場していても判別できないため、来場者数には含めていません。</p>
+          <div class='sub-title'>記録が無い学生（全開催日を通じて）</div>
+          <p class='sec-note'>スタンプ開始・当日登録・スタンプ取得・QR読み取りの
+          いずれの記録も、<strong>どの日にも</strong>残さなかった学生です。実際に来場していても判別できないため、
+          応援については来場者数に含めていません。選手は一律加算しているため、選手の人数は来場者数には影響しません。</p>
           <div class='tbl-wrap'>
             <table class='data-tbl' aria-label='記録が無い学生'>
-              <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>人数</th></tr></thead>
+              <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>対象</th><th class='num' scope='col'>記録なし</th></tr></thead>
               <tbody>
-                <tr><th scope='row'>学生マスターの登録者</th><td class='num'>${count_(ops.registeredStudents)}</td></tr>
-                <tr><th scope='row'>うち記録が一切ない（選手を除く）</th><td class='num'>${count_(ops.noRecordStudents)}</td></tr>
+                <tr>
+                  <th scope='row'>応援（学生マスター登録者・選手を除く）</th>
+                  <td class='num'>${Math.max(0, count_(ops.registeredStudents) - count_(ops.driverIdCount))}</td>
+                  <td class='num'>${count_(ops.noRecordStudents)}</td>
+                </tr>
+                <tr>
+                  <th scope='row'>選手</th>
+                  <td class='num'>${count_(ops.driverIdCount)}</td>
+                  <td class='num'>${count_(ops.driversNoRecord)}</td>
+                </tr>
+                <tr class='total-row'>
+                  <th scope='row'>合計</th>
+                  <td class='num'>${count_(ops.registeredStudents)}</td>
+                  <td class='num'>${count_(ops.noRecordStudents) + count_(ops.driversNoRecord)}</td>
+                </tr>
               </tbody>
             </table>
           </div>

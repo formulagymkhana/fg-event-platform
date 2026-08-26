@@ -3358,6 +3358,11 @@ function actionAdminGetAttendanceReport_(p) {
   const bySource = {}; // day -> { registration, stamp, view } の件数（内訳表示用。重複除去前の延べ数）
   days.forEach(d => { bySource[d] = { registration: 0, stamp: 0, view: 0 }; });
 
+  // 選手のうち、実際に何らかの記録（スタンプ開始・当日登録／スタンプ／QR読み取り）が
+  // 残っている人の studentId。来場者数の集計には使わない（選手は一律加算のまま）が、
+  // 「選手で何も操作しなかった人数」を出すために別途ためておく（2026-08-26 追加）。
+  const driverRecordIds = new Set();
+
   const addRows = (sheetName, timeColName, sidColName, key) => {
     const sheet = ss.getSheetByName(sheetName);
     if (!sheet || sheet.getLastRow() < 2) return;
@@ -3371,7 +3376,9 @@ function actionAdminGetAttendanceReport_(p) {
       if (!day || !byDay[day]) return; // 開催日外は無視
       const sid = String(r[sCol] || '');
       if (!sid) return;
-      if (driverIds.has(sid)) return;  // 選手は一律加算済み。二重計上を防ぐ
+      // 選手は一律加算済みなので来場者数には入れない（二重計上を防ぐ）。
+      // ただし記録が残っていること自体は控えておく。
+      if (driverIds.has(sid)) { driverRecordIds.add(sid); return; }
       byDay[day].add(sid);
       bySource[day][key]++;
     });
@@ -3619,7 +3626,10 @@ function actionAdminGetAttendanceReport_(p) {
     });
   }
 
-  // 登録はあるが、全開催日を通じて記録が一切ない学生（＝来場者数に計上されない人数）
+  // 登録はあるが、全開催日を通じて記録が一切ない学生（＝来場者数に計上されない人数）。
+  // ⚠ 上の「弁当の未消化」は日別（その日に記録が無い）なのに対し、こちらは
+  //   全開催日を通じて1件も記録が無い人だけを数える。片方の日しか来ていない学生は
+  //   弁当側では未消化に入るが、こちらには入らない。数字がずれるのはこのため。
   let registeredStudents = 0, noRecordStudents = 0;
   {
     const sheet = ss.getSheetByName(SHEET.STUDENTS);
@@ -3631,12 +3641,20 @@ function actionAdminGetAttendanceReport_(p) {
           const sid = String(r[sidCol] || '').trim();
           if (!sid) return;
           registeredStudents++;
-          if (driverIds.has(sid)) return;                    // 選手は一律来場扱い
+          if (driverIds.has(sid)) return;                    // 選手は別枠で数える
           if (!attendedNonDrivers.has(sid)) noRecordStudents++;
         });
       }
     }
   }
+
+  // 選手のうち、開催日中に何の記録も残さなかった人数（2026-08-26 追加）。
+  // 来場者数では選手を一律加算しているため、この人数は来場者数には影響しない。
+  // 分母は driverIds（＝studentId を持つ選手）。事前登録行に studentId が無い選手は
+  // 突き合わせようがないため、driverCount ではなく driverIds.size を分母にしている。
+  const driverIdCount     = driverIds.size;
+  const driversWithRecord = driverRecordIds.size;
+  const driversNoRecord   = Math.max(0, driverIdCount - driversWithRecord);
 
   // ── 景品（交換済み個数・交換回数） ──────────────────
   const prizeSheet = ss.getSheetByName(SHEET.PRIZE_LOG);
@@ -3674,6 +3692,9 @@ function actionAdminGetAttendanceReport_(p) {
     ops: {
       registeredStudents: registeredStudents,
       noRecordStudents:   noRecordStudents,
+      driverIdCount:      driverIdCount,
+      driversWithRecord:  driversWithRecord,
+      driversNoRecord:    driversNoRecord,
       lunch:              lunchRows_,
     },
     prizeItemCount,
