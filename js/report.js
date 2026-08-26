@@ -123,8 +123,8 @@
     if (!lastStudents_.length) return;
     const days = (lastStudents_[0].days || []).map(d => d.day);
     const header = ['studentId', '氏名', '大学名', '学年', '属性', '区分', '登録種別']
-      .concat(days.map(d => dayLabel_(d) + 'のアクション'))
-      .concat(['アクションのある日数', 'スタンプ数', 'QR件数', '弁当_土', '弁当_日']);
+      .concat(days.map(d => dayLabel_(d) + 'のアクション記録'))
+      .concat(['アクション記録のある日数', 'スタンプ数', 'QR件数', '弁当_土', '弁当_日']);
     const lines = [header.map(csvSafe_).join(',')];
     lastStudents_.forEach(s => {
       const dayFlags = (s.days || []).map(d => (d.acted ? 'あり' : 'なし'));
@@ -447,7 +447,7 @@
     const boothDays = Array.isArray(booth.days) && booth.days.length ? booth.days : days;
     const boothRows = Array.isArray(booth.rows) ? booth.rows : [];
     const boothTableHtml = boothRows.length ? `
-      <p class='sec-note'>企業ブースごとのスタンプ取得数です（取得数の多い順）。横にスクロールできます。</p>
+      <p class='sec-note'>企業ブースごとのスタンプ取得数です。ブース名順に並べています。横にスクロールできます。</p>
       <div class='tbl-wrap'>
         <table class='data-tbl booth-tbl' aria-label='ブース別スタンプ取得数'>
           <thead>
@@ -486,9 +486,8 @@
     // 企業別のQR読み取り。GAS 側が「延べ回数」ではなく実人数を返す点に注意（重複抑制のため）。
     const viewCompanyRows = Array.isArray((data.viewByCompany || {}).rows) ? data.viewByCompany.rows : [];
     const viewCompanyHtml = viewCompanyRows.length ? `
-      <p class='sec-note'>企業が学生QRを読み取った件数です（多い順）。
-      同じ企業が同じ学生を何度読み取っても1件として記録される仕様のため、
-      <strong>延べ回数ではなく読み取った学生の実人数</strong>に相当します。</p>
+      <p class='sec-note'>企業が学生QRを読み取った実人数です（企業と学生の組で重複を除いています）。
+      企業名順に並べています。</p>
       <div class='tbl-wrap'>
         <table class='data-tbl' aria-label='企業別のQR読み取り'>
           <thead><tr><th scope='col'>企業</th><th class='num' scope='col'>選手</th><th class='num' scope='col'>応援</th><th class='num' scope='col'>合計</th></tr></thead>
@@ -567,10 +566,10 @@
                 <th colspan='2' scope='colgroup'>弁当なし</th>
               </tr>
               <tr>
-                <th class='num' scope='col'>アクションあり</th>
-                <th class='num' scope='col'>アクションなし<span class='th-sub'>弁当が余る</span></th>
-                <th class='num' scope='col'>アクションあり<span class='th-sub'>案内未読か</span></th>
-                <th class='num' scope='col'>アクションなし</th>
+                <th class='num' scope='col'>アクション記録あり</th>
+                <th class='num' scope='col'>アクション<br>記録なし</th>
+                <th class='num' scope='col'>アクション<br>記録あり</th>
+                <th class='num' scope='col'>アクション記録なし</th>
               </tr>
             </thead>
             <tbody>
@@ -589,7 +588,7 @@
       const driverDayTable = driverDays.length ? `
         <div class='tbl-wrap'>
           <table class='data-tbl' aria-label='選手の日別アクション有無'>
-            <thead><tr><th scope='col'>日程</th><th class='num' scope='col'>アクションあり</th><th class='num' scope='col'>アクションなし</th></tr></thead>
+            <thead><tr><th scope='col'>日程</th><th class='num' scope='col'>アクション記録あり</th><th class='num' scope='col'>アクション記録なし</th></tr></thead>
             <tbody>
               ${driverDays.map(row => `<tr>
                 <th scope='row'>${esc(dayLabel_(row.day))}</th>
@@ -607,33 +606,32 @@
 
       return sectionHtml_('運用データ', `
         <div class='sub-block'>
-          <div class='sub-title'>弁当希望 × アクションの有無（応援・日別）</div>
+          <div class='sub-title'>弁当希望 × アクション記録の有無（応援・日別）</div>
           <p class='sec-note'>事前登録で弁当を希望したかどうかと、<strong>その日に</strong>何らかの操作
           （スタンプ開始・当日登録／スタンプ取得／QR読み取り）の記録が残ったかを掛け合わせています。
           読み方は次のとおりです。</p>
-          <p class='sec-note'>
-            <strong>弁当あり × アクションなし</strong>… 欠席、または来場したが何もアクションしなかった人。用意した弁当が余った可能性がある数です。<br>
-            <strong>弁当なし × アクションあり</strong>… 弁当を申し込まずに来場して操作した人。申込時の案内が読まれていない可能性があります。
-          </p>
+          <p class='sec-note'>4区分はいずれも人数です。「アクション記録あり」はその日にスタンプ開始・当日登録／
+          スタンプ取得／企業によるQR読み取りのいずれかの記録が存在すること、「アクション記録なし」は
+          いずれの記録も存在しないことを指します。記録の有無は来場の有無と同一ではありません。</p>
           <p class='sec-note'>対象は<strong>事前登録した選手以外</strong>です。当日登録者は弁当の設問自体を通っていないため含めていません。</p>
           ${lunchTable}
         </div>
         <div class='sub-block'>
-          <div class='sub-title'>選手のアクションなし（日別）</div>
-          <p class='sec-note'>選手は出走のため必ず来場しています。したがってここでの「アクションなし」は
-          <strong>来場したが何もアクションしなかった人数</strong>です（欠席ではありません）。
-          来場者数では選手を一律加算しているため、この人数は来場者数には影響しません。</p>
+          <div class='sub-title'>選手のアクション記録（日別）</div>
+          <p class='sec-note'>事前登録の参加区分が出場選手の学生について、その日にアクションの記録が
+          あったかを数えています。来場者数では選手を全開催日に一律加算しているため、この人数は
+          来場者数には影響しません。</p>
           ${driverDayTable}
         </div>
         <div class='sub-block'>
-          <div class='sub-title'>全開催日を通じて記録が無い学生</div>
+          <div class='sub-title'>全開催日を通じてアクション記録が無い学生</div>
           <p class='sec-note'>上の表が<strong>日ごと</strong>の数え方なのに対し、こちらは
           <strong>どの日にも</strong>1件も記録を残さなかった人だけを数えています。
-          片方の日だけ来場した学生は日別では「アクションなし」に入りますが、こちらには入りません。
+          片方の日だけ記録がある学生は日別では「アクション記録なし」に入りますが、こちらには入りません。
           そのため必ずこちらの方が小さい数になります。</p>
           <div class='tbl-wrap'>
             <table class='data-tbl' aria-label='全開催日を通じて記録が無い学生'>
-              <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>対象</th><th class='num' scope='col'>記録なし</th></tr></thead>
+              <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>対象</th><th class='num' scope='col'>アクション記録なし</th></tr></thead>
               <tbody>
                 <tr>
                   <th scope='row'>応援（学生マスター登録者・選手を除く）</th>
@@ -676,23 +674,23 @@
       const rows = Object.keys(bySchool).map(name => {
         const b = bySchool[name];
         return { name, ...b, idle: b.total - b.acted };
-      }).sort((a, b) => b.idle - a.idle || b.total - a.total);
+      }).sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja'));
 
       return sectionHtml_('大学別のアクション状況', `
-        <p class='sec-note'>学生マスターの登録者を大学ごとに集計しています。「アクションあり」は
+        <p class='sec-note'>学生マスターの登録者を大学ごとに集計しています。「アクション記録あり」は
         スタンプ開始・当日登録／スタンプ取得／企業によるQR読み取りのいずれかの記録が、
-        <strong>いずれかの開催日に</strong>あった人数です。アクションなしの多い順に並べています。</p>
+        <strong>いずれかの開催日に</strong>あった人数です。大学名順に並べています。</p>
         <p class='sec-note'>この表が<strong>含まないもの</strong>: 来場したが何もアクションしなかった人と、
-        そもそも来場しなかった人は区別できません。機器の不具合等で記録が残らなかった場合もアクションなしに入ります。
-        当日登録者は登録と同時に記録が残るため、登録した日は必ずアクションありになります。</p>
+        そもそも来場しなかった人は区別できません。機器の不具合等で記録が残らなかった場合もアクション記録なしに入ります。
+        当日登録者は登録と同時に記録が残るため、登録した日は必ずアクション記録ありになります。</p>
         <div class='tbl-wrap'>
           <table class='data-tbl' aria-label='大学別のアクション状況'>
             <thead><tr>
               <th scope='col'>大学</th>
               <th class='num' scope='col'>登録</th>
               <th class='num' scope='col'>うち選手</th>
-              <th class='num' scope='col'>アクションあり</th>
-              <th class='num' scope='col'>アクションなし</th>
+              <th class='num' scope='col'>アクション記録あり</th>
+              <th class='num' scope='col'>アクション記録なし</th>
               <th class='num' scope='col'>スタンプ<span class='th-sub'>延べ</span></th>
               <th class='num' scope='col'>QR<span class='th-sub'>件数</span></th>
             </tr></thead>

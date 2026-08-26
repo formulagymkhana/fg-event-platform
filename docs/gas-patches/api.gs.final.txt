@@ -3547,7 +3547,7 @@ function actionAdminGetAttendanceReport_(p) {
       return { driver: c.driver, nonDriver: c.nonDriver, total: c.driver + c.nonDriver };
     });
     return { name, days: perDay, total: perDay.reduce((s, c) => s + c.total, 0) };
-  }).sort((a, b) => b.total - a.total); // 取得数の多い順
+  }).sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja')); // 名前順（件数順はランキング表示になるため使わない）
 
   // 出場校エントリー数（＝報告書の「参加校数」）／出展企業数（＝ブース出展数）
   const schoolSheet2 = ss.getSheetByName(SHEET.SCHOOL_ENTRIES);
@@ -3609,7 +3609,7 @@ function actionAdminGetAttendanceReport_(p) {
       nonDriver: c.nonDriver,
       total: c.driver + c.nonDriver,
     };
-  }).sort((a, b) => b.total - a.total);
+  }).sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja')); // 名前順
 
   // ── 記録が無い学生・弁当の未消化 ──────────────────────
   // ⚠ 対象は選手以外のみ。選手は弁当希望を聞かず無条件で加算される運用
