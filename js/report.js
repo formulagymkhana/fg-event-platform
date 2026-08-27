@@ -278,11 +278,6 @@
       </section>`;
   }
 
-  function activityCell_(activity, kind, group) {
-    const cell = ((activity[kind] || {})[group]) || {};
-    return { count: count_(cell.count), users: count_(cell.users) };
-  }
-
   function detailText_(detail) {
     return Object.entries(detail || {})
       .sort((a, b) => count_(b[1]) - count_(a[1]))
@@ -490,49 +485,7 @@
     const days = Array.isArray(data.days) ? data.days : [];
     if (!lastPeriods_.length) return;
 
-    const byDay = data.byDay || {};
     const event = events_.find(item => String(item.eventId) === String(eventId));
-
-    const dayRows = days.map(day => {
-      const row = byDay[day] || {};
-      return `
-        <tr>
-          <th scope='row'>${esc(dayLabel_(day))}</th>
-          <td class='num'>${fmt_(row.drivers)}</td>
-          <td class='num'>${fmt_(row.nonDrivers)}</td>
-          <td class='num'>${fmt_(row.total)}</td>
-        </tr>`;
-    }).join('');
-
-    const totalDrivers = days.reduce((sum, day) => sum + count_((byDay[day] || {}).drivers), 0);
-    const totalSupport = days.reduce((sum, day) => sum + count_((byDay[day] || {}).nonDrivers), 0);
-    const totalVisitors = totalDrivers + totalSupport;
-
-    const sourceRows = days.map(day => {
-      const source = (byDay[day] || {}).sources || {};
-      return `
-        <tr>
-          <th scope='row'>${esc(dayLabel_(day))}</th>
-          <td class='num'>${fmt_(source.registration)}</td>
-          <td class='num'>${fmt_(source.stamp)}</td>
-          <td class='num'>${fmt_(source.view)}</td>
-        </tr>`;
-    }).join('');
-
-    const activity = data.activity || {};
-    const stampDriver = activityCell_(activity, 'stamp', 'driver');
-    const stampSupport = activityCell_(activity, 'stamp', 'nonDriver');
-    const viewDriver = activityCell_(activity, 'view', 'driver');
-    const viewSupport = activityCell_(activity, 'view', 'nonDriver');
-    const activityRows = [
-      ['選手', stampDriver, viewDriver],
-      ['応援', stampSupport, viewSupport],
-    ].map(([label, stamp, view]) => `
-      <tr>
-        <th scope='row'>${label}</th>
-        <td class='num'>${fmt_(stamp.count)}<span class='cell-sub'>${fmt_(stamp.users)}人</span></td>
-        <td class='num'>${fmt_(view.count)}<span class='cell-sub'>${fmt_(view.users)}人</span></td>
-      </tr>`).join('');
 
     // ── 開催サマリー（KPIはセクションの外に置く＝カードを入れ子にしない） ──
     const summary = data.eventSummary;
@@ -595,30 +548,6 @@
               <th scope='row'>登録者<span class='cell-note'>学生マスター</span></th>
               ${cohortCells(totalPeriod, 'registered')}
               <td class='num'>${fmt_(totalPeriod.total.registered)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>`);
-
-    const attendanceHtml = sectionHtml_('来場状況（日別・旧集計）', `
-      <p class='sec-note'>選手は登録ベース、応援は会場で確認できた来場記録ベースです。学生のみの日別の延べ人数で、企業スタッフ・一般来場者は含みません。</p>
-      <div class='tbl-wrap'>
-        <table class='data-tbl' aria-label='日別の学生来場者数'>
-          <thead>
-            <tr>
-              <th scope='col'>日程</th>
-              <th class='num' scope='col'>選手<span class='th-sub'>登録</span></th>
-              <th class='num' scope='col'>応援<span class='th-sub'>来場記録</span></th>
-              <th class='num' scope='col'>合計<span class='th-sub'>概算</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            ${dayRows}
-            <tr class='total-row'>
-              <th scope='row'>合計（延べ）</th>
-              <td class='num'>${fmt_(totalDrivers)}</td>
-              <td class='num'>${fmt_(totalSupport)}</td>
-              <td class='num'>${fmt_(totalVisitors)}</td>
             </tr>
           </tbody>
         </table>
@@ -692,8 +621,6 @@
         </table>
       </div>` : "<p class='empty-msg'>QR読み取りの記録はありません</p>";
 
-    const viewUsers = viewDriver.users + viewSupport.users;
-
     // スタンプ・景品は日ごとに1枚ずつカードを縦に並べ、最後に合計を足す。
     // ⚠ 期間切替タブとは独立。lastPeriods_ をそのまま並べるだけなので、
     //   開催日数が増えれば自動でカードの枚数も増える（3日開催なら4枚になる）。
@@ -714,13 +641,12 @@
       <p class='sec-note'>企業QRは再読み取り時に記録の時刻だけが更新されるため、日別には分けられません。
       開催期間を通じた合計のみを表示しています。</p>
       <div class='stat-grid'>
-        ${statHtml_('接点学生', count_(qr.contactStudents) || viewUsers, '名', '企業に読み取られた実人数')}
+        ${statHtml_('接点学生', count_(qr.contactStudents), '名', '企業に読み取られた実人数')}
         ${statHtml_('接点企業', count_(qr.contactCompanies) || viewCompanyRows.length, '社', '読み取り記録あり')}
       </div>
       ${sectionHtml_('企業別QR読み取り', viewCompanyHtml, { foldable: true, open: true })}`;
 
     // ── 学生属性 ──
-    const attributes = data.attributes;
     const YEAR_ORDER = ['大学1年生', '大学2年生', '大学3年生', '大学4年生', '大学院生', 'その他', '未回答'];
     const FACULTY_ORDER = ['理工学系', '人文・社会経済系', 'その他', '未回答'];
     // ⚠ 期間タブに依存せず、全期間（日ごと＋合計）を常にまとめて表示する（2026-08-26 修正）。
@@ -1179,6 +1105,8 @@
     })();
 
     // ── 集計方法（既定は閉じる。印刷時は CSS で必ず展開される） ──
+    const sourceTotals = data.sourceTotals || {};
+    const unmatchedLogs = data.unmatchedLogs || {};
     const methodologyHtml = sectionHtml_('集計方法・注意事項', `
       <p class='sec-note'><strong>来場者数:</strong> 学生のみの概算で、企業スタッフ・一般来場者は含みません。
       選手は来場予定日を取得していないため開催日すべてに一律加算し、応援はスタンプ開始・当日登録、
@@ -1188,35 +1116,31 @@
       来場記録が一切ない応援学生は、実際に来場していても判別できないため含みません。</p>
       <p class='sec-note'><strong>学生属性:</strong> 選手と来場記録のある応援学生が対象です。学年は自由記述から
       大学院生を補正し、短期大学・専門学校・自動車大学校は「その他」に含めます。</p>
-      <div class='attr-grid'>
-        <div class='sub-block'>
-          <div class='sub-title'>応援の来場判定に使用した記録</div>
-          <div class='tbl-wrap'>
-            <table class='data-tbl' aria-label='応援の来場判定に使用した記録'>
-              <thead><tr><th scope='col'>日程</th><th class='num' scope='col'>開始・当日登録</th><th class='num' scope='col'>スタンプ</th><th class='num' scope='col'>QR読み取り</th></tr></thead>
-              <tbody>${sourceRows}</tbody>
-            </table>
-          </div>
-          <p class='sec-note' style='margin-top:8px'>同じ学生が複数列に入るため、列の合計は応援来場者数と一致しません。</p>
-        </div>
-        <div class='sub-block'>
-          <div class='sub-title'>活動記録の選手・応援内訳</div>
-          <div class='tbl-wrap'>
-            <table class='data-tbl' aria-label='活動記録の選手と応援の内訳'>
-              <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>スタンプ取得</th><th class='num' scope='col'>QR読み取り</th></tr></thead>
-              <tbody>${activityRows}</tbody>
-            </table>
-          </div>
-          <p class='sec-note' style='margin-top:8px'>大きい数字は延べ回数、小さい数字はその記録を持つ実人数です。</p>
+      <div class='sub-block'>
+        <div class='sub-title'>元ログとの照合（検算用）</div>
+        <p class='sec-note'>この画面の集計はすべて学生マスター起点（<code>students[]</code>）で行っています。
+        以下は元ログの生の行数で、上の集計とは別に取っている検算用の数値です。学生マスターに存在しない
+        studentId の記録はここに含まれますが、学生単位の集計には反映されません（黙って除外されます）。
+        差が大きい場合は集計漏れの可能性があるため、この表で気づけるようにしています。</p>
+        <div class='tbl-wrap'>
+          <table class='data-tbl' aria-label='元ログとの照合'>
+            <thead><tr><th scope='col'>ログ</th><th class='num' scope='col'>行数</th><th class='num' scope='col'>うち学生マスターに無いstudentId</th></tr></thead>
+            <tbody>
+              <tr><th scope='row'>学生マスター</th><td class='num'>${fmt_(sourceTotals.studentRows)}</td><td class='num'>—</td></tr>
+              <tr><th scope='row'>開始・当日登録</th><td class='num'>${fmt_(sourceTotals.participantRows)}</td><td class='num'>${fmt_(unmatchedLogs.participants)}</td></tr>
+              <tr><th scope='row'>スタンプ取得</th><td class='num'>${fmt_(sourceTotals.stampRows)}</td><td class='num'>${fmt_(unmatchedLogs.stamp)}</td></tr>
+              <tr><th scope='row'>QR読み取り</th><td class='num'>${fmt_(sourceTotals.viewRows)}</td><td class='num'>${fmt_(unmatchedLogs.view)}</td></tr>
+              <tr><th scope='row'>景品交換<span class='cell-note'>開催期間内</span></th><td class='num'>${fmt_(sourceTotals.prizeRows)}</td><td class='num'>${fmt_(unmatchedLogs.prize)}</td></tr>
+              <tr><th scope='row'>景品交換<span class='cell-note'>全期間</span></th><td class='num'>${fmt_(sourceTotals.prizeRowsAllDays)}</td><td class='num'>—</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>`, { foldable: true, open: false });
 
     // 記録が1件も無いイベントは「集計に失敗した」と見分けがつかないため明示する。
     // （デジタル化前のイベントを開いた場合など。2026-08-26 追加）
-    const hasAnyRecord = days.some(day => {
-      const s = (byDay[day] || {}).sources || {};
-      return count_(s.registration) + count_(s.stamp) + count_(s.view) > 0;
-    });
+    const hasAnyRecord = count_(sourceTotals.participantRows) + count_(sourceTotals.stampRows)
+      + count_(sourceTotals.viewRows) > 0;
     const emptyHtml = hasAnyRecord ? '' : `
       <div class='warn-box' role='status'>
         <div class='warn-title'>このイベントにはアクションの記録がありません</div>
@@ -1246,7 +1170,6 @@
       </div>
       ${summaryHtml}
       ${attendanceMatrixHtml}
-      ${attendanceHtml}
       ${rallyHtml}
       ${attributeHtml}
       ${metricsHtml}
