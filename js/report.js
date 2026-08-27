@@ -632,7 +632,8 @@
     const boothDays = Array.isArray(booth.days) && booth.days.length ? booth.days : days;
     const boothRows = Array.isArray(booth.rows) ? booth.rows : [];
     const boothTableHtml = boothRows.length ? `
-      <p class='sec-note'>企業ブースごとのスタンプ取得数です。ブース名順に並べています。横にスクロールできます。</p>
+      <p class='sec-note'>企業ブースごとのスタンプ取得数です。ブース名順に並べています。横にスクロールできます。
+      記録のあるブースは${fmt_(boothRows.length)}件です。</p>
       <div class='tbl-wrap'>
         <table class='data-tbl booth-tbl' aria-label='ブース別スタンプ取得数'>
           <thead>
@@ -693,26 +694,32 @@
         </table>
       </div>` : "<p class='empty-msg'>QR読み取りの記録はありません</p>";
 
-    const stampCount = stampDriver.count + stampSupport.count;
-    const stampUsers = stampDriver.users + stampSupport.users;
-    const viewCount = viewDriver.count + viewSupport.count;
     const viewUsers = viewDriver.users + viewSupport.users;
-    // スタンプ・景品は期間別。QRは通算のみ（日で割ると最後に読まれた日に寄るため）。
     const qr = data.qrOverall || {};
-    const rallyHtml = `
-      <div class='area-label'>スタンプ・景品（${esc(period.label)}）</div>
+
+    // スタンプ・景品は日ごとに1枚ずつカードを縦に並べ、最後に合計を足す。
+    // ⚠ 期間切替タブとは独立。lastPeriods_ をそのまま並べるだけなので、
+    //   開催日数が増えれば自動でカードの枚数も増える（3日開催なら4枚になる）。
+    const stampCardsHtml = lastPeriods_.map(pr => `
+      <div class='period-stat-lbl'>${esc(pr.label)}</div>
       <div class='stat-grid'>
-        ${statHtml_('スタンプ取得', period.total.stampTotal, '回', `${fmt_(period.total.stampUsers)}人が取得`)}
-        ${statHtml_('景品交換', period.total.prizeExchanges, '回', '交換処理回数')}
-        ${statHtml_('交換済み景品', period.total.prizeItems, '個', '配布個数')}
-      </div>
-      <div class='area-label'>QR閲覧（2日間通算）</div>
+        ${statHtml_('スタンプ取得', pr.total.stampTotal, '回', `${fmt_(pr.total.stampUsers)}人が取得`)}
+        ${statHtml_('景品交換', pr.total.prizeExchanges, '回', '交換処理回数')}
+        ${statHtml_('交換済み景品', pr.total.prizeItems, '個', '配布個数')}
+      </div>`).join('');
+
+    const rallyHtml = `
+      <div class='area-label'>スタンプ</div>
+      ${stampCardsHtml}
+      ${sectionHtml_('ブース別スタンプ取得数', boothTableHtml, { foldable: true, open: true })}
+
+      <div class='area-label'>QR読み取り（2日間通算）</div>
+      <p class='sec-note'>企業QRは再読み取り時に記録の時刻だけが更新されるため、日別には分けられません。
+      開催期間を通じた合計のみを表示しています。</p>
       <div class='stat-grid'>
         ${statHtml_('接点学生', count_(qr.contactStudents) || viewUsers, '名', '企業に読み取られた実人数')}
         ${statHtml_('接点企業', count_(qr.contactCompanies) || viewCompanyRows.length, '社', '読み取り記録あり')}
-        ${statHtml_('記録ブース', boothRows.length, '件', 'スタンプ取得あり')}
       </div>
-      ${sectionHtml_('ブース別スタンプ取得数', boothTableHtml, { foldable: true, open: true })}
       ${sectionHtml_('企業別QR読み取り', viewCompanyHtml, { foldable: true, open: true })}`;
 
     // ── 学生属性 ──
