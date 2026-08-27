@@ -70,6 +70,15 @@
   .period-stat-lbl { font-size: 11px; font-weight: 700; color: var(--fg-muted); margin: 4px 0 6px 2px; }
   .period-stat-lbl:first-child { margin-top: 0; }
 
+  /* セクション内で日ごと（土/日/合計）のまとまりを示す軽い区切り。
+     影を付けない塗りだけの箱にして .stat-card / .section の入れ子二重カード化を避ける。 */
+  .period-group { background: var(--fg-bg); border-radius: 8px; padding: 12px 12px 2px; margin-bottom: 14px; }
+  .period-group:last-child { margin-bottom: 0; }
+  .period-group-lbl { font-size: 12px; font-weight: 700; color: var(--fg-navy); margin-bottom: 10px; }
+  .period-group .sub-block { margin-top: 14px; }
+  .period-group .sub-block:first-of-type { margin-top: 0; }
+  .period-group .attr-grid { margin-bottom: 10px; }
+
   /* ── 集計期間の切替（土曜／日曜／合計） ── */
   .period-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
   .period-lbl { font-size: 11px; font-weight: 700; color: var(--fg-muted); letter-spacing: .08em; margin-right: 2px; }
@@ -213,7 +222,8 @@
     .booth-tbl .col-booth, .booth-tbl .col-total { position: static; }
     .attr-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
     .sec-note, .stat-sub, .attr-detail { color: #444; }
-    .stat-grid, .section, .sub-block, .data-tbl tr { break-inside: avoid; }
+    .period-group { background: none; border: 1px solid var(--fg-line); border-radius: 0; padding: 8px; }
+    .stat-grid, .section, .sub-block, .period-group, .data-tbl tr { break-inside: avoid; }
     .data-tbl thead { display: table-header-group; }
   }
 </style>
@@ -258,6 +268,6 @@
 
 <script src="../js/config.js?v=20260724h"></script>
 <script src="../js/csv-util.js?v=20260825a"></script>
-<script src="../js/report.js?v=20260826v"></script>
+<script src="../js/report.js?v=20260826w"></script>
 </body>
 </html>

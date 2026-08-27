@@ -726,38 +726,42 @@
     const attributes = data.attributes;
     const YEAR_ORDER = ['大学1年生', '大学2年生', '大学3年生', '大学4年生', '大学院生', 'その他', '未回答'];
     const FACULTY_ORDER = ['理工学系', '人文・社会経済系', 'その他', '未回答'];
+    // ⚠ 期間タブに依存せず、全期間（日ごと＋合計）を常にまとめて表示する（2026-08-26 修正）。
+    //   タブを切り替えないと他の日が見られない状態をやめてほしいという要望による。
     const attributeHtml = !attributes ? '' : (() => {
-      // 期間別・区分別。母集団はその期間に来場として数えた学生。
-      const driver = { years: period.byCohort['選手'].years, prefectures: period.byCohort['選手'].prefectures,
-                       faculties: period.byCohort['選手'].faculties, facultiesDetail: (attributes.driver || {}).facultiesDetail };
-      const mergeDist = key => {
+      const mergeDist = (pr, key) => {
         const out = {};
         ['応援・事前', '応援・当日', '区分不明'].forEach(c => {
-          Object.keys(period.byCohort[c][key]).forEach(k => { out[k] = (out[k] || 0) + period.byCohort[c][key][k]; });
+          Object.keys(pr.byCohort[c][key]).forEach(k => { out[k] = (out[k] || 0) + pr.byCohort[c][key][k]; });
         });
         return out;
       };
-      const support = { years: mergeDist('years'), prefectures: mergeDist('prefectures'),
-                        faculties: mergeDist('faculties'), facultiesDetail: (attributes.nonDriver || {}).facultiesDetail };
-      const yearRows = comparisonRows_(driver.years, support.years, { order: YEAR_ORDER });
-      const prefectureRows = comparisonRows_(driver.prefectures, support.prefectures, {
-        limit: 11,
-        restUnit: '府県',
-      });
-      const facultyRows = comparisonRows_(driver.faculties, support.faculties, {
-        order: FACULTY_ORDER,
-        driverDetails: driver.facultiesDetail,
-        supportDetails: support.facultiesDetail,
-      });
+      const periodBlocks = lastPeriods_.map(pr => {
+        const driver = { years: pr.byCohort['選手'].years, prefectures: pr.byCohort['選手'].prefectures,
+                         faculties: pr.byCohort['選手'].faculties, facultiesDetail: (attributes.driver || {}).facultiesDetail };
+        const support = { years: mergeDist(pr, 'years'), prefectures: mergeDist(pr, 'prefectures'),
+                          faculties: mergeDist(pr, 'faculties'), facultiesDetail: (attributes.nonDriver || {}).facultiesDetail };
+        const yearRows = comparisonRows_(driver.years, support.years, { order: YEAR_ORDER });
+        const prefectureRows = comparisonRows_(driver.prefectures, support.prefectures, { limit: 11, restUnit: '府県' });
+        const facultyRows = comparisonRows_(driver.faculties, support.faculties, {
+          order: FACULTY_ORDER, driverDetails: driver.facultiesDetail, supportDetails: support.facultiesDetail,
+        });
+        return `
+          <div class='period-group'>
+            <div class='period-group-lbl'>${esc(pr.label)}</div>
+            <div class='attr-grid'>
+              ${attributeBlockHtml_('学年', yearRows, false)}
+              ${attributeBlockHtml_('住所（都道府県）', prefectureRows, false)}
+              ${attributeBlockHtml_('学部学科（自動分類）', facultyRows, true)}
+            </div>
+          </div>`;
+      }).join('');
 
-      return sectionHtml_(`学生属性（${period.label}）`, `
-        <p class='sec-note'>${esc(period.label)}に来場として数えた学生が対象です。期間を切り替えると母集団が変わります。
-        区分と並び順は開催報告書に合わせています。学部学科は自由入力をキーワード分類した参考値で、入力内訳を併記しています。</p>
-        <div class='attr-grid'>
-          ${attributeBlockHtml_('学年', yearRows, false)}
-          ${attributeBlockHtml_('住所（都道府県）', prefectureRows, false)}
-          ${attributeBlockHtml_('学部学科（自動分類）', facultyRows, true)}
-        </div>`, { foldable: true, open: false });
+      return sectionHtml_('学生属性', `
+        <p class='sec-note'>その日に来場として数えた学生が対象です。日ごとに母集団が変わるため、
+        人数や構成が日によって異なります。区分と並び順は開催報告書に合わせています。
+        学部学科は自由入力をキーワード分類した参考値で、入力内訳を併記しています。</p>
+        ${periodBlocks}`, { foldable: true, open: false });
     })();
 
     // ── 運用データ（弁当の未消化・記録が無い学生） ──
@@ -894,40 +898,10 @@
         + supDay.filter(s => s.actedAny).length
         + supUnk.filter(s => s.actedAny).length;
 
-      const countRows = groups.map(([label, g, note]) => {
-        const a = period.byCohort[label] ? period.byCohort[label].acted : 0;
-        return `<tr>
-          <th scope='row'>${esc(label)}<span class='cell-note'>${esc(note)}</span></th>
-          <td class='num'>${fmt_(g.length)}</td>
-          <td class='num'>${fmt_(a)}</td>
-          <td class='num'>${fmt_(g.length - a)}</td>
-        </tr>`;
-      }).join('') + `<tr class='total-row'>
-        <th scope='row'>合計</th>
-        <td class='num'>${fmt_(allStudents.length)}</td>
-        <td class='num'>${fmt_(period.total.acted)}</td>
-        <td class='num'>${fmt_(count_(period.total.registered) - count_(period.total.acted))}</td>
-      </tr>`;
-
       const cell = (num, den) => {
         const r = rate_(num, den);
         return `<td class='num'>${r.text}<span class='cell-sub'>${r.detail}</span></td>`;
       };
-      // ⚠ ここに「アクション記録あり（いずれか）」の率を置かないこと（2026-08-26 判断）。
-      //   3ソースのうち「スタンプ開始・当日登録」は activateStamp が MYPASS を開いた
-      //   時点でも呼ばれるため（js/mypass.js の restoreStampCookie_）、受付を通れば
-      //   ほぼ全員に付く。OR判定の率は常に100%近くになり指標として機能しない。
-      //   ブースでの行動はスタンプ取得とQR接点で見る。
-      // スタンプは期間別、QR接点は通算（日別に割れないため）。
-      const rateRows = groups.map(([label, g]) => {
-        const b = period.byCohort[label];   // label は COHORTS のキーと一致させること
-        return `<tr>
-          <th scope='row'>${esc(label)}</th>
-          ${cell(b.stampUsers, b.registered)}
-          ${cell(b.qrUsers, b.registered)}
-        </tr>`;
-      }).join('');
-
       // 1人あたりは「その区分で記録がある人」だけを母集団にする。
       // 記録が無い人を含めると、区分によって0の意味が変わって比較できなくなる。
       const statRow = (label, metric, values) => `
@@ -939,12 +913,81 @@
           <td class='num'>${fmt_(values.length)}</td>
         </tr>`;
       const supCohorts = ['応援・事前', '応援・当日', '区分不明'];
-      const supStampValues = supCohorts.reduce((a, c) => a.concat(period.byCohort[c].stampValues), []);
-      const perPersonRows =
-        statRow('選手', 'スタンプ数（' + period.label + '）', period.byCohort['選手'].stampValues) +
-        statRow('選手', '接点企業数（2日間通算）', drivers.map(s => count_(s.qrCompanyCount)).filter(v => v > 0)) +
-        statRow('応援', 'スタンプ数（' + period.label + '）', supStampValues) +
-        statRow('応援', '接点企業数（2日間通算）', supports.map(s => count_(s.qrCompanyCount)).filter(v => v > 0));
+
+      // ⚠ 期間タブに依存せず、日ごと＋合計を常にまとめて表示する（2026-08-26 修正）。
+      //   QR接点は日別に割れない（通算のみ）ため、どの期間ブロックでも同じ値になる。
+      //   毎回同じ数字が出るのは誤りではなくQRの性質だと分かるよう注記している。
+      const periodBlocks = lastPeriods_.map(pr => {
+        const countRows = groups.map(([label, g, note]) => {
+          const a = pr.byCohort[label] ? pr.byCohort[label].acted : 0;
+          return `<tr>
+            <th scope='row'>${esc(label)}<span class='cell-note'>${esc(note)}</span></th>
+            <td class='num'>${fmt_(g.length)}</td>
+            <td class='num'>${fmt_(a)}</td>
+            <td class='num'>${fmt_(g.length - a)}</td>
+          </tr>`;
+        }).join('') + `<tr class='total-row'>
+          <th scope='row'>合計</th>
+          <td class='num'>${fmt_(allStudents.length)}</td>
+          <td class='num'>${fmt_(pr.total.acted)}</td>
+          <td class='num'>${fmt_(count_(pr.total.registered) - count_(pr.total.acted))}</td>
+        </tr>`;
+
+        // ⚠ ここに「アクション記録あり（いずれか）」の率を置かないこと（2026-08-26 判断）。
+        //   3ソースのうち「スタンプ開始・当日登録」は activateStamp が MYPASS を開いた
+        //   時点でも呼ばれるため（js/mypass.js の restoreStampCookie_）、受付を通れば
+        //   ほぼ全員に付く。OR判定の率は常に100%近くになり指標として機能しない。
+        //   ブースでの行動はスタンプ取得とQR接点で見る。
+        const rateRows = groups.map(([label]) => {
+          const b = pr.byCohort[label];   // label は COHORTS のキーと一致させること
+          return `<tr>
+            <th scope='row'>${esc(label)}</th>
+            ${cell(b.stampUsers, b.registered)}
+            ${cell(b.qrUsers, b.registered)}
+          </tr>`;
+        }).join('');
+
+        const supStampValues = supCohorts.reduce((a, c) => a.concat(pr.byCohort[c].stampValues), []);
+        const perPersonRows =
+          statRow('選手', 'スタンプ数', pr.byCohort['選手'].stampValues) +
+          statRow('選手', '接点企業数（2日間通算）', drivers.map(s => count_(s.qrCompanyCount)).filter(v => v > 0)) +
+          statRow('応援', 'スタンプ数', supStampValues) +
+          statRow('応援', '接点企業数（2日間通算）', supports.map(s => count_(s.qrCompanyCount)).filter(v => v > 0));
+
+        return `
+          <div class='period-group'>
+            <div class='period-group-lbl'>${esc(pr.label)}</div>
+            <div class='sub-block'>
+              <div class='sub-title'>人数の内訳</div>
+              <div class='tbl-wrap'>
+                <table class='data-tbl' aria-label='区分別の人数 ${esc(pr.label)}'>
+                  <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>登録者</th><th class='num' scope='col'>記録あり</th><th class='num' scope='col'>記録なし</th></tr></thead>
+                  <tbody>${countRows}</tbody>
+                </table>
+              </div>
+            </div>
+            <div class='sub-block'>
+              <div class='sub-title'>ブースでの記録あり率</div>
+              <p class='sec-note'>スタンプ取得は${esc(pr.label)}の値、QR接点は2日間通算の値です（日別に割れないため、
+              どの期間ブロックでも同じ数字になります）。</p>
+              <div class='tbl-wrap'>
+                <table class='data-tbl' aria-label='区分別の記録あり率 ${esc(pr.label)}'>
+                  <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>スタンプ取得</th><th class='num' scope='col'>QR接点</th></tr></thead>
+                  <tbody>${rateRows}</tbody>
+                </table>
+              </div>
+            </div>
+            <div class='sub-block'>
+              <div class='sub-title'>1人あたりの記録件数</div>
+              <div class='tbl-wrap'>
+                <table class='data-tbl' aria-label='1人あたりの記録件数 ${esc(pr.label)}'>
+                  <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>平均</th><th class='num' scope='col'>中央値</th><th class='num' scope='col'>最大</th><th class='num' scope='col'>人数</th></tr></thead>
+                  <tbody>${perPersonRows}</tbody>
+                </table>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
 
       const dayCountRows = days.map((_, i) => i + 1).concat([0]).sort((a, b) => a - b)
         .map(n => {
@@ -967,7 +1010,7 @@
           <td class='num'>${fmt_(dv)}</td><td class='num'>${fmt_(sv)}</td><td class='num'>${fmt_(dv + sv)}</td></tr>`;
       }).join('');
 
-      return sectionHtml_(`アクション記録の集計（${period.label}）`, `
+      return sectionHtml_('アクション記録の集計', `
         <p class='sec-note'>「アクション記録あり」は、スタンプ開始・当日登録／スタンプ取得／
         企業によるQR読み取りの<strong>いずれか</strong>の記録が存在することです。記録の有無は来場の有無と同一ではありません。
         3種類は性質が違うので、下の表では分けて出しています。</p>
@@ -978,49 +1021,11 @@
         「スタンプ開始」を含みます。ブースを回ったかどうかは、その下の表の「スタンプ取得」「QR接点」で見てください。</p>
         <p class='sec-note'>参考値として、選手全員＋記録がある応援を合わせた実人数は
         <strong>${fmt_(uniqueParticipants)}人</strong>です。イベント規模の目安であり、率の分母には使っていません。</p>
+        <p class='sec-note'>1人あたりの記録件数の母集団はその区分で<strong>記録がある人だけ</strong>です。記録が無い人を
+        含めると区分によって0の意味が変わり比較できなくなるため除いています。平均だけでは活動量の多い一部に
+        引っ張られるので、中央値と最大値を併記しています。</p>
 
-        <div class='sub-block'>
-          <div class='sub-title'>人数の内訳</div>
-          <div class='tbl-wrap'>
-            <table class='data-tbl' aria-label='区分別の人数'>
-              <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>登録者</th><th class='num' scope='col'>記録あり</th><th class='num' scope='col'>記録なし</th></tr></thead>
-              <tbody>${countRows}</tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class='sub-block'>
-          <div class='sub-title'>ブースでの記録あり率（区分別）</div>
-          <p class='sec-note'>スタンプ取得は${esc(period.label)}の値です。QR接点は日別に割れないため、
-          期間を切り替えても2日間通算の値のままです。</p>
-          <p class='sec-note'>分母は各区分の登録者数です。大きい数字が割合、小さい数字が分子/分母です。</p>
-          <p class='sec-note'>3種類の記録のうち<strong>「スタンプ開始・当日登録」はここに含めていません。</strong>
-          学生が自分のパス画面（MYPASS）を開いた時点でも記録が作られる仕組みのため、受付を通ればほぼ全員に付き、
-          率にすると常に100%近くになって指標として機能しないためです。上の「記録あり」はこの記録を含みます。</p>
-          <div class='tbl-wrap'>
-            <table class='data-tbl' aria-label='区分別の記録あり率'>
-              <thead><tr>
-                <th scope='col'>区分</th>
-                <th class='num' scope='col'>スタンプ取得</th>
-                <th class='num' scope='col'>QR接点</th>
-              </tr></thead>
-              <tbody>${rateRows}</tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class='sub-block'>
-          <div class='sub-title'>1人あたりの記録件数</div>
-          <p class='sec-note'>母集団はその区分で<strong>記録がある人だけ</strong>です。記録が無い人を含めると
-          区分によって0の意味が変わり比較できなくなるため除いています。平均だけでは活動量の多い一部に
-          引っ張られるので、中央値と最大値を併記しています。</p>
-          <div class='tbl-wrap'>
-            <table class='data-tbl' aria-label='1人あたりの記録件数'>
-              <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>平均</th><th class='num' scope='col'>中央値</th><th class='num' scope='col'>最大</th><th class='num' scope='col'>人数</th></tr></thead>
-              <tbody>${perPersonRows}</tbody>
-            </table>
-          </div>
-        </div>
+        ${periodBlocks}
 
         <div class='sub-block'>
           <div class='sub-title'>アクション記録のある日数</div>
