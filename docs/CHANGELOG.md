@@ -31,6 +31,29 @@ GAS はリポジトリ管理外のため、push しても自動反映されま�
 
 ---
 
+## 2026-08-26 Step4-1 学部学科の生テキストとPRE_REG突き合わせ警告を追加
+
+- 変更ファイル: `docs/gas-patches/api.gs.final.txt`
+- 変更内容:
+  - `students[]` に `faculty`（学部学科の生テキスト）と `hasPreRegistration`
+    （PRE_REGに対応する行があるか）を追加。フロントはまだ参照していない（Step4-2で使う）。
+  - PRE_REGと学生マスターの突き合わせ警告を追加。
+    - PRE_REG内の `studentId` 重複
+    - PRE_REG内の `studentId` 空欄
+    - PRE_REGにあるが学生マスターに存在しない `studentId`（孤立行）
+    - 選手として登録された `studentId` が学生マスターに存在しない
+- 理由/背景: `ops`（弁当・選手記録集計）の母集団はPRE_REGの全行であり、`students[]`
+  （学生マスター起点）とは母集団が異なる。`students[]`だけから`ops`相当を再現すると、
+  両者の食い違い（孤立行・重複ID）を静かに握りつぶすことになるため、先に検知の仕組みを
+  用意した。
+- GAS: **再デプロイ必須**
+- 申し送り/注意点:
+  - 追加のみの変更で、既存のレスポンス・警告・集計値は変更していない。
+  - `hasPreRegistration`は「事前登録した応援 かつ 学生マスターにも存在する」を
+    Step4-2で判定する際の基準になる。
+  - `faculty`は、`facultiesDetail`（学部自動分類の検証用に実際の学科名を出す機能）を
+    `students`から期間別に導出し直すためにStep4-2で使う。
+
 ## 2026-08-26 Step3 期間切替（土曜／日曜／合計）とフロント側の共通集計
 
 - 変更ファイル: `js/report.js`, `app/report.html`

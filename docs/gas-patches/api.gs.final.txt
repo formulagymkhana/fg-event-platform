@@ -3364,6 +3364,13 @@ function actionAdminGetAttendanceReport_(p) {
   const preData_ = (preSheet && preSheet.getLastRow() > 1) ? preSheet.getDataRange().getValues() : null;
   let driverCount = 0, fgDrivers = 0, womenDrivers = 0;
   const driverIds = new Set();
+  // ⚠ PRE_REG の全 studentId（区分を問わず）と、重複IDを検出するためのセット。
+  //   students[] は学生マスター起点で作るため、PRE_REG にだけ存在する行（マスターと
+  //   結合できない孤立行）はそこに現れない。弁当集計等は PRE_REG 起点のままにする
+  //   必要があるため、この不一致を検知して警告する（2026-08-26 追加）。
+  const preRegSidSet_ = new Set();
+  const preRegDupSids_ = new Set();
+  let preRegBlankSidCount_ = 0;
   if (!preSheet) {
     warnings.push('シート「' + SHEET.PRE_REG + '」が見つかりません。選手数・弁当の集計は0件になります。');
   }
@@ -3385,6 +3392,14 @@ function actionAdminGetAttendanceReport_(p) {
         if (sid) driverIds.add(sid);
       }
     });
+    if (sidCol >= 0) {
+      pData.slice(1).forEach(r => {
+        const sid = String(r[sidCol] || '').trim();
+        if (!sid) { preRegBlankSidCount_++; return; }
+        if (preRegSidSet_.has(sid)) preRegDupSids_.add(sid);
+        preRegSidSet_.add(sid);
+      });
+    }
   }
 
   // ── 選手以外（3方向の和集合・日別） ──────────────────
@@ -3850,6 +3865,8 @@ function actionAdminGetAttendanceReport_(p) {
           yearGroup:    normalizeYear_(yrCol >= 0 ? r[yrCol] : ''),
           prefecture:   prefCol >= 0 ? (String(r[prefCol] || '').trim() || '未回答') : '未回答',
           facultyGroup: classifyFaculty_(facCol >= 0 ? r[facCol] : ''),
+          faculty:      facCol >= 0 ? String(r[facCol] || '').trim() : '',   // 生の学部学科（分類の検証用）
+          hasPreRegistration: preRegSidSet_.has(sid),   // PRE_REG に対応する行があるか
           days:      perDay,
           actedAny:  perDay.some(d => d.acted),
           stamps:    stampBySid_[sid] || 0,   // スタンプ取得の回数（1回ごとに別の記録なので行数でよい）
@@ -3860,6 +3877,31 @@ function actionAdminGetAttendanceReport_(p) {
         });
       });
     }
+  }
+
+  // ── PRE_REG と学生マスターの突き合わせ警告（2026-08-26 追加） ──
+  // ⚠ 弁当集計・選手判定は PRE_REG 起点のままで、students[]（学生マスター起点）と
+  //   母集団が異なる。両者が食い違っている場合は数値のズレとしてではなく、
+  //   ここで明示的に検知して警告する。
+  if (preRegDupSids_.size > 0) {
+    warnings.push('事前登録シートに studentId が重複している行が' + preRegDupSids_.size +
+      '件あります（' + Array.from(preRegDupSids_).slice(0, 5).join('、') +
+      (preRegDupSids_.size > 5 ? ' ほか' : '') + '）。弁当・選手判定が二重に計上されている可能性があります。');
+  }
+  if (preRegBlankSidCount_ > 0) {
+    warnings.push('事前登録シートに studentId が空の行が' + preRegBlankSidCount_ + '件あります。');
+  }
+  const preRegOrphanCount_ = Array.from(preRegSidSet_).filter(sid => !studentIdSet_.has(sid)).length;
+  if (preRegOrphanCount_ > 0) {
+    warnings.push('事前登録シートにあるが学生マスターに存在しない studentId が' + preRegOrphanCount_ +
+      '件あります。該当する学生は students（大学別・学生属性・CSV）には含まれませんが、' +
+      '弁当・選手数の集計には含まれています。');
+  }
+  const driverOrphanCount_ = Array.from(driverIds).filter(sid => !studentIdSet_.has(sid)).length;
+  if (driverOrphanCount_ > 0) {
+    warnings.push('選手として登録された studentId のうち' + driverOrphanCount_ +
+      '件が学生マスターに存在しません。該当する選手は students・大学別集計には含まれませんが、' +
+      '選手数（出場選手・FG/女子）には含まれています。');
   }
 
   // 選手のうち、開催日中に何の記録も残さなかった人数（2026-08-26 追加）。
