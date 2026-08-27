@@ -290,60 +290,54 @@
       .join('、');
   }
 
-  function comparisonRows_(driverValues, supportValues, options) {
+  // 4区分（選手／応援・事前／応援・当日／区分不明）で分布を比較する行を作る。
+  // ⚠ 以前は選手/応援の2列に応援側3区分を合算していたが、「アクション記録の集計」
+  //   セクションは既に4区分で出しており粒度が不揃いだった（2026-08-26 修正）。
+  function cohortDistRows_(distByCohort, options) {
     const opts = options || {};
-    const driver = driverValues || {};
-    const support = supportValues || {};
-    const existing = Array.from(new Set([...Object.keys(driver), ...Object.keys(support)]));
+    const existing = Array.from(new Set(
+      COHORTS.flatMap(c => Object.keys((distByCohort[c] || {}).dist || {}))
+    ));
     let keys;
-
     if (opts.order) {
       keys = opts.order.concat(existing.filter(key => !opts.order.includes(key)));
     } else {
       keys = existing.sort((a, b) => {
-        const countDiff = (count_(driver[b]) + count_(support[b]))
-          - (count_(driver[a]) + count_(support[a]));
-        return countDiff || String(a).localeCompare(String(b), 'ja');
+        const sum = k => COHORTS.reduce((s, c) => s + count_((distByCohort[c] || {}).dist && distByCohort[c].dist[k]), 0);
+        return sum(b) - sum(a) || String(a).localeCompare(String(b), 'ja');
       });
     }
 
-    const makeRow = key => ({
-      label: key,
-      driver: count_(driver[key]),
-      support: count_(support[key]),
-      driverDetail: detailText_(opts.driverDetails && opts.driverDetails[key]),
-      supportDetail: detailText_(opts.supportDetails && opts.supportDetails[key]),
-    });
+    const makeRow = key => {
+      const values = {};
+      COHORTS.forEach(c => { values[c] = count_((distByCohort[c] || {}).dist && distByCohort[c].dist[key]); });
+      return {
+        label: key,
+        values,
+        details: COHORTS.map(c => detailText_((distByCohort[c] || {}).detail && distByCohort[c].detail[key])),
+      };
+    };
 
     const rows = keys.map(makeRow);
     if (!opts.limit || rows.length <= opts.limit) return rows;
 
     const visible = rows.slice(0, opts.limit);
     const rest = rows.slice(opts.limit);
-    visible.push({
-      label: `他${rest.length}${opts.restUnit || '件'}`,
-      driver: rest.reduce((sum, row) => sum + row.driver, 0),
-      support: rest.reduce((sum, row) => sum + row.support, 0),
-      driverDetail: '',
-      supportDetail: '',
-    });
+    const restValues = {};
+    COHORTS.forEach(c => { restValues[c] = rest.reduce((sum, row) => sum + row.values[c], 0); });
+    visible.push({ label: `他${rest.length}${opts.restUnit || '件'}`, values: restValues, details: ['', '', '', ''] });
     return visible;
   }
 
   function attributeBlockHtml_(title, rows, wide) {
     const bodyRows = rows.length ? rows.map(row => {
-      const details = row.driverDetail || row.supportDetail
-        ? `<span class='attr-detail'>
-            ${row.driverDetail ? `<span>選手：${esc(row.driverDetail)}</span>` : ''}
-            ${row.supportDetail ? `<span>応援：${esc(row.supportDetail)}</span>` : ''}
-          </span>`
-        : '';
+      const detailSpans = COHORTS.map((c, i) => row.details[i] ? `<span>${esc(c)}：${esc(row.details[i])}</span>` : '').join('');
+      const total = COHORTS.reduce((s, c) => s + row.values[c], 0);
       return `
         <tr>
-          <th scope='row'>${esc(row.label)}${details}</th>
-          <td class='num'>${fmt_(row.driver)}</td>
-          <td class='num'>${fmt_(row.support)}</td>
-          <td class='num'>${fmt_(row.driver + row.support)}</td>
+          <th scope='row'>${esc(row.label)}${detailSpans ? `<span class='attr-detail'>${detailSpans}</span>` : ''}</th>
+          ${COHORTS.map(c => `<td class='num'>${fmt_(row.values[c])}</td>`).join('')}
+          <td class='num'>${fmt_(total)}</td>
         </tr>`;
     }).join('') : "<tr><td colspan='4' class='empty-msg'>データなし</td></tr>";
 
@@ -352,7 +346,7 @@
         <div class='sub-title'>${esc(title)}</div>
         <div class='tbl-wrap'>
           <table class='data-tbl attr-tbl' aria-label='${esc(title)}'>
-            <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>選手</th><th class='num' scope='col'>応援</th><th class='num' scope='col'>合計</th></tr></thead>
+            <thead><tr><th scope='col'>区分</th>${COHORTS.map(c => `<th class='num' scope='col'>${esc(c)}</th>`).join('')}<th class='num' scope='col'>合計</th></tr></thead>
             <tbody>${bodyRows}</tbody>
           </table>
         </div>
@@ -367,6 +361,7 @@
   // ⚠ QRは日別に割らない。企業QRは再読み取りで時刻だけ更新されるため、日で割ると
   //   最後に読まれた日に寄る。QR関連はイベント通算の qrOverall を使う。
   const COHORTS = ['選手', '応援・事前', '応援・当日', '区分不明'];
+  const COHORTS_FACULTY_GROUPS = ['理工学系', '人文・社会経済系', 'その他', '未回答'];
 
   function derivePeriods_(students, days) {
     const defs = days.map((d, i) => ({ key: d, label: dayLabel_(d), kind: 'day', idx: [i] }));
@@ -378,6 +373,10 @@
       registered: 0, unique: 0, gross: 0, acted: 0,
       stampTotal: 0, stampUsers: 0, prizeExchanges: 0, prizeItems: 0,
       years: {}, prefectures: {}, faculties: {}, stampValues: [], qrUsers: 0,
+      // facultiesDetail: 学部区分(3〜4種)ごとに実際の学科名(生テキスト)の件数。
+      // 旧 GAS の attributes.facultiesDetail は期間非依存の単一値だったが、
+      // ここで students[].faculty から期間ごとに作り直す（2026-08-26 Step4-2）。
+      facultiesDetail: { '理工学系': {}, '人文・社会経済系': {}, 'その他': {}, '未回答': {} },
     });
     const bump = (obj, key) => { const k = String(key == null ? '' : key).trim() || '未回答'; obj[k] = (obj[k] || 0) + 1; };
 
@@ -415,6 +414,8 @@
           bump(b.years, s.yearGroup);
           bump(b.prefectures, s.prefecture);
           bump(b.faculties, s.facultyGroup);
+          const fg = COHORTS_FACULTY_GROUPS.indexOf(s.facultyGroup) >= 0 ? s.facultyGroup : '未回答';
+          bump(b.facultiesDetail[fg], s.faculty);
         }
       });
 
@@ -427,6 +428,11 @@
         total.stampValues = total.stampValues.concat(b.stampValues);
         ['years','prefectures','faculties'].forEach(dist => {
           Object.keys(b[dist]).forEach(k => { total[dist][k] = (total[dist][k] || 0) + b[dist][k]; });
+        });
+        COHORTS_FACULTY_GROUPS.forEach(fg => {
+          Object.keys(b.facultiesDetail[fg]).forEach(k => {
+            total.facultiesDetail[fg][k] = (total.facultiesDetail[fg][k] || 0) + b.facultiesDetail[fg][k];
+          });
         });
       });
 
@@ -529,7 +535,7 @@
       </tr>`).join('');
 
     // ── 開催サマリー（KPIはセクションの外に置く＝カードを入れ子にしない） ──
-    const summary = data.summary;
+    const summary = data.eventSummary;
     const summaryHtml = !summary ? '' : (() => {
       const registeredDrivers = count_(summary.fgDrivers) + count_(summary.womenDrivers);
       return `
@@ -538,7 +544,7 @@
           ${statHtml_('出場校', count_(summary.schoolEntryCount), '校', '出場校エントリー')}
           ${statHtml_('出展ブース', count_(summary.companyCount), '社', '出店中の企業')}
           ${statHtml_('出場選手', registeredDrivers, '名', `FG ${count_(summary.fgDrivers)} / 女子 ${count_(summary.womenDrivers)}`)}
-          ${statHtml_('登録学生', count_((data.eventSummary || {}).registeredStudents) || count_((data.ops || {}).registeredStudents), '名', '学生マスター')}
+          ${statHtml_('登録学生', count_(summary.registeredStudents), '名', '学生マスター')}
           ${statHtml_('来場学生の所属大学', count_(summary.attendeeSchoolCount), '校', '応援のみの大学を含む')}
           ${statHtml_('開催日数', days.length, '日間', days.map(dayLabel_).join('・'))}
         </div>`;
@@ -548,6 +554,9 @@
     // ⚠ 各日の値は lastPeriods_ の day 期間から取る。ここで再集計しないこと。
     const dayPeriods = lastPeriods_.filter(pr => pr.kind === 'day');
     const totalPeriod = lastPeriods_.find(pr => pr.kind === 'total') || dayPeriods[dayPeriods.length - 1];
+    // ⚠ students の別名。opsHtml/metricsHtml/schoolHtml など後続セクションが参照するので、
+    //   ここで一度だけ宣言する（複数箇所で data.students を読み直さない）。
+    const allStudents = Array.isArray(data.students) ? data.students : [];
     const cohortCells = (pr, field) => COHORTS.map(c =>
       `<td class='num'>${fmt_(pr.byCohort[c][field])}</td>`).join('');
 
@@ -616,7 +625,8 @@
       </div>`);
 
     // ── スタンプラリー ──
-    const booth = data.booth || {};
+    const qr = data.qrOverall || {};
+    const booth = data.boothByDay || {};
     const boothDays = Array.isArray(booth.days) && booth.days.length ? booth.days : days;
     const boothRows = Array.isArray(booth.rows) ? booth.rows : [];
     const boothTableHtml = boothRows.length ? `
@@ -658,7 +668,7 @@
       </div>` : "<p class='empty-msg'>ブース別スタンプの記録はありません</p>";
 
     // 企業別のQR読み取り。GAS 側が「延べ回数」ではなく実人数を返す点に注意（重複抑制のため）。
-    const viewCompanyRows = Array.isArray((data.viewByCompany || {}).rows) ? data.viewByCompany.rows : [];
+    const viewCompanyRows = Array.isArray(qr.byCompany) ? qr.byCompany : [];
     const viewCompanyHtml = viewCompanyRows.length ? `
       <p class='sec-note'>企業が学生QRを読み取った実人数です（企業と学生の組で重複を除いています）。
       企業名順に並べています。</p>
@@ -683,7 +693,6 @@
       </div>` : "<p class='empty-msg'>QR読み取りの記録はありません</p>";
 
     const viewUsers = viewDriver.users + viewSupport.users;
-    const qr = data.qrOverall || {};
 
     // スタンプ・景品は日ごとに1枚ずつカードを縦に並べ、最後に合計を足す。
     // ⚠ 期間切替タブとは独立。lastPeriods_ をそのまま並べるだけなので、
@@ -716,29 +725,31 @@
     const FACULTY_ORDER = ['理工学系', '人文・社会経済系', 'その他', '未回答'];
     // ⚠ 期間タブに依存せず、全期間（日ごと＋合計）を常にまとめて表示する（2026-08-26 修正）。
     //   タブを切り替えないと他の日が見られない状態をやめてほしいという要望による。
-    const attributeHtml = !attributes ? '' : (() => {
-      const mergeDist = (pr, key) => {
-        const out = {};
-        ['応援・事前', '応援・当日', '区分不明'].forEach(c => {
-          Object.keys(pr.byCohort[c][key]).forEach(k => { out[k] = (out[k] || 0) + pr.byCohort[c][key][k]; });
-        });
-        return out;
-      };
+    // ⚠ Step4-2（2026-08-26）: attributes（旧・期間非依存の単一値）への依存を廃止し、
+    //   lastPeriods_（students から導出済み）だけを参照する。4区分（選手／応援・事前／
+    //   応援・当日／区分不明）で表示する。以前は応援側3区分を合算した2列だったが、
+    //   「アクション記録の集計」は既に4区分で出しており粒度が不揃いだった。
+    const attributeHtml = !lastPeriods_.length ? '' : (() => {
       const periodBlocks = lastPeriods_.map(pr => {
-        const driver = { years: pr.byCohort['選手'].years, prefectures: pr.byCohort['選手'].prefectures,
-                         faculties: pr.byCohort['選手'].faculties, facultiesDetail: (attributes.driver || {}).facultiesDetail };
-        const support = { years: mergeDist(pr, 'years'), prefectures: mergeDist(pr, 'prefectures'),
-                          faculties: mergeDist(pr, 'faculties'), facultiesDetail: (attributes.nonDriver || {}).facultiesDetail };
-        const yearRows = comparisonRows_(driver.years, support.years, { order: YEAR_ORDER });
-        const prefectureRows = comparisonRows_(driver.prefectures, support.prefectures, { limit: 11, restUnit: '府県' });
-        const facultyRows = comparisonRows_(driver.faculties, support.faculties, {
-          order: FACULTY_ORDER, driverDetails: driver.facultiesDetail, supportDetails: support.facultiesDetail,
+        const prefectureRows = cohortDistRows_(
+          Object.fromEntries(COHORTS.map(c => [c, { dist: pr.byCohort[c].prefectures }])),
+          { limit: 11, restUnit: '府県' }
+        );
+        const facultyByCohort = {};
+        COHORTS.forEach(c => {
+          facultyByCohort[c] = {
+            dist: pr.byCohort[c].faculties,
+            detail: Object.fromEntries(FACULTY_ORDER.map(fg => [fg, pr.byCohort[c].facultiesDetail[fg]])),
+          };
         });
+        const facultyRows = cohortDistRows_(facultyByCohort, { order: FACULTY_ORDER });
+        const yearByCohort = {};
+        COHORTS.forEach(c => { yearByCohort[c] = { dist: pr.byCohort[c].years }; });
         return `
           <div class='period-group'>
             <div class='period-group-lbl'>${esc(pr.label)}</div>
             <div class='attr-grid'>
-              ${attributeBlockHtml_('学年', yearRows, false)}
+              ${attributeBlockHtml_('学年', cohortDistRows_(yearByCohort, { order: YEAR_ORDER }), false)}
               ${attributeBlockHtml_('住所（都道府県）', prefectureRows, false)}
               ${attributeBlockHtml_('学部学科（自動分類）', facultyRows, true)}
             </div>
@@ -753,9 +764,56 @@
     })();
 
     // ── 運用データ（弁当の未消化・記録が無い学生） ──
-    const ops = data.ops;
-    const opsHtml = !ops ? '' : (() => {
-      const lunch = Array.isArray(ops.lunch) ? ops.lunch : [];
+    // ⚠ Step4-2（2026-08-26）: GAS の ops フィールドへの依存を廃止し、lastPeriods_ と
+    //   students[].hasPreRegistration から導出する。
+    //   ⚠ 弁当の母集団は元々「PRE_REGの全行」だったが、students[]は学生マスター起点
+    //   なのでPRE_REGにあってもマスターに無い孤立行はここに現れない
+    //   （検知は GAS 側の warnings「PRE_REGにあるが学生マスターに存在しないstudentId」）。
+    //   hasPreRegistration で絞ることで、少なくとも学生マスターの登録種別だけを見て
+    //   誤って当日登録者を弁当対象に含めてしまう事故は防いでいる。
+    const lunchFieldForDay_ = day => {
+      const m = String(day).match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
+      if (!m) return null;
+      const w = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getDay();
+      if (w === 6) return 'lunchSat';
+      if (w === 0) return 'lunchSun';
+      return null;
+    };
+    const opsHtml = !allStudents.length ? '' : (() => {
+      const lunchPre = allStudents.filter(s => !s.isDriver && s.regType === '事前' && s.hasPreRegistration);
+      const lunch = dayPeriods.map(pr => {
+        const field = lunchFieldForDay_(pr.key);
+        if (!field) return null;
+        const idx = pr.dayIdx[0];
+        let yesActive = 0, yesIdle = 0, noActive = 0, noIdle = 0;
+        lunchPre.forEach(s => {
+          const wants = s[field] === 'はい';
+          const acted = !!((s.days || [])[idx] || {}).acted;
+          if (wants && acted) yesActive++;
+          else if (wants) yesIdle++;
+          else if (acted) noActive++;
+          else noIdle++;
+        });
+        return { day: pr.key, yesActive, yesIdle, noActive, noIdle };
+      }).filter(Boolean);
+
+      const driversTotal = totalPeriod.byCohort['選手'];
+      const driverIdCount = driversTotal.registered;
+      const driversWithRecord = driversTotal.acted;
+      const driversNoRecord = Math.max(0, driverIdCount - driversWithRecord);
+      const driverDays = dayPeriods.map(pr => ({
+        day: pr.key,
+        active: pr.byCohort['選手'].acted,
+        idle: Math.max(0, pr.byCohort['選手'].registered - pr.byCohort['選手'].acted),
+      }));
+      const supportNoRecord = ['応援・事前', '応援・当日', '区分不明'].reduce((sum, c) =>
+        sum + Math.max(0, totalPeriod.byCohort[c].registered - totalPeriod.byCohort[c].acted), 0);
+      const ops = {
+        registeredStudents: allStudents.length,
+        noRecordStudents: supportNoRecord,
+        driverIdCount, driversWithRecord, driversNoRecord,
+      };
+
       const lunchTable = lunch.length ? `
         <div class='tbl-wrap'>
           <table class='data-tbl cross-tbl' aria-label='弁当希望とアクション有無のクロス集計'>
@@ -784,7 +842,6 @@
           </table>
         </div>` : "<p class='empty-msg'>弁当希望の記録はありません</p>";
 
-      const driverDays = Array.isArray(ops.driverDays) ? ops.driverDays : [];
       const driverDayTable = driverDays.length ? `
         <div class='tbl-wrap'>
           <table class='data-tbl' aria-label='選手の日別アクション有無'>
@@ -813,7 +870,8 @@
           <p class='sec-note'>4区分はいずれも人数です。「アクション記録あり」はその日にスタンプ開始・当日登録／
           スタンプ取得／企業によるQR読み取りのいずれかの記録が存在すること、「アクション記録なし」は
           いずれの記録も存在しないことを指します。記録の有無は来場の有無と同一ではありません。</p>
-          <p class='sec-note'>対象は<strong>事前登録した選手以外</strong>です。当日登録者は弁当の設問自体を通っていないため含めていません。</p>
+          <p class='sec-note'>対象は<strong>事前登録した選手以外</strong>です。当日登録者は弁当の設問自体を通っていないため含めていません。
+          事前登録シートにあるが学生マスターに存在しない学生は対象に含められません（該当があれば上に警告が出ます）。</p>
           ${lunchTable}
         </div>
         <div class='sub-block'>
@@ -862,7 +920,6 @@
     //         「来たが操作しなかった」のか区別できない。
     //   さらに当日登録は登録と同時に記録が付くため定義上100%になる。応援に混ぜると率が上がる。
     //   よって 選手 / 応援(事前登録) / 応援(当日登録) の3区分で出す。
-    const allStudents = Array.isArray(data.students) ? data.students : [];
     const metricsHtml = !allStudents.length ? '' : (() => {
       // ⚠ 登録種別は GAS の normalizeRegType_ で 事前/当日/不明 の3値に正規化済み。
       //   ここで `!== '事前'` のような判定をしないこと。空欄を当日登録に寄せると、
@@ -1039,15 +1096,14 @@
 
     // ── 大学別のアクション状況 ──
     // 判断材料として出すだけで、値の良し悪しはここでは述べない。
-    const students = Array.isArray(data.students) ? data.students : [];
-    lastStudents_ = students;
+    lastStudents_ = allStudents;
     lastEventId_ = eventId;
-    const schoolHtml = !students.length ? '' : (() => {
+    const schoolHtml = !allStudents.length ? '' : (() => {
       // ⚠ 期間タブに依存せず、日ごと＋合計を常にまとめて表示する（2026-08-26 修正）。
       //   QR接点は日別に割れない（通算のみ）ため、どの期間ブロックでも同じ値になる。
       const bySchoolForPeriod = pr => {
         const bySchool = {};
-        students.forEach(s => {
+        allStudents.forEach(s => {
           const key = String(s.school || '（大学名なし）');
           if (!bySchool[key]) bySchool[key] = { total: 0, acted: 0, drivers: 0, stamps: 0, views: 0 };
           const b = bySchool[key];

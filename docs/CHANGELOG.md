@@ -31,6 +31,35 @@ GAS はリポジトリ管理外のため、push しても自動反映されま�
 
 ---
 
+## 2026-08-27 Step4-2 フロントを新フィールドへ切替、学生属性を4区分・運用データをlastPeriods_由来に
+
+- 変更ファイル: `js/report.js`, `app/report.html`
+- 変更内容:
+  - 集計元を旧フィールドから新フィールドへ切替: `data.summary`→`data.eventSummary`、
+    `data.booth`→`data.boothByDay`、`data.viewByCompany`→`data.qrOverall.byCompany`。
+  - 学生属性（学年・住所・学部学科）の表を、選手/応援の2区分から
+    選手/応援・事前/応援・当日/区分不明の4区分表示に戻した（`cohortDistRows_`・
+    `attributeBlockHtml_`を4区分対応に書き換え）。`derivePeriods_`の期間別集計に
+    `facultiesDetail`（学部自動分類の内訳）を追加し、`students[].faculty`（Step4-1で追加）
+    から期間ごとに再構築するようにした。
+  - 運用データ（弁当希望×アクション記録・選手の日別記録・記録なし人数）を、`data.ops`を
+    参照せず`lastPeriods_`・`students[].hasPreRegistration`から導出するように書き換えた。
+    弁当集計の対象は「事前登録の応援 かつ PRE_REGに対応行がある学生」に限定。
+- 理由/背景: Step2で追加した新フィールドへの移行と、Step1で先送りにしていた学生属性の
+  4区分粒度の復元。`ops`はPRE_REG起点で母集団が`students[]`と異なるため、Step4-1で追加した
+  `hasPreRegistration`を使わずに`students[]`だけから再現すると母集団の食い違いを
+  静かに握りつぶすことになる（レビュー指摘により修正）。
+- GAS: 不要（Step4-1で追加済みのフィールドを消費するのみ）
+- 申し送り/注意点:
+  - 旧フィールド（`summary`/`booth`/`viewByCompany`/`attributes`/`ops`）はまだGAS側に
+    残っている。フロントは参照しなくなったが、削除はキャッシュされた旧JS配信への配慮から
+    フロント切替確認後の別リリース（Step4-4）に分離する。
+  - モックデータ（`data.summary`等の旧5フィールドを意図的に欠落させたレスポンス）で
+    ローカル検証済み。弁当クロス集計・選手日別記録・記録なし人数の全数値を手計算と突合し一致。
+  - `来場状況（日別・旧集計）`セクションと`集計方法`内の`sourceRows`/`activityRows`監査表は
+    今回は未着手（Step4-3で対応。単純な重複除去ではなく「生ログ件数表示の意図的な廃止」として
+    ドキュメント化する）。
+
 ## 2026-08-26 Step4-1 学部学科の生テキストとPRE_REG突き合わせ警告を追加
 
 - 変更ファイル: `docs/gas-patches/api.gs.final.txt`
