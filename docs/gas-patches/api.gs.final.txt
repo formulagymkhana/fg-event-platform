@@ -1496,6 +1496,17 @@ function actionRegisterPreStudent_(p) {
   const attr = preAttr_(p.category, p.driverClass, p.serviceClass);
   if (isPastCategoryDeadline_(cfg, attr)) return err_('registration_closed');
 
+  // ⚠ 学校職員の参加承諾書は女子クラスドライバーのみ必須。
+  //   女子クラスは出場校エントリー(actionSubmitSchoolEntry_)を経由しないため、
+  //   この承諾書が「学校の許可を得ている」ことを確認できる唯一の書類になる。
+  //   フロント(register-pre.js の fileSpec)でも必須にしているが、学校エントリーと同様に
+  //   サーバー側でも検証する。フォームを経由しない送信や、フロントの検証が抜けた場合に、
+  //   承諾書の無い申込が「受付しました」として記録されるのを防ぐため。
+  if (String(p.category) === '出場選手(女子クラスドライバー)') {
+    const approvalFile = (p.files || {}).approval;
+    if (!approvalFile || !approvalFile.b64) return err_('missing_approval');
+  }
+
   const ss           = eventSs_(p.event);
   const studentSheet = ss.getSheetByName(SHEET.STUDENTS);
 

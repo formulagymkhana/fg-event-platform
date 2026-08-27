@@ -75,6 +75,8 @@ let _formConfig = {};
     const du = _formConfig.docUrls || {};
     if (du.rulebook) { const a = $('link-doc-rulebook'); if (a) a.href = du.rulebook; }
     if (du.pledge)   { const a = $('link-doc-pledge');   if (a) a.href = du.pledge;   }
+    // 学校職員の参加承諾書（女子クラスドライバー区分）。学校エントリーと同じ設定値を使う。
+    if (du.schoolApproval) { const a = $('link-doc-approval'); if (a) a.href = du.schoolApproval; }
     const now = new Date();
 
     // フォーム公開開始前
@@ -213,7 +215,7 @@ function fileSpec(cat) {
   if (cat === '出場選手(FGクラスドライバー)')
     return [{ key: 'pledge', id: 'f-fg-pledge', req: true }, { key: 'license', id: 'f-fg-license', req: true }];
   if (cat === '出場選手(女子クラスドライバー)')
-    return [{ key: 'approval', id: 'f-w-approval', req: false }, { key: 'pledge', id: 'f-w-pledge', req: true }, { key: 'license', id: 'f-w-license', req: true }];
+    return [{ key: 'approval', id: 'f-w-approval', req: true }, { key: 'pledge', id: 'f-w-pledge', req: true }, { key: 'license', id: 'f-w-license', req: true }];
   if (cat === '補欠ドライバー')
     return [{ key: 'pledge', id: 'f-b-pledge', req: true }, { key: 'license', id: 'f-b-license', req: true }];
   if (cat === '見学・応援学生(メカニック登録含む)') {
