@@ -556,31 +556,50 @@
         </div>`;
     })();
 
-    const attendanceRows = COHORTS.map(c => {
-      const b = period.byCohort[c];
-      if (!b.registered) return '';
-      return `<tr>
-        <th scope='row'>${esc(c)}</th>
-        <td class='num'>${fmt_(b.registered)}</td>
-        <td class='num'>${fmt_(b.unique)}</td>
-        <td class='num'>${fmt_(b.gross)}</td>
-      </tr>`;
-    }).join('') + `<tr class='total-row'>
-      <th scope='row'>合計</th>
-      <td class='num'>${fmt_(period.total.registered)}</td>
-      <td class='num'>${fmt_(period.total.unique)}</td>
-      <td class='num'>${fmt_(period.total.gross)}</td>
-    </tr>`;
+    // 日（行）× 学生区分（列）のクロス表。期間タブを切り替えなくても日ごとの比較ができる。
+    // ⚠ 各日の値は lastPeriods_ の day 期間から取る。ここで再集計しないこと。
+    const dayPeriods = lastPeriods_.filter(pr => pr.kind === 'day');
+    const totalPeriod = lastPeriods_.find(pr => pr.kind === 'total') || dayPeriods[dayPeriods.length - 1];
+    const cohortCells = (pr, field) => COHORTS.map(c =>
+      `<td class='num'>${fmt_(pr.byCohort[c][field])}</td>`).join('');
 
-    const attendanceByCohortHtml = sectionHtml_(`来場概要（${period.label}）`, `
-      <p class='sec-note'>学生区分ごとの来場者数です。<strong>実人数</strong>は同じ学生を期間内で1人として数え、
-      <strong>延べ</strong>は日ごとの人数を単純合計しています。1日だけの期間では両者は一致します。</p>
-      <p class='sec-note'>選手は来場予定日を取得していないため、記録の有無によらず全開催日を来場として数えています
-      （実測ではなく規則による加算です）。応援は記録がある日だけを来場として数えます。</p>
+    const attendanceMatrixHtml = sectionHtml_('来場概要', `
+      <p class='sec-note'>日ごとの来場者数を学生区分別に並べています。上の期間切替とは独立していて、
+      この表は常に全日程を表示します。</p>
+      <p class='sec-note'><strong>延べ</strong>は日ごとの人数を単純合計したものです。
+      <strong>実人数</strong>は同じ学生を全日程で1人として数え直しています。両日来場した学生がいる分、
+      実人数は延べより小さくなります。</p>
+      <p class='sec-note'>選手は来場予定日を取得していないため、記録の有無によらず全開催日を来場として
+      数えています（実測ではなく規則による加算です）。応援は記録がある日だけを来場として数えます。</p>
       <div class='tbl-wrap'>
-        <table class='data-tbl' aria-label='区分別の来場者数'>
-          <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>登録者</th><th class='num' scope='col'>実人数</th><th class='num' scope='col'>延べ</th></tr></thead>
-          <tbody>${attendanceRows}</tbody>
+        <table class='data-tbl' aria-label='日別・区分別の来場者数'>
+          <thead><tr>
+            <th scope='col'>日程</th>
+            ${COHORTS.map(c => `<th class='num' scope='col'>${esc(c)}</th>`).join('')}
+            <th class='num' scope='col'>合計</th>
+          </tr></thead>
+          <tbody>
+            ${dayPeriods.map(pr => `<tr>
+              <th scope='row'>${esc(pr.label)}</th>
+              ${cohortCells(pr, 'unique')}
+              <td class='num'>${fmt_(pr.total.unique)}</td>
+            </tr>`).join('')}
+            <tr class='total-row'>
+              <th scope='row'>合計（延べ）</th>
+              ${cohortCells(totalPeriod, 'gross')}
+              <td class='num'>${fmt_(totalPeriod.total.gross)}</td>
+            </tr>
+            <tr class='total-row'>
+              <th scope='row'>実人数<span class='cell-note'>重複を除いた人数</span></th>
+              ${cohortCells(totalPeriod, 'unique')}
+              <td class='num'>${fmt_(totalPeriod.total.unique)}</td>
+            </tr>
+            <tr>
+              <th scope='row'>登録者<span class='cell-note'>学生マスター</span></th>
+              ${cohortCells(totalPeriod, 'registered')}
+              <td class='num'>${fmt_(totalPeriod.total.registered)}</td>
+            </tr>
+          </tbody>
         </table>
       </div>`);
 
@@ -1166,7 +1185,7 @@
         </div>
       </div>
       ${summaryHtml}
-      ${attendanceByCohortHtml}
+      ${attendanceMatrixHtml}
       ${attendanceHtml}
       ${rallyHtml}
       ${attributeHtml}
