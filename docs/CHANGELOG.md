@@ -31,6 +31,35 @@ GAS はリポジトリ管理外のため、push しても自動反映されま�
 
 ---
 
+## 2026-08-27 Step4-4 GASの旧フィールドと学生別旧エイリアスを削除
+
+- 変更ファイル: `docs/gas-patches/api.gs.final.txt`, `js/report.js`, `app/report.html`
+- 変更内容:
+  - `adminGetAttendanceReport` のレスポンスから旧フィールド（`byDay`/`activity`/
+    `summary`/`attributes`/`booth`/`viewByCompany`/`ops`）を削除。Step4-1〜4-3で
+    フロントの参照は無くなっていたが、GAS側の計算・出力自体は残っていたため今回削除した。
+  - `students[]`から旧エイリアス（`actedAny`/`stamps`/`views`）を削除。
+  - 上記削除に伴い不要になった中間変数・関数も削除（`byDayResult`/`bySource`/`attrs_`/
+    `mkDist_`/`bump_`/`countActivity_`/`stampAct_`/`viewAct_`/`actOut_`/`stampBySid_`/
+    `lunchColOfDay_`/`lunchRows_`/`driverDayRows_`/`noRecordStudents`/`driverIdCount`/
+    `driversAllDays`/`driversWithRecord`/`driversNoRecord`）。`registeredStudents`と
+    `schoolSet`（`eventSummary`が使う）は計算ロジックを残して継続使用。
+  - `js/report.js`側で、GAS削除より前から実は残っていた`students[].actedAny/.stamps/.views`
+    への参照3箇所（CSV出力のスタンプ数合計・大学別セクションのアクションあり人数集計・
+    記録件数分布のバケット分け）を発見し、`days[]`/`qrCompanyCount`から導出する形に修正。
+    Step4-2時点でこれらの参照を見落としており、今回のGAS削除で気づいた。
+- 理由/背景: フロントが新フィールドへ完全に切り替わったため（Step4-2/4-3）、GAS側の
+  旧フィールドは死んだコードになっていた。キャッシュされた旧JS配信への配慮から
+  Step4-2/4-3とは別リリースとして分離した。
+- GAS: **再デプロイ必須**
+- 申し送り/注意点:
+  - モックデータ（`actedAny`/`stamps`/`views`を意図的に持たない`students[]`）で
+    ローカル検証済み。CSV出力のスタンプ数合計、アクション記録の集計、大学別セクションの
+    数値がすべて正しく算出されることを確認（例: スタンプ数合計 = 日別stampCountの合計）。
+  - GAS再デプロイ前は旧フロントJS（ブラウザキャッシュ）が新フィールド無しのレスポンスを
+    期待するコードのままの場合があるが、report.jsは既にStep4-2/4-3で新フィールドのみを
+    参照するよう切り替え済みのため、再デプロイのタイミングによる不整合は無い。
+
 ## 2026-08-27 Step4-3 旧来場状況セクションと生ログ件数表を廃止、元ログ照合表に置き換え
 
 - 変更ファイル: `js/report.js`, `app/report.html`

@@ -160,6 +160,7 @@
     lastStudents_.forEach(s => {
       const sd = s.days || [];
       const actedDays = sd.filter(d => d.acted).length;
+      const stampTotal = sd.reduce((sum, d) => sum + count_(d.stampCount), 0);
       lines.push([
         s.studentId, s.name, s.school, s.year, s.yearGroup, s.attribute,
         s.cohort || (s.isDriver ? '選手' : '応援'), s.regType, s.prefecture, s.facultyGroup,
@@ -167,7 +168,7 @@
        .concat(sd.map(d => (d.acted ? 'あり' : 'なし')))
        .concat(sd.map(d => count_(d.stampCount)))
        .concat(sd.map(d => count_(d.prizeExchangeCount)))
-       .concat([actedDays, s.stamps, count_(s.qrCompanyCount), s.lunchSat, s.lunchSun])
+       .concat([actedDays, stampTotal, count_(s.qrCompanyCount), s.lunchSat, s.lunchSun])
        .map(csvSafe_).join(','));
     });
     downloadCsv_(`学生アクション明細_${lastEventId_ || 'event'}.csv`, lines.join('\r\n'));
@@ -864,10 +865,11 @@
         ['区分不明', supUnk, '登録種別が事前・当日のどちらでもない'],
       ];
       // 規模の目安。率の分母には使わない（区分ごとに分母が異なるため）。
+      const actedAny_ = s => (s.days || []).some(d => d.acted);
       const uniqueParticipants = drivers.length
-        + supPre.filter(s => s.actedAny).length
-        + supDay.filter(s => s.actedAny).length
-        + supUnk.filter(s => s.actedAny).length;
+        + supPre.filter(actedAny_).length
+        + supDay.filter(actedAny_).length
+        + supUnk.filter(actedAny_).length;
 
       const cell = (num, den) => {
         const r = rate_(num, den);
@@ -968,7 +970,7 @@
             <td class='num'>${fmt_(dv)}</td><td class='num'>${fmt_(sv)}</td><td class='num'>${fmt_(dv + sv)}</td></tr>`;
         }).join('');
 
-      const totalActions = s => count_(s.stamps) + count_(s.views);
+      const totalActions = s => (s.days || []).reduce((sum, d) => sum + count_(d.stampCount), 0) + count_(s.qrCompanyCount);
       const buckets = [
         ['0件',     s => totalActions(s) === 0],
         ['1件',     s => totalActions(s) === 1],
