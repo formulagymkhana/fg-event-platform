@@ -51,9 +51,8 @@
   let reportRequestId_ = 0;
   let lastStudents_ = [];   // 直近に描画した学生ごとの明細（CSV出力用）
   let lastEventId_ = '';
-  let lastData_ = null;     // 直近のAPIレスポンス（期間切替で再取得しないため保持）
-  let lastPeriods_ = [];    // derivePeriods_ の結果
-  let periodKey_ = 'total'; // 選択中の期間。既定は2日間合計
+  let lastData_ = null;     // 直近のAPIレスポンス（再取得せず再描画するために保持）
+  let lastPeriods_ = [];    // derivePeriods_ の結果。全セクションが直接ループする
 
   async function call_(action, params) {
     const body = JSON.stringify({ action, adminKey: adminKey_, ...params });
@@ -176,13 +175,6 @@
 
   $('report-body')?.addEventListener('click', event => {
     if (event.target.id === 'btn-csv-students') { exportStudentsCsv_(); return; }
-    // 期間切替。データは保持しているので再取得せず描画だけやり直す。
-    const pb = event.target.closest && event.target.closest('.period-btn');
-    if (pb) {
-      periodKey_ = pb.dataset.period;
-      renderReport_();
-      return;
-    }
     const head = foldTarget_(event.target);
     if (head) toggleSection_(head);
   });
@@ -475,26 +467,22 @@
       return;
     }
 
-    // 期間切替では再取得しない。取得結果と導出結果を保持して描画だけやり直す。
+    // データ取得と描画を分けている（renderReport_ が本体）。全セクションが
+    // lastPeriods_ を直接ループして日ごと＋合計をまとめて表示する設計になったため
+    // （2026-08-26）、選択中の期間を保持する必要が無くなり、再取得しない構造だけ残した。
     lastData_ = data;
     lastEventId_ = eventId;
     lastStudents_ = Array.isArray(data.students) ? data.students : [];
     lastPeriods_ = derivePeriods_(lastStudents_, days);
-    // 既定は合計。1日開催なら合計期間が無いのでその日を選ぶ。
-    if (!lastPeriods_.some(pr => pr.key === periodKey_)) {
-      periodKey_ = (lastPeriods_[lastPeriods_.length - 1] || {}).key || '';
-    }
     renderReport_();
   }
 
-  // 期間切替で呼び直される描画本体。データ取得はしない。
   function renderReport_() {
     const body = $('report-body');
     const data = lastData_ || {};
     const eventId = lastEventId_;
     const days = Array.isArray(data.days) ? data.days : [];
-    const period = lastPeriods_.find(pr => pr.key === periodKey_) || lastPeriods_[lastPeriods_.length - 1];
-    if (!period) return;
+    if (!lastPeriods_.length) return;
 
     const byDay = data.byDay || {};
     const event = events_.find(item => String(item.eventId) === String(eventId));
@@ -1055,65 +1043,77 @@
     lastStudents_ = students;
     lastEventId_ = eventId;
     const schoolHtml = !students.length ? '' : (() => {
-      // 期間内の値で集計する。QR接点だけは通算（日別に割れないため）。
-      const bySchool = {};
-      students.forEach(s => {
-        const key = String(s.school || '（大学名なし）');
-        if (!bySchool[key]) bySchool[key] = { total: 0, acted: 0, drivers: 0, stamps: 0, views: 0 };
-        const b = bySchool[key];
-        const sd = s.days || [];
-        b.total++;
-        if (period.dayIdx.some(i => (sd[i] || {}).acted)) b.acted++;
-        if (s.isDriver) b.drivers++;
-        b.stamps += period.dayIdx.reduce((a, i) => a + count_((sd[i] || {}).stampCount), 0);
-        b.views  += count_(s.qrCompanyCount);
-      });
-      const rows = Object.keys(bySchool).map(name => {
-        const b = bySchool[name];
-        return { name, ...b, idle: b.total - b.acted };
-      }).sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja'));
+      // ⚠ 期間タブに依存せず、日ごと＋合計を常にまとめて表示する（2026-08-26 修正）。
+      //   QR接点は日別に割れない（通算のみ）ため、どの期間ブロックでも同じ値になる。
+      const bySchoolForPeriod = pr => {
+        const bySchool = {};
+        students.forEach(s => {
+          const key = String(s.school || '（大学名なし）');
+          if (!bySchool[key]) bySchool[key] = { total: 0, acted: 0, drivers: 0, stamps: 0, views: 0 };
+          const b = bySchool[key];
+          const sd = s.days || [];
+          b.total++;
+          if (pr.dayIdx.some(i => (sd[i] || {}).acted)) b.acted++;
+          if (s.isDriver) b.drivers++;
+          b.stamps += pr.dayIdx.reduce((a, i) => a + count_((sd[i] || {}).stampCount), 0);
+          b.views  += count_(s.qrCompanyCount);
+        });
+        return Object.keys(bySchool).map(name => {
+          const b = bySchool[name];
+          return { name, ...b, idle: b.total - b.acted };
+        }).sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja'));
+      };
 
-      return sectionHtml_(`大学別のアクション状況（${period.label}）`, `
+      const periodBlocks = lastPeriods_.map(pr => {
+        const rows = bySchoolForPeriod(pr);
+        return `
+          <div class='period-group'>
+            <div class='period-group-lbl'>${esc(pr.label)}</div>
+            <div class='tbl-wrap'>
+              <table class='data-tbl' aria-label='大学別のアクション状況 ${esc(pr.label)}'>
+                <thead><tr>
+                  <th scope='col'>大学</th>
+                  <th class='num' scope='col'>登録</th>
+                  <th class='num' scope='col'>うち選手</th>
+                  <th class='num' scope='col'>アクション記録あり</th>
+                  <th class='num' scope='col'>アクション記録なし</th>
+                  <th class='num' scope='col'>スタンプ<span class='th-sub'>延べ</span></th>
+                  <th class='num' scope='col'>QR接点<span class='th-sub'>企業数計</span></th>
+                </tr></thead>
+                <tbody>
+                  ${rows.map(r => `<tr>
+                    <th scope='row'>${esc(r.name)}</th>
+                    <td class='num'>${fmt_(r.total)}</td>
+                    <td class='num'>${fmt_(r.drivers)}</td>
+                    <td class='num'>${fmt_(r.acted)}</td>
+                    <td class='num'>${fmt_(r.idle)}</td>
+                    <td class='num'>${fmt_(r.stamps)}</td>
+                    <td class='num'>${fmt_(r.views)}</td>
+                  </tr>`).join('')}
+                  <tr class='total-row'>
+                    <th scope='row'>合計</th>
+                    <td class='num'>${fmt_(rows.reduce((s, r) => s + r.total, 0))}</td>
+                    <td class='num'>${fmt_(rows.reduce((s, r) => s + r.drivers, 0))}</td>
+                    <td class='num'>${fmt_(rows.reduce((s, r) => s + r.acted, 0))}</td>
+                    <td class='num'>${fmt_(rows.reduce((s, r) => s + r.idle, 0))}</td>
+                    <td class='num'>${fmt_(rows.reduce((s, r) => s + r.stamps, 0))}</td>
+                    <td class='num'>${fmt_(rows.reduce((s, r) => s + r.views, 0))}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>`;
+      }).join('');
+
+      return sectionHtml_('大学別のアクション状況', `
         <p class='sec-note'>学生マスターの登録者を大学ごとに集計しています。「アクション記録あり」は
         スタンプ開始・当日登録／スタンプ取得／企業によるQR読み取りのいずれかの記録が、
-        <strong>${esc(period.label)}に</strong>あった人数です。大学名順に並べています。
-        QR接点は日別に割れないため、期間を切り替えても2日間通算の値です。</p>
+        <strong>その日に</strong>あった人数です。大学名順に並べています。
+        QR接点は日別に割れないため、どの期間ブロックでも2日間通算の同じ値です。</p>
         <p class='sec-note'>この表が<strong>含まないもの</strong>: 来場したが何もアクションしなかった人と、
         そもそも来場しなかった人は区別できません。機器の不具合等で記録が残らなかった場合もアクション記録なしに入ります。
         当日登録者は登録と同時に記録が残るため、登録した日は必ずアクション記録ありになります。</p>
-        <div class='tbl-wrap'>
-          <table class='data-tbl' aria-label='大学別のアクション状況'>
-            <thead><tr>
-              <th scope='col'>大学</th>
-              <th class='num' scope='col'>登録</th>
-              <th class='num' scope='col'>うち選手</th>
-              <th class='num' scope='col'>アクション記録あり</th>
-              <th class='num' scope='col'>アクション記録なし</th>
-              <th class='num' scope='col'>スタンプ<span class='th-sub'>延べ</span></th>
-              <th class='num' scope='col'>QR接点<span class='th-sub'>企業数計</span></th>
-            </tr></thead>
-            <tbody>
-              ${rows.map(r => `<tr>
-                <th scope='row'>${esc(r.name)}</th>
-                <td class='num'>${fmt_(r.total)}</td>
-                <td class='num'>${fmt_(r.drivers)}</td>
-                <td class='num'>${fmt_(r.acted)}</td>
-                <td class='num'>${fmt_(r.idle)}</td>
-                <td class='num'>${fmt_(r.stamps)}</td>
-                <td class='num'>${fmt_(r.views)}</td>
-              </tr>`).join('')}
-              <tr class='total-row'>
-                <th scope='row'>合計</th>
-                <td class='num'>${fmt_(rows.reduce((s, r) => s + r.total, 0))}</td>
-                <td class='num'>${fmt_(rows.reduce((s, r) => s + r.drivers, 0))}</td>
-                <td class='num'>${fmt_(rows.reduce((s, r) => s + r.acted, 0))}</td>
-                <td class='num'>${fmt_(rows.reduce((s, r) => s + r.idle, 0))}</td>
-                <td class='num'>${fmt_(rows.reduce((s, r) => s + r.stamps, 0))}</td>
-                <td class='num'>${fmt_(rows.reduce((s, r) => s + r.views, 0))}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        ${periodBlocks}
         <div class='action-row no-print' style='margin:12px 0 0'>
           <button class='act-btn act-btn-ghost' id='btn-csv-students' type='button'>学生ごとの明細をCSVで出力</button>
         </div>
@@ -1177,15 +1177,7 @@
         <p>該当箇所の数値は0件として表示されています。記録が無いのか、集計できていないのかを取り違えないでください。</p>
       </div>`;
 
-    const periodTabs = lastPeriods_.length < 2 ? '' : `
-      <div class='period-row no-print' role='group' aria-label='集計期間'>
-        <span class='period-lbl'>集計期間</span>
-        ${lastPeriods_.map(pr => `<button type='button' class='period-btn${pr.key === period.key ? ' active' : ''}'
-          data-period='${esc(pr.key)}' aria-pressed='${pr.key === period.key}'>${esc(pr.label)}</button>`).join('')}
-      </div>`;
-
     body.innerHTML = `
-      ${periodTabs}
       ${emptyHtml}
       ${warnHtml}
       <div class='ev-head'>
