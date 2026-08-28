@@ -167,7 +167,19 @@
       .concat(['アクション記録のあった日数', 'スタンプ取得数 合計',
                'QR読み取り企業数(イベント通算)', '弁当_土', '弁当_日']);
     const lines = [header.map(csvSafe_).join(',')];
-    lastStudents_.forEach(s => {
+
+    // studentId 昇順で出す。GAS はシートの行順（登録順）で返すため、そのままだと
+    // 大学も区分もばらばらに混ざって並び、目視で追いにくい。
+    //
+    // ⚠ 単純な文字列比較にしないこと。studentId は
+    //   「西暦下1桁 + 大学コード4桁 + 区分文字 + 連番」で、連番は padStart(2,'0') のため
+    //   **同一大学・同一区分が100人を超えると3桁になり桁数が揃わない**。
+    //   文字列順では 60012V100 が 60012V20 より前に来る。numeric:true で数値として比較する。
+    // ⚠ 元配列は画面側の集計でも使うのでコピーしてから並べ替える。
+    const sorted = lastStudents_.slice().sort((a, b) =>
+      String(a.studentId || '').localeCompare(String(b.studentId || ''), 'ja', { numeric: true }));
+
+    sorted.forEach(s => {
       const sd = s.days || [];
       const actedDays = sd.filter(d => d.acted).length;
       const stampTotal = sd.reduce((sum, d) => sum + count_(d.stampCount), 0);
