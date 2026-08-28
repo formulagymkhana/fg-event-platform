@@ -346,6 +346,31 @@
   </div>
 
   <!-- エラー -->
+  <!-- ⚠ 重複登録の案内。エラー画面(state-error)を流用しないこと。
+       不具合ではなく「すでに登録済み」という正常な状態であり、⚠アイコンと
+       「もう一度試す」ボタンは誤解を招くため専用の状態にしている。
+       ここに MY PASS リンクを置いてはいけない（2026-08-28）。氏名・大学名・
+       生年月日は秘密ではないため、第三者に他人のパスを開かせることになる。 -->
+  <div class="card" id="state-duplicate" style="display:none">
+    <div class="fg-header">
+      <div class="fg-logo"><img class="fg-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
+      <div class="fg-page-name">当日参加登録</div>
+    </div>
+    <div class="card-body">
+      <div class="state-icon">✉</div>
+      <p class="state-title">すでに登録があります</p>
+      <p class="state-msg">
+        登録時にお送りしたメールから <b>MY PASS</b> をご確認ください。<br>
+        <b style="color:var(--fg-navy)">迷惑メールフォルダに振り分けられている場合があります。</b><br>
+        あわせてご確認ください。
+      </p>
+      <p class="state-msg" style="margin-top:10px">
+        メールが見つからない場合や、登録したアドレスが使えない場合は、
+        <b>受付スタッフにお声がけください。</b>
+      </p>
+    </div>
+  </div>
+
   <div class="card" id="state-error" style="display:none">
     <div class="fg-header">
       <div class="fg-logo"><img class="fg-logo-img" src="../assets/logo.png" alt="FORMULA GYMKHANA"></div>
@@ -361,6 +386,6 @@
 
   <script src="../js/config.js?v=20260728a"></script>
   <script src="../js/api.js?v=20260819a"></script>
-  <script src="../js/register.js?v=20260820a"></script>
+  <script src="../js/register.js?v=20260828a"></script>
 </body>
 </html>
