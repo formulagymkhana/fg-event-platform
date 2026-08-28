@@ -148,14 +148,24 @@
     if (!lastStudents_.length) return;
     const days = (lastStudents_[0].days || []).map(d => d.day);
     // ⚠ 画面と同じ定義で出す。日別の事実（acted / stampCount）を日ごとに列へ展開し、
-    //   QR接点企業数だけは日別に割れないため通算値を1列で出す。
-    const header = ['studentId', '氏名', '大学名', '学年', '学年区分', '属性', '区分', '登録種別',
-                    '都道府県', '学部区分']
-      .concat(days.map(d => dayLabel_(d) + ' 来場'))
-      .concat(days.map(d => dayLabel_(d) + ' アクション記録'))
-      .concat(days.map(d => dayLabel_(d) + ' スタンプ数'))
-      .concat(days.map(d => dayLabel_(d) + ' 景品交換回数'))
-      .concat(['アクション記録のある日数', 'スタンプ数合計', 'QR接点企業数(2日間通算)', '弁当_土', '弁当_日']);
+    //   QR読み取り企業数だけは日別に割れないため通算値を1列で出す。
+    //
+    // ⚠ 列名は必ず「指標名 → 日付」の順にすること（2026-08-28 修正）。
+    //   以前は「8/23（土） 来場」のように日付が先頭だったため、Excel の既定列幅では
+    //   後半が切れ、**どの列も「8/23（土）」としか見えなかった**。
+    //   指標名を先に置けば、列を広げなくても何の列か分かる。
+    //
+    // ⚠ 正規化済みの値と生の入力値が混在するため、列名で区別を明示する。
+    //   学年/属性は学生マスターの生テキスト、学年区分/区分/学部区分は GAS が正規化した値。
+    const header = ['studentId', '氏名', '大学名',
+                    '学年(入力値)', '学年区分(正規化)', '属性(入力値)', '区分(選手/応援)',
+                    '登録種別', '都道府県', '学部区分(正規化)']
+      .concat(days.map(d => '来場(推定) ' + dayLabel_(d)))
+      .concat(days.map(d => 'アクション記録あり ' + dayLabel_(d)))
+      .concat(days.map(d => 'スタンプ取得数 ' + dayLabel_(d)))
+      .concat(days.map(d => '景品交換回数 ' + dayLabel_(d)))
+      .concat(['アクション記録のあった日数', 'スタンプ取得数 合計',
+               'QR読み取り企業数(イベント通算)', '弁当_土', '弁当_日']);
     const lines = [header.map(csvSafe_).join(',')];
     lastStudents_.forEach(s => {
       const sd = s.days || [];
@@ -171,6 +181,25 @@
        .concat([actedDays, stampTotal, count_(s.qrCompanyCount), s.lunchSat, s.lunchSun])
        .map(csvSafe_).join(','));
     });
+
+    // ⚠ 定義はデータの「後ろ」に置くこと。先頭に置くと1行目がヘッダーでなくなり、
+    //   Excel の並べ替え・フィルタが使えなくなる。
+    // ⚠ 「来場(推定)」は実測ではない。GAS は attended = isDriver ? true : acted と
+    //   しており、選手は常に true、応援は acted と同値になる。来場そのものを記録する
+    //   仕組みが無いため、実測値と誤解されないよう必ず注記を残すこと。
+    lines.push('');
+    lines.push(csvSafe_('■ 列の定義'));
+    [
+      'アクション記録あり … スタンプ開始/当日登録・スタンプ取得・企業によるQR読み取りの、いずれかの記録がその日にあったこと',
+      '来場(推定) … 選手は出走のため常に「あり」。応援はアクション記録と同じ値（来場そのものを記録する仕組みが無いため）',
+      'QR読み取り企業数 … 企業が学生のQRを読み取った企業数。企業単位で重複排除し、イベント通算（日別には割れない）',
+      '学年区分(正規化) … 大学1〜4年生 / 大学院生 / その他 / 未回答',
+      '区分(選手/応援) … 選手 / 応援・事前 / 応援・当日 / 区分不明',
+      '学部区分(正規化) … 理工学系 / 人文・社会経済系 / その他 / 未回答',
+      '学年(入力値)・属性(入力値) … 学生マスターの生の入力値（正規化していない）',
+      '記録が無いことは「来場しなかった」を意味しない。機器の不具合等で残らなかった場合も含む。',
+    ].forEach(t => lines.push(csvSafe_(t)));
+
     downloadCsv_(`学生アクション明細_${lastEventId_ || 'event'}.csv`, lines.join('\r\n'));
   }
 
@@ -888,7 +917,7 @@
       const supCohorts = ['応援・事前', '応援・当日', '区分不明'];
 
       // ⚠ 期間タブに依存せず、日ごと＋合計を常にまとめて表示する（2026-08-26 修正）。
-      //   QR接点は日別に割れない（通算のみ）ため、どの期間ブロックでも同じ値になる。
+      //   QR読み取りは日別に割れない（通算のみ）ため、どの期間ブロックでも同じ値になる。
       //   毎回同じ数字が出るのは誤りではなくQRの性質だと分かるよう注記している。
       const periodBlocks = lastPeriods_.map(pr => {
         const countRows = groups.map(([label, g, note]) => {
@@ -910,7 +939,7 @@
         //   3ソースのうち「スタンプ開始・当日登録」は activateStamp が MYPASS を開いた
         //   時点でも呼ばれるため（js/mypass.js の restoreStampCookie_）、受付を通れば
         //   ほぼ全員に付く。OR判定の率は常に100%近くになり指標として機能しない。
-        //   ブースでの行動はスタンプ取得とQR接点で見る。
+        //   ブースでの行動はスタンプ取得とQR読み取りで見る。
         const rateRows = groups.map(([label]) => {
           const b = pr.byCohort[label];   // label は COHORTS のキーと一致させること
           return `<tr>
@@ -941,11 +970,11 @@
             </div>
             <div class='sub-block'>
               <div class='sub-title'>ブースでの記録あり率</div>
-              <p class='sec-note'>スタンプ取得は${esc(pr.label)}の値、QR接点は2日間通算の値です（日別に割れないため、
+              <p class='sec-note'>スタンプ取得は${esc(pr.label)}の値、QR読み取りは2日間通算の値です（日別に割れないため、
               どの期間ブロックでも同じ数字になります）。</p>
               <div class='tbl-wrap'>
                 <table class='data-tbl' aria-label='区分別の記録あり率 ${esc(pr.label)}'>
-                  <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>スタンプ取得</th><th class='num' scope='col'>QR接点</th></tr></thead>
+                  <thead><tr><th scope='col'>区分</th><th class='num' scope='col'>スタンプ取得</th><th class='num' scope='col'>QR読み取り</th></tr></thead>
                   <tbody>${rateRows}</tbody>
                 </table>
               </div>
@@ -991,7 +1020,7 @@
         「記録なし」は来場したが操作しなかったことを指します。応援は来場自体が記録経由でしか分からないため、
         「記録なし」が未来場なのか無操作なのかを区別できません。同じ率でも意味が違うので合算していません。</p>
         <p class='sec-note'>下の「記録あり」は3種類のいずれかがあることを指し、受付でパス画面を開いた際に付く
-        「スタンプ開始」を含みます。ブースを回ったかどうかは、その下の表の「スタンプ取得」「QR接点」で見てください。</p>
+        「スタンプ開始」を含みます。ブースを回ったかどうかは、その下の表の「スタンプ取得」「QR読み取り」で見てください。</p>
         <p class='sec-note'>参考値として、選手全員＋記録がある応援を合わせた実人数は
         <strong>${fmt_(uniqueParticipants)}人</strong>です。イベント規模の目安であり、率の分母には使っていません。</p>
         <p class='sec-note'>1人あたりの記録件数の母集団はその区分で<strong>記録がある人だけ</strong>です。記録が無い人を
@@ -1028,7 +1057,7 @@
     lastEventId_ = eventId;
     const schoolHtml = !allStudents.length ? '' : (() => {
       // ⚠ 期間タブに依存せず、日ごと＋合計を常にまとめて表示する（2026-08-26 修正）。
-      //   QR接点は日別に割れない（通算のみ）ため、どの期間ブロックでも同じ値になる。
+      //   QR読み取りは日別に割れない（通算のみ）ため、どの期間ブロックでも同じ値になる。
       const bySchoolForPeriod = pr => {
         const bySchool = {};
         allStudents.forEach(s => {
@@ -1062,7 +1091,7 @@
                   <th class='num' scope='col'>アクション記録あり</th>
                   <th class='num' scope='col'>アクション記録なし</th>
                   <th class='num' scope='col'>スタンプ<span class='th-sub'>延べ</span></th>
-                  <th class='num' scope='col'>QR接点<span class='th-sub'>企業数計</span></th>
+                  <th class='num' scope='col'>QR読み取り<span class='th-sub'>企業数計</span></th>
                 </tr></thead>
                 <tbody>
                   ${rows.map(r => `<tr>
@@ -1093,7 +1122,7 @@
         <p class='sec-note'>学生マスターの登録者を大学ごとに集計しています。「アクション記録あり」は
         スタンプ開始・当日登録／スタンプ取得／企業によるQR読み取りのいずれかの記録が、
         <strong>その日に</strong>あった人数です。大学名順に並べています。
-        QR接点は日別に割れないため、どの期間ブロックでも2日間通算の同じ値です。</p>
+        QR読み取りは日別に割れないため、どの期間ブロックでも2日間通算の同じ値です。</p>
         <p class='sec-note'>この表が<strong>含まないもの</strong>: 来場したが何もアクションしなかった人と、
         そもそも来場しなかった人は区別できません。機器の不具合等で記録が残らなかった場合もアクション記録なしに入ります。
         当日登録者は登録と同時に記録が残るため、登録した日は必ずアクション記録ありになります。</p>
@@ -1102,7 +1131,7 @@
           <button class='act-btn act-btn-ghost' id='btn-csv-students' type='button'>学生ごとの明細をCSVで出力</button>
         </div>
         <p class='sec-note' style='margin-top:8px'>CSVには学生1人1行で、氏名・大学・学年・区分・登録種別・
-        日別のアクション記録・スタンプ数・QR接点企業数・弁当希望が入ります。個人が特定できるデータのため取り扱いに注意してください。</p>`,
+        日別のアクション記録・スタンプ数・QR読み取り企業数・弁当希望が入ります。個人が特定できるデータのため取り扱いに注意してください。</p>`,
         { foldable: true, open: false });
     })();
 
