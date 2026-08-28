@@ -112,7 +112,10 @@
     .err-msg { font-size: 13px; color: var(--fg-muted); line-height: 1.7; }
 
     /* コピートースト */
+    /* ⚠ width指定が無いと left:50% のせいで使える幅が画面の右半分に制限され、
+       短い文でも3行に折り返してピル型が崩れる（2026-08-28 修正）。 */
     #toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px);
+             width: max-content; max-width: calc(100vw - 32px);
              background: #222; color: #fff; padding: 9px 20px; border-radius: 100px;
              font-size: 13px; opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; }
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -222,6 +225,6 @@
   <script src="../js/api.js?v=20260819a"></script>
   <!-- ⚠ csv-util.js は company.js より前に読み込むこと（CSV出力の共通ヘルパー） -->
   <script src="../js/csv-util.js?v=20260828a"></script>
-  <script src="../js/company.js?v=20260828b"></script>
+  <script src="../js/company.js?v=20260828c"></script>
 </body>
 </html>

@@ -460,6 +460,10 @@ async function downloadVisitorsCsv_() {
     } else {
       downloadCsvSjis_(fname, body);
     }
+
+    // ブラウザのダウンロードは無言で終わるため、完了を明示する。
+    // 件数も出して「空のファイルではない」ことを担当者が確認できるようにする。
+    toast(`ダウンロードしました（${qr.length + stamp.length}件）`);
   } catch (e) {
     alert('出力に失敗しました。もう一度お試しください。');
   } finally {
