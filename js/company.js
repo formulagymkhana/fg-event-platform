@@ -364,6 +364,36 @@ function csvRows_(visitors, label) {
   ].map(csvCell_).join(','));
 }
 
+/**
+ * Shift_JIS に変換できない文字を「どの学生の・どの項目か」まで特定して返す。
+ *
+ * ⚠ 留学生の氏名（é / ü / ハングル / 簡体字）や 𠮷（つちよし）は Shift_JIS に無く、
+ *   そのまま出力すると `?` に置き換わる。**メールアドレスが化けると連絡不能**になるが、
+ *   従来は落ちた文字を並べるだけで誰の欄か分からなかった（2026-08-28 追加）。
+ */
+function scanVisitorsSjis_(visitors, label) {
+  const issues = [];
+  (visitors || []).forEach(v => {
+    [['日時', v.time], ['氏名', v.name], ['ふりがな', v.furigana],
+     ['大学名', v.school], ['学部学科', v.department], ['学年', v.year],
+     ['参加区分', v.category], ['メールアドレス', v.email],
+    ].forEach(([col, val]) => {
+      const bad = sjisUnsupported_(val);
+      if (bad.length) issues.push({ label, who: v.name || '(氏名不明)', col, chars: bad });
+    });
+  });
+  return issues;
+}
+
+/** 変換不可箇所の一覧を、件数が多くても読める長さの文面にまとめる。 */
+function sjisIssueText_(issues) {
+  const MAX = 10;
+  const lines = issues.slice(0, MAX)
+    .map(i => `・${i.who}さん / ${i.col}：${i.chars.join(' ')}`);
+  if (issues.length > MAX) lines.push(`…ほか ${issues.length - MAX} 件`);
+  return lines.join('\n');
+}
+
 async function downloadVisitorsCsv_() {
   const btn = $('btn-download-csv');
   if (!btn) return;
@@ -409,9 +439,28 @@ async function downloadVisitorsCsv_() {
     const company = (qrRes.ok && qrRes.data.companyName)
       || (stampRes.ok && stampRes.data.companyName) || '来訪学生';
     const stamp10 = new Date().toISOString().slice(0, 10);
-    const bad = downloadCsvSjis_(`来訪学生一覧_${company}_${stamp10}.csv`, lines.join('\r\n'));
-    if (bad && bad.length) {
-      alert('一部の文字がShift_JISに変換できず「?」になりました。\n\n' + bad.join(' '));
+    const fname = `来訪学生一覧_${company}_${stamp10}.csv`;
+    const body  = lines.join('\r\n');
+
+    // ⚠ 通常は Shift_JIS（Windows の Excel でそのまま開けるため）。
+    //   変換できない文字が1つでもあるときだけ UTF-8(BOM付き) へ切り替える。
+    //   Shift_JIS のまま出すと該当文字が `?` になり、**メールアドレスが壊れても
+    //   企業側は気づけない**（連絡不能な宛先が正常な顔で混ざる）。
+    //   欠損を出さないことを、文字コードの一貫性より優先する（2026-08-28）。
+    const issues = scanVisitorsSjis_(qr, 'QR').concat(scanVisitorsSjis_(stamp, 'スタンプ'));
+    if (issues.length) {
+      downloadCsv_(fname, body);   // UTF-8 + BOM。文字は一切落ちない
+      const hasEmail = issues.some(i => i.col === 'メールアドレス');
+      alert(
+        'Shift_JISで表せない文字が含まれていたため、文字化けを防ぐ目的で\n' +
+        'UTF-8形式で出力しました。Excelでそのまま開けます。\n\n' +
+        '該当箇所：\n' + sjisIssueText_(issues) +
+        (hasEmail
+          ? '\n\n⚠ メールアドレスが含まれます。送信前に該当学生の宛先をご確認ください。'
+          : '')
+      );
+    } else {
+      downloadCsvSjis_(fname, body);
     }
   } catch (e) {
     alert('出力に失敗しました。もう一度お試しください。');

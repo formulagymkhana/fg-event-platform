@@ -91,6 +91,28 @@ function encodeSjis_(text) {
 }
 
 /**
+ * 文字列中の Shift_JIS 変換不可文字を返す（検査専用・バイト列は作らない）。
+ *
+ * ⚠ encodeSjis_ は CSV 全体を一括で変換するため、戻り値の unsupported は
+ *   「落ちた文字」しか分からず **どのセルが壊れたのか** を呼び出し元へ返せない。
+ *   その結果、利用者には「é が変換できません」とだけ伝わり、
+ *   誰のメールアドレスが `?` になったのか気づけなかった（2026-08-28 追加）。
+ *   CSV へ結合する前にセル単位でこれを呼べば、該当箇所を特定できる。
+ *
+ * 判定は encodeSjis_ と同じ表・同じ改行の扱いに揃えること（乖離すると
+ * 「警告は出ないのに化ける」「警告だけ出て実際は化けない」が起きる）。
+ */
+function sjisUnsupported_(text) {
+  const map = buildSjisMap_();
+  const bad = new Set();
+  for (const ch of String(text == null ? '' : text)) {
+    if (ch === '\n' || ch === '\r') continue;   // encodeSjis_ が素通しする文字
+    if (!map.has(ch)) bad.add(ch);
+  }
+  return [...bad];
+}
+
+/**
  * Shift_JIS の CSV としてダウンロードする（BOMは付けない）。
  * 変換できない文字があれば呼び出し元へ返し、警告に使わせる。
  */
