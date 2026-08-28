@@ -146,10 +146,13 @@ async function handleSubmit() {
     renderSuccess_(res.data);
     showState('success');
   } else if (res.error === 'already_registered') {
-    // 同日・同一学生の重複登録 → 既存stampTokenを再利用
-    FG_API.saveStampToken(res.data.stampToken);
-    renderSuccess_(res.data);
-    showState('success');
+    // ⚠ 重複時はトークンを保存しない・成功画面を出さない（2026-08-28）。
+    //   以前は既存のstampTokenを保存し renderSuccess_ で MY PASS リンクまで表示していた。
+    //   照合は氏名・大学名・生年月日だけで、いずれも秘密ではないため、
+    //   第三者が他人のMY PASSを開ける状態だった。さらに画面が「登録完了！」と出るので
+    //   本人も第三者も異常に気づけなかった。
+    //   復帰は登録時に届いているメールの MY PASS から行わせる。
+    showState('duplicate');
   } else if (res.error === 'email_already_used') {
     // フロントの blur チェックが走らなかった場合の保険。警告を強制表示してフォームに戻す。
     showState('form');
@@ -370,7 +373,7 @@ function fillSchoolList_(schools) {
 
 // ── ユーティリティ ────────────────────────────────
 function showState(state) {
-  ['no-code', 'loading', 'form', 'submitting', 'success', 'error'].forEach(s => {
+  ['no-code', 'loading', 'form', 'submitting', 'success', 'duplicate', 'error'].forEach(s => {
     const el = document.getElementById('state-' + s);
     if (el) el.style.display = s === state ? 'block' : 'none';
   });

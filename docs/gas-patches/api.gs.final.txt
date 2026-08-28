@@ -1310,9 +1310,61 @@ function actionGetCurrentEvent_(p) {
 }
 
 // ============================================================
+// 重複登録の本人照合ヘルパー（2026-08-28 追加）
+// ============================================================
+//
+// ⚠ 氏名＋大学名だけでは足りない。同一大学に同姓同名がいると、後から登録した
+//   学生が先の学生の記録を引き継いでしまう（画面は「登録完了！」と出るため
+//   双方とも気づけない）。生年月日を third key として加える。
+//
+// ⚠ 生年月日の比較は必ずこの関数を通すこと。素の `===` では必ず外れる:
+//     - シートは値を Date オブジェクトで返すことがある
+//     - フォーム(<input type="date">)の送信値は '2004-05-01'
+//     - 既存の読み出し処理が作る文字列は '2004/05/01'
+//   数字だけ抽出して 'YYYYMMDD' に揃えることで、型と区切り文字の差を吸収する。
+//   ここを誤ると**全員が別人と判定され、重複レコードが際限なく増える**。
+function normBirthday_(v) {
+  if (v instanceof Date) {
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyyMMdd');
+  }
+  return String(v == null ? '' : v).replace(/\D/g, '');
+}
+
+// 氏名・大学名の表記ゆれ（半角/全角/前後の空白）を吸収する。
+function normNameKey_(s) {
+  return String(s == null ? '' : s).replace(/[\s　]/g, '');
+}
+
+// 管理画面の <input type="date"> へ渡すための 'YYYY-MM-DD'。
+// シートが Date を返す場合と文字列の場合の両方を吸収する。
+// 形式が判別できないときは空文字（入力欄を空にして、スタッフに入れ直させる）。
+function birthdayForInput_(v) {
+  if (v instanceof Date) {
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  var d = String(v == null ? '' : v).replace(/\D/g, '');
+  return d.length === 8 ? d.slice(0, 4) + '-' + d.slice(4, 6) + '-' + d.slice(6, 8) : '';
+}
+
+// 保存済みの行 r が、送信された p と同一人物かを判定する。
+// ⚠ 生年月日が空（旧データ・シート直編集など）の場合は false を返す。
+//   照合できない以上「同一人物」と断定してはいけない。別人として新規登録に流れ、
+//   既存のメール重複チェックが警告を出す方が安全側に倒れる。
+function isSameStudent_(r, cols, p) {
+  const bday = normBirthday_(p.birthday);
+  if (!bday) return false;
+  return normNameKey_(r[cols.name])   === normNameKey_(p.name) &&
+         normNameKey_(r[cols.school]) === normNameKey_(p.school) &&
+         normBirthday_(r[cols.birthday]) === bday;
+}
+
+// ============================================================
 // アクション: registerWalkIn (T6)
 // 当日飛び込み参加者を登録してstampTokenを発行する。
-// 同日・同一学生(氏名+大学名)の重複登録は既存stampTokenを返す。
+// ⚠ 重複登録時はトークンを一切返さない（2026-08-28）。
+//   氏名・大学名・生年月日は秘密情報ではないため、返すと第三者が
+//   未認証POSTだけで他人の cardToken / stampToken を取得できてしまう。
+//   復帰は「登録時に送信済みのメール」から行わせる。
 // ============================================================
 
 function actionRegisterWalkIn_(p) {
@@ -1341,14 +1393,12 @@ function actionRegisterWalkIn_(p) {
     const schoolCol = sHeaders.indexOf('大学名');
     const sidCol   = sHeaders.indexOf('studentId');
 
-    // 同日・同一学生の重複チェック(氏名+大学名)
+    // 同日・同一学生の重複チェック(氏名+大学名+生年月日)
     // 空白の表記揺れ（半角/全角/前後）で別人扱いにならないよう正規化して照合する。
-    // （クッキー喪失→再登録での復帰の取りこぼしを防ぐ）
-    const norm_ = s => String(s == null ? '' : s).replace(/[\s　]/g, '');
-    const existing = sData.slice(1).find(r =>
-      norm_(r[nameCol])   === norm_(p.name) &&
-      norm_(r[schoolCol]) === norm_(p.school)
-    );
+    // 生年月日は isSameStudent_ / normBirthday_ 側で型と区切り文字を吸収する。
+    const bdayCol = sHeaders.indexOf('生年月日');
+    const matchCols = { name: nameCol, school: schoolCol, birthday: bdayCol };
+    const existing = sData.slice(1).find(r => isSameStudent_(r, matchCols, p));
 
     if (existing) {
       const existStudentId = String(existing[sidCol]);
@@ -1360,27 +1410,24 @@ function actionRegisterWalkIn_(p) {
       const pData    = participantSheet.getDataRange().getValues();
       const pHeaders = pData[0].map(String);
       const pSidCol  = pHeaders.indexOf('studentId');
-      const pStCol   = pHeaders.indexOf('stampToken');
       const pRow     = pData.slice(1).find(r =>
         String(r[pSidCol]) === existStudentId &&
         String(r[pHeaders.indexOf('eventId')]) === String(p.event)
       );
-      // 既存学生だが参加者行が無い場合（例: 事前登録済みで未開始）は
-      // 新規トークンを発行し、必ずシートへ追記する。
-      // （追記しないと未保存トークンを返し、以後スタンプ不能になるため）
-      let stampToken;
-      if (pRow) {
-        stampToken = String(pRow[pStCol]);
-      } else {
-        stampToken = Utilities.getUuid();
+      // 既存学生だが参加者行が無い場合（例: 事前登録済みで未開始）は追記しておく。
+      // 会場に来て再登録している＝物理的に参加しているため、有効化してよい（§4）。
+      //
+      // ⚠ ここで発行/取得したトークンは**呼び出し元へ返さない**。
+      //   氏名・大学名・生年月日は秘密ではないので、返すと第三者が未認証POSTだけで
+      //   他人の stampToken / cardToken を入手できてしまう。
+      //   本人の復帰経路は「登録時に送信済みのメール → MY PASS」。
+      //   MY PASS は source=mypass で stampToken も受け取れるため、これで機能は揃う。
+      if (!pRow) {
         participantSheet.appendRow([
-          new Date(), p.event, existStudentId, stampToken, new Date(), 'active',
+          new Date(), p.event, existStudentId, Utilities.getUuid(), new Date(), 'active',
         ]);
       }
-      const existCardToken = String(existing[sHeaders.indexOf('cardToken')] || '');
-      const count = countStamps_(p.event, existStudentId);
-      const result = buildStampResult_(p.event, existStudentId, count, { stampToken, cardToken: existCardToken });
-      outcome_ = { type: 'existing', existStudentId, existCardToken, stampResult: result };
+      outcome_ = { type: 'existing' };
     } else {
       // メアド重複チェック（部活代表や共有アドレスの使い回し抑止）
       // フロントで警告表示→同意チェックを経由した場合のみ emailDupAcknowledged=true が送られてくる。
@@ -1454,15 +1501,16 @@ function actionRegisterWalkIn_(p) {
 
   // ロック解放後にメール送信（IO待ちでロックを保持しない）
   if (outcome_.type === 'existing') {
-    const { existStudentId, existCardToken, stampResult } = outcome_;
-    // 再登録は実質「復帰」操作。個人ページ(氏名+QR)のリンクを再送（失敗しても登録判定は維持）
-    try {
-      sendWalkInPassMail_(p.email, p.name, p.event, buildPassUrl_(p.appBase, existCardToken, p.event));
-    } catch (err) {
-      console.error('sendWalkInPassMail_ (already_registered) failed:', err);
-    }
-    return { ok: false, error: 'already_registered', data: stampResult,
-             message: 'すでに本日のイベントに登録済みです' };
+    // ⚠ 重複時は「トークンを返さない」「メールも送らない」の2点を必ず守ること。
+    //   - data にトークンを載せると、氏名・大学名・生年月日を知る第三者が
+    //     未認証POSTだけで他人の cardToken / stampToken を入手できる。
+    //   - 以前はここで sendWalkInPassMail_(p.email, ...) を呼んでいたが、宛先が
+    //     **フォームに入力されたアドレス**であり、本人の登録済みアドレスではなかった。
+    //     つまり送信者が自分の宛先を書けばパスのリンクが届いてしまう状態だった。
+    //     復帰は「登録時に既に届いているメール」から行わせるため、ここでは送らない。
+    //     アドレスが不通の場合は管理画面でスタッフが修正・再送できる。
+    return { ok: false, error: 'already_registered',
+             message: 'すでに登録があります' };
   } else {
     const { studentId, token, stampToken } = outcome_;
     // 個人ページ(氏名+QR)のリンクをメール送信（失敗しても登録は成立させる）
@@ -1520,15 +1568,20 @@ function actionRegisterPreStudent_(p) {
     const sHeaders = sData[0].map(String);
     const idx     = n => sHeaders.indexOf(n);
 
-    // 重複（氏名+大学名+登録種別=事前）→ 既存 cardToken を返す
+    // 重複（氏名+大学名+生年月日+登録種別=事前）
+    // ⚠ 生年月日を加えたのは、同一大学の同姓同名が先に登録した学生の記録を
+    //   引き継いでしまうのを防ぐため。比較は必ず isSameStudent_ を通すこと
+    //   （シートが Date を返す／区切り文字が異なるため素の === では外れる）。
+    const preCols = { name: idx('氏名'), school: idx('大学名'), birthday: idx('生年月日') };
     const existing = sData.slice(1).find(r =>
-      String(r[idx('氏名')])     === String(p.name).trim() &&
-      String(r[idx('大学名')])   === String(p.school).trim() &&
+      isSameStudent_(r, preCols, p) &&
       String(r[idx('登録種別')]) === '事前'
     );
     if (existing) {
+      // ⚠ data にトークンを載せないこと。register-pre.js は案内バナーを出すだけで
+      //   cardToken を使っておらず、以前は「画面に出ないが通信では渡る」状態だった。
+      //   氏名・大学名・生年月日を知る第三者に他人のトークンを渡す経路になる。
       return { ok: false, error: 'already_registered',
-        data: { studentId: String(existing[idx('studentId')]), cardToken: String(existing[idx('cardToken')]) },
         message: 'すでに事前登録済みです' };
     }
 
@@ -2775,6 +2828,10 @@ function actionAdminUpdateStudent_(p) {
   if (p.school   !== undefined) fields.school    = String(p.school).trim();
   if (p.category !== undefined) fields.category  = String(p.category).trim();
   if (p.email    !== undefined) fields.email     = String(p.email).trim();
+  // ⚠ 生年月日は重複登録の本人照合キー（isSameStudent_）。値が誤っていると本人が
+  //   再登録時に別人扱いされ続けるため、スタッフが管理画面から直せる必要がある。
+  //   保存形式は問わない（normBirthday_ が Date / ハイフン / スラッシュを吸収する）。
+  if (p.birthday !== undefined) fields.birthday  = String(p.birthday).trim();
   if (!Object.keys(fields).length) return err_('missing_params');
 
   // 属性は自由入力のため、未知の値だと区分コードが既定値'V'に落ちて静かに誤分類される。
@@ -2784,8 +2841,8 @@ function actionAdminUpdateStudent_(p) {
   }
 
   // 各シートの列名マッピング
-  var masterMap = { name:'氏名', furigana:'ふりがな', school:'大学名', category:'属性', email:'メールアドレス' };
-  var preMap    = { name:'氏名', furigana:'ふりがな', school:'大学名', email:'メールアドレス' }; // category は事前登録には書かない
+  var masterMap = { name:'氏名', furigana:'ふりがな', school:'大学名', category:'属性', email:'メールアドレス', birthday:'生年月日' };
+  var preMap    = { name:'氏名', furigana:'ふりがな', school:'大学名', email:'メールアドレス', birthday:'生年月日' }; // category は事前登録には書かない
 
   var updated = { students: 0, preReg: 0, stampLog: 0, prizeLog: 0 };
   var eventIds = [eventId];
@@ -3905,6 +3962,9 @@ function actionAdminGetStudents_(p) {
       category:   g(r, '属性'),
       regType:    normalizeRegType_(g(r, '登録種別')),
       email:      g(r, 'メールアドレス'),
+      // 重複登録の本人照合キー。誤っていると本人が再登録時に別人扱いされ続けるため、
+      // 管理画面から確認・修正できるようにする（2026-08-28）。
+      birthday:   birthdayForInput_(g(r, '生年月日')),
     }));
   return ok_({ students });
 }

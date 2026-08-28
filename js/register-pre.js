@@ -529,7 +529,10 @@ async function submitForm() {
   }
 
   if (res.error === 'already_registered') {
-    banner.textContent = 'この氏名・大学名ではすでに事前登録済みです。内容変更は事務局へご連絡ください。';
+    // ⚠ ここに MY PASS リンクやトークンを出さないこと（2026-08-28）。
+    //   照合キー（氏名・大学名・生年月日）はいずれも秘密ではないため、
+    //   第三者に他人のパスを開かせる経路になる。案内のみに留める。
+    banner.textContent = 'すでに事前登録済みです。登録時にお送りしたメールをご確認ください（迷惑メールフォルダに振り分けられている場合があります）。メールが見つからない場合や内容の変更は事務局へご連絡ください。';
     banner.classList.add('show');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     return;

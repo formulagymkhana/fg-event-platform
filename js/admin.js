@@ -1215,6 +1215,11 @@ function renderStudentList_() {
                 <input class="f-input" style="padding:6px 8px;font-size:12px;margin:0" data-field="school" value="${esc_(s.school)}"></div>
               <div><label style="font-size:10px;color:var(--gray);display:block;margin-bottom:2px">属性</label>
                 <input class="f-input" style="padding:6px 8px;font-size:12px;margin:0" data-field="category" value="${esc_(s.category || '')}"></div>
+              ${'' /* ⚠ 生年月日は重複登録の本人照合キー（GAS の isSameStudent_）。
+                     誤りや空のままだと、本人が再登録しても別人と判定され続ける。
+                     スタッフがここで直せないとシート直編集になるため必ず残すこと。 */}
+              <div><label style="font-size:10px;color:var(--gray);display:block;margin-bottom:2px">生年月日</label>
+                <input class="f-input" style="padding:6px 8px;font-size:12px;margin:0" type="date" data-field="birthday" value="${esc_(s.birthday || '')}"></div>
               <div style="grid-column:1/-1"><label style="font-size:10px;color:var(--gray);display:block;margin-bottom:2px">メールアドレス</label>
                 <input class="f-input" style="padding:6px 8px;font-size:12px;margin:0" type="email" data-field="email" value="${esc_(s.email || '')}"></div>
             </div>
