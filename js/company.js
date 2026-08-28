@@ -447,21 +447,23 @@ async function downloadVisitorsCsv_() {
     //   Shift_JIS のまま出すと該当文字が `?` になり、**メールアドレスが壊れても
     //   企業側は気づけない**（連絡不能な宛先が正常な顔で混ざる）。
     //   欠損を出さないことを、文字コードの一貫性より優先する（2026-08-28）。
+    //
+    // ⚠ 切り替わっても企業側へは何も表示しない。UTF-8 で出た時点で文字は1つも
+    //   欠けておらず、BOM付きなので Excel はそのまま開ける＝伝えるべき異常が無い。
+    //   以前は「Shift_JISに変換できませんでした」と警告していたが、
+    //   正常なのに警告を出すと受け取った企業に不具合だと誤解される。
     const issues = scanVisitorsSjis_(qr, 'QR').concat(scanVisitorsSjis_(stamp, 'スタンプ'));
     if (issues.length) {
+      // 事務局・開発者向けの記録のみ（学生の入力ミス検知に使える）。画面には出さない。
+      console.info('[CSV] Shift_JIS非対応の文字があるためUTF-8で出力:\n' + sjisIssueText_(issues));
       downloadCsv_(fname, body);   // UTF-8 + BOM。文字は一切落ちない
-      const hasEmail = issues.some(i => i.col === 'メールアドレス');
-      alert(
-        'Shift_JISで表せない文字が含まれていたため、文字化けを防ぐ目的で\n' +
-        'UTF-8形式で出力しました。Excelでそのまま開けます。\n\n' +
-        '該当箇所：\n' + sjisIssueText_(issues) +
-        (hasEmail
-          ? '\n\n⚠ メールアドレスが含まれます。送信前に該当学生の宛先をご確認ください。'
-          : '')
-      );
     } else {
       downloadCsvSjis_(fname, body);
     }
+
+    // ブラウザのダウンロードは無言で終わるため、完了を明示する。
+    // 件数も出して「空のファイルではない」ことを担当者が確認できるようにする。
+    toast(`ダウンロードしました（${qr.length + stamp.length}件）`);
   } catch (e) {
     alert('出力に失敗しました。もう一度お試しください。');
   } finally {
