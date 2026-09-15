@@ -11,9 +11,10 @@
 const $ = id => document.getElementById(id);
 
 const MAX_FILE = 10 * 1024 * 1024; // 10MB
-const PHONE_RE = /^[0-9]{10,11}$/;
-const POSTAL_RE = /^[0-9]{7}$/;
-const stripHyphen_ = s => String(s || '').replace(/[-−ー－]/g, '');
+// ⚠ 電話番号・郵便番号はハイフン必須（company-entry.js と同じ規則）。
+//   ハイフン無しの数字だけだと、CSVをExcelで開いたときに先頭の0が落ちるため。
+const PHONE_RE = /^0\d{1,4}-\d{1,4}-\d{3,4}$/;
+const POSTAL_RE = /^\d{3}-\d{4}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 let _event = null;
@@ -141,12 +142,12 @@ async function submit() {
 
   setErr('school',      !school);                                 if (!school) ok = false;
   setErr('repname',     !repName);                                if (!repName) ok = false;
-  setErr('repphone',    !PHONE_RE.test(stripHyphen_(repPhone))); if (!PHONE_RE.test(stripHyphen_(repPhone))) ok = false;
+  setErr('repphone',    !PHONE_RE.test(repPhone));                if (!PHONE_RE.test(repPhone)) ok = false;
   setErr('repemail',    !EMAIL_RE.test(repEmail));                if (!EMAIL_RE.test(repEmail)) ok = false;
   setErr('shipname',    !shipName);                               if (!shipName) ok = false;
-  setErr('shippostal',  !POSTAL_RE.test(stripHyphen_(shipPostal))); if (!POSTAL_RE.test(stripHyphen_(shipPostal))) ok = false;
+  setErr('shippostal',  !POSTAL_RE.test(shipPostal));             if (!POSTAL_RE.test(shipPostal)) ok = false;
   setErr('shipaddress', !shipAddr);                               if (!shipAddr) ok = false;
-  setErr('shipphone',   !PHONE_RE.test(stripHyphen_(shipPhone))); if (!PHONE_RE.test(stripHyphen_(shipPhone))) ok = false;
+  setErr('shipphone',   !PHONE_RE.test(shipPhone));               if (!PHONE_RE.test(shipPhone)) ok = false;
 
   const rgPermErr = $('err-permission'); rgPermErr.classList.toggle('show', !permission); if (!permission) ok = false;
 

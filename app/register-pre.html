@@ -235,15 +235,15 @@
         </div>
         <div class="form-row">
           <label>電話番号<span class="req">*</span></label>
-          <input type="tel" id="f-phone" placeholder="例：090-1234-5678 または 09012345678" autocomplete="tel" inputmode="tel" maxlength="13">
-          <p class="hint">半角数字（ハイフンあり・なしどちらでも可）</p>
-          <p class="field-err" id="err-phone">10〜11桁の半角数字で入力してください</p>
+          <input type="tel" id="f-phone" placeholder="例：090-1234-5678" autocomplete="tel" inputmode="tel" maxlength="13">
+          <p class="hint">半角数字・ハイフン付きで入力してください</p>
+          <p class="field-err" id="err-phone">ハイフン付きで入力してください（例：090-1234-5678）</p>
         </div>
         <div class="form-row-half">
           <div class="form-row">
             <label>郵便番号<span class="req">*</span></label>
-            <input type="tel" id="f-postal" placeholder="例：100-0001 または 1000001" inputmode="numeric" maxlength="8">
-            <p class="field-err" id="err-postal">7桁の半角数字で入力してください</p>
+            <input type="tel" id="f-postal" placeholder="例：100-0001" inputmode="tel" maxlength="8">
+            <p class="field-err" id="err-postal">ハイフン付きで入力してください（例：100-0001）</p>
           </div>
           <div class="form-row">
             <label>都道府県<span class="req">*</span></label>
@@ -608,6 +608,6 @@
 
   <script src="../js/config.js?v=20260728a"></script>
   <script src="../js/api.js?v=20260819a"></script>
-  <script src="../js/register-pre.js?v=20260828a"></script>
+  <script src="../js/register-pre.js?v=20260915a"></script>
 </body>
 </html>

@@ -259,13 +259,14 @@ function validateForm_() {
       showErr_('err-email-dup-ack', 'f-email-dup-ack'); ok = false;
     }
   }
-  // 電話番号: 必須 + ハイフン無し半角数字のみ（フォーム規則）
+  // 電話番号: 必須 + ハイフン必須（company-entry.js と同じ規則。
+  //   ハイフン無しだとCSVをExcelで開いたときに先頭の0が落ちるため）
   const phone = val_('f-phone').trim();
   if (!phone) {
     setErrText_('err-phone', '電話番号を入力してください');
     showErr_('err-phone', 'f-phone'); ok = false;
-  } else if (!/^[0-9]{10,11}$/.test(phone)) {
-    setErrText_('err-phone', 'ハイフン無しの半角数字で入力してください（10〜11桁）');
+  } else if (!/^0\d{1,4}-\d{1,4}-\d{3,4}$/.test(phone)) {
+    setErrText_('err-phone', 'ハイフン付きで入力してください（例：090-1234-5678）');
     showErr_('err-phone', 'f-phone'); ok = false;
   }
   // 住所(都道府県): 必須（フォーム規則）
