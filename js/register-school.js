@@ -16,8 +16,12 @@ const MAX_FILE = 10 * 1024 * 1024; // 10MB
 const PHONE_RE = /^0\d{1,4}-\d{1,4}-\d{3,4}$/;
 const POSTAL_RE = /^\d{3}-\d{4}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const COUNT_RE = /^\d+$/;
 
 let _event = null;
+// 出場選手数の上限（GAS getSchoolEntryFormConfig から上書き。未設定時の既定値は GAS 側と一致させる）
+let _maxFgDrivers    = 3;
+let _maxWomenDrivers = 9;
 
 (async () => {
   _event = FG_API.getParam('event');
@@ -44,6 +48,7 @@ let _event = null;
   const approvalUrl = du.schoolApproval || d.approvalUrl;
   if (approvalUrl)    { const a = $('link-approval-doc'); if (a) a.href = approvalUrl; }
   if (du.rulebook)    { const a = $('link-doc-rulebook'); if (a) a.href = du.rulebook; }
+  applyDriverLimits_(d.maxFgDrivers, d.maxWomenDrivers);
 
   showState('form');
 
@@ -55,6 +60,16 @@ let _event = null;
     _overwriteChecked = '';
   });
 })();
+
+// ⚠ 0 は「そのクラスは出場不可」という有効な設定なので、|| で既定値に倒さない。
+function applyDriverLimits_(fg, women) {
+  if (COUNT_RE.test(String(fg)))    _maxFgDrivers    = Number(fg);
+  if (COUNT_RE.test(String(women))) _maxWomenDrivers = Number(women);
+  $('f-fgdrivers').max    = _maxFgDrivers;
+  $('f-womendrivers').max = _maxWomenDrivers;
+  $('hint-fgdrivers').textContent    = `0〜${_maxFgDrivers}名`;
+  $('hint-womendrivers').textContent = `0〜${_maxWomenDrivers}名`;
+}
 
 function fillSchoolList_(list) {
   const dl = $('dl-universities');
@@ -149,6 +164,22 @@ async function submit() {
   setErr('shipaddress', !shipAddr);                               if (!shipAddr) ok = false;
   setErr('shipphone',   !PHONE_RE.test(shipPhone));               if (!PHONE_RE.test(shipPhone)) ok = false;
 
+  // 出場選手数：各クラス 0〜上限の整数、合計1以上
+  const fgDrivers    = $('f-fgdrivers').value.trim();
+  const womenDrivers = $('f-womendrivers').value.trim();
+  const fgOk    = COUNT_RE.test(fgDrivers)    && Number(fgDrivers)    <= _maxFgDrivers;
+  const womenOk = COUNT_RE.test(womenDrivers) && Number(womenDrivers) <= _maxWomenDrivers;
+  $('err-fgdrivers').textContent = COUNT_RE.test(fgDrivers) && Number(fgDrivers) > _maxFgDrivers
+    ? `FGクラスは1校${_maxFgDrivers}名までです。補欠・メカニックは含めず、走行する選手の数のみ入力してください`
+    : `0〜${_maxFgDrivers}の半角数字で入力してください`;
+  $('err-womendrivers').textContent = COUNT_RE.test(womenDrivers) && Number(womenDrivers) > _maxWomenDrivers
+    ? `女子クラスは1校${_maxWomenDrivers}名までです。補欠・メカニックは含めず、走行する選手の数のみ入力してください`
+    : `0〜${_maxWomenDrivers}の半角数字で入力してください`;
+  setErr('fgdrivers',    !fgOk);    if (!fgOk) ok = false;
+  setErr('womendrivers', !womenOk); if (!womenOk) ok = false;
+  const totalOk = !(fgOk && womenOk) || Number(fgDrivers) + Number(womenDrivers) >= 1;
+  $('err-drivertotal').classList.toggle('show', !totalOk); if (!totalOk) ok = false;
+
   const rgPermErr = $('err-permission'); rgPermErr.classList.toggle('show', !permission); if (!permission) ok = false;
 
   const fileTooBig = file && file.size > MAX_FILE;
@@ -185,6 +216,8 @@ async function submit() {
       shipAddress:      shipAddr,
       shipPhone:        shipPhone,
       carPassCount:     '1枚',
+      fgDriverCount:    fgDrivers,
+      womenDriverCount: womenDrivers,
       schoolPermission: permission,
       note:             note,
       ruleConsent:      'true',
@@ -203,6 +236,8 @@ async function submit() {
                     ? '承諾書の保存に失敗しました。お手数ですが、もう一度送信してください。' :
                   res.error === 'missing_approval'
                     ? '学校職員の参加承諾書をアップロードしてください。' :
+                  res.error === 'invalid_driver_count'
+                    ? '出場選手数の入力内容に誤りがあります。上限と合計（1名以上）をご確認ください。' :
                   ('送信に失敗しました：' + (res.message || res.error || 'unknown'));
       banner.textContent = msg;
       banner.classList.add('show');
