@@ -689,6 +689,10 @@ async function loadConfig_(gen, ev) {
   setVal_('cfg-deadlineMechanic',   toDtLocal_(cfg.deadlineMechanic));
   setVal_('cfg-schoolEntryFormOpenAt',  toDtLocal_(cfg.schoolEntryFormOpenAt));
   setVal_('cfg-schoolEntryDeadline',    toDtLocal_(cfg.schoolEntryDeadline));
+  // ⚠ 0 は有効値なので || ではなく「空欄のときだけ既定値」。既定値は GAS schoolEntryDriverLimits_ と一致させる
+  const orDefault_ = (v, def) => (v === undefined || v === null || String(v).trim() === '') ? def : v;
+  setVal_('cfg-schoolEntryMaxFgDrivers',    orDefault_(cfg.schoolEntryMaxFgDrivers,    3));
+  setVal_('cfg-schoolEntryMaxWomenDrivers', orDefault_(cfg.schoolEntryMaxWomenDrivers, 9));
   setVal_('cfg-docUrlRulebook',         cfg.docUrlRulebook          || '');
   setVal_('cfg-docUrlPledge',           cfg.docUrlPledge            || '');
   setVal_('cfg-schoolEntryApprovalUrl', cfg.schoolEntryApprovalUrl  || '');
@@ -785,6 +789,8 @@ async function saveConfig_(btnId, fbId) {
     deadlineMechanic:     toIso_(getVal_('cfg-deadlineMechanic')),
     schoolEntryFormOpenAt: toIso_(getVal_('cfg-schoolEntryFormOpenAt')),
     schoolEntryDeadline:   toIso_(getVal_('cfg-schoolEntryDeadline')),
+    schoolEntryMaxFgDrivers:    getVal_('cfg-schoolEntryMaxFgDrivers'),
+    schoolEntryMaxWomenDrivers: getVal_('cfg-schoolEntryMaxWomenDrivers'),
     docUrlRulebook:        getVal_('cfg-docUrlRulebook'),
     docUrlPledge:          getVal_('cfg-docUrlPledge'),
     schoolEntryApprovalUrl: getVal_('cfg-schoolEntryApprovalUrl'),
@@ -2005,7 +2011,18 @@ function loadUniversities_(gen = null, ev = null) {
 }
 
 let schoolEntries_  = [];
-let allSchoolNames_ = [];   // 大学マスターの全大学名（統合先プルダウン用）
+let allSchoolNames_ = [];
+
+/**
+ * 出場校エントリーの出場選手数（FG / 女子 / 合計）。
+ * 列追加（2026-09-15）以前の提出や未入力の行は total を null にし、「未入力」と表示する。
+ * ⚠ 0 は有効値（そのクラスに出場しない）なので空欄と区別する。
+ */
+function schoolEntryDrivers_(e) {
+  const num = v => /^\d+$/.test(String(v == null ? '' : v).trim()) ? Number(v) : null;
+  const fg = num(e['FGドライバー数']), women = num(e['女子ドライバー数']);
+  return { fg, women, total: (fg === null || women === null) ? null : fg + women };
+}   // 大学マスターの全大学名（統合先プルダウン用）
 
 function renderSchoolEntries_(res) {
   const wrap = id_('school-entries-wrap');
@@ -2029,6 +2046,7 @@ function renderSchoolEntries_(res) {
     const school = esc_(e['学校名'] || '—');
     const rep    = esc_(e['代表者氏名'] || '—');
     const carPass = esc_(e['車両入場証枚数'] || '—');
+    const drivers = schoolEntryDrivers_(e);
     const perm   = e['学校許可取得'] === 'はい';
     const upd    = Number(e['更新回数'] || 1);
     const permChip = perm
@@ -2045,6 +2063,7 @@ function renderSchoolEntries_(res) {
         <div class="entry-card-contact">${rep} / ${esc_(e['代表者電話'] || '—')}</div>
         <div class="entry-card-chips">
           <span class="entry-chip car-yes">車両入場証: ${carPass}</span>
+          <span class="entry-chip car-yes">選手: ${drivers.total === null ? '未入力' : drivers.total + '名'}</span>
           ${permChip}
           ${updChip}
         </div>
@@ -2063,6 +2082,8 @@ function showSchoolEntryDetail_(e) {
   const link = url =>
     url ? `<a href="${esc_(url)}" target="_blank" style="color:var(--fg-blue);text-decoration:underline;font-size:13px">開く</a>` : '—';
   const historyBlock = (e['承諾書履歴'] || '').trim();
+  const drivers = schoolEntryDrivers_(e);
+  const cnt = v => v === null ? '未入力' : v + '名';
   id_('modal-school-entry-title').textContent = e['学校名'] || '出場校エントリー';
   body.innerHTML = [
     grp('提出日時', esc_(e['提出日時'] || '')),
@@ -2076,6 +2097,9 @@ function showSchoolEntryDetail_(e) {
     grp('発送先 住所', esc_(e['発送先_住所'] || '')),
     grp('発送先 電話', esc_(e['発送先_電話'] || '')),
     grp('車両入場証枚数', esc_(e['車両入場証枚数'] || '')),
+    grp('FGクラス ドライバー数', cnt(drivers.fg)),
+    grp('女子クラス ドライバー数', cnt(drivers.women)),
+    grp('選手合計', cnt(drivers.total)),
     grp('学校許可取得', esc_(e['学校許可取得'] || '')),
     grp('承諾書', link(e['承諾書URL'])),
     historyBlock ? grp('承諾書（過去分）', `<div style="font-size:12px;white-space:pre-wrap;background:var(--gray-light);padding:8px 10px;border-radius:6px">${esc_(historyBlock)}</div>`) : '',

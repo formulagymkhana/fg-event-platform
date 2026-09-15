@@ -965,6 +965,15 @@
               <label>締切日時</label>
               <input type="datetime-local" class="cfg-input" max="2099-12-31T23:59" id="cfg-schoolEntryDeadline">
             </div>
+            <div class="cfg-row">
+              <label>FGクラス ドライバー数の上限（1校あたり）</label>
+              <input type="number" class="cfg-input" id="cfg-schoolEntryMaxFgDrivers" min="0" step="1" inputmode="numeric">
+            </div>
+            <div class="cfg-row">
+              <label>女子クラス ドライバー数の上限（1校あたり）</label>
+              <input type="number" class="cfg-input" id="cfg-schoolEntryMaxWomenDrivers" min="0" step="1" inputmode="numeric">
+            </div>
+            <div class="cfg-hint">補欠・メカニックを除く走行選手の人数です。未設定の場合は FGクラス 3名 / 女子クラス 9名。0 にするとそのクラスは入力できなくなります。</div>
             <div class="cfg-row" style="margin-top:8px">
               <label>出場校エントリーフォームURL</label>
               <div class="url-box">
@@ -1375,6 +1384,6 @@
 <script src="../js/config.js?v=20260724h"></script>
 <!-- ⚠ csv-util.js は admin.js より前に読み込むこと（CSV出力の共通ヘルパー） -->
 <script src="../js/csv-util.js?v=20260828a"></script>
-<script src="../js/admin.js?v=20260828a"></script>
+<script src="../js/admin.js?v=20260915a"></script>
 </body>
 </html>

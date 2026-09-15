@@ -242,6 +242,25 @@
         </div>
       </div>
 
+      <!-- 出場選手数（パス発送枚数の確認用。上限は CONFIG の schoolEntryMaxFgDrivers / schoolEntryMaxWomenDrivers） -->
+      <div class="form-section">
+        <p class="section-label">出場選手数</p>
+        <p style="font-size:11px;color:var(--fg-muted);line-height:1.5;margin:0 0 12px">補欠・メカニックを除く、走行する選手の人数を入力してください。出場しないクラスは 0 を入力してください。</p>
+        <div class="form-row">
+          <label>FGクラス ドライバー数<span class="req">*</span></label>
+          <input type="number" id="f-fgdrivers" min="0" max="3" step="1" inputmode="numeric" placeholder="例：3">
+          <p class="hint" id="hint-fgdrivers">0〜3名</p>
+          <p class="field-err" id="err-fgdrivers">0〜3の半角数字で入力してください</p>
+        </div>
+        <div class="form-row">
+          <label>女子クラス ドライバー数<span class="req">*</span></label>
+          <input type="number" id="f-womendrivers" min="0" max="9" step="1" inputmode="numeric" placeholder="例：2">
+          <p class="hint" id="hint-womendrivers">0〜9名</p>
+          <p class="field-err" id="err-womendrivers">0〜9の半角数字で入力してください</p>
+        </div>
+        <p class="field-err" id="err-drivertotal">FGクラス・女子クラスのどちらかに1名以上入力してください</p>
+      </div>
+
       <!-- 車両入場証 -->
       <div class="form-section">
         <p class="section-label">車両入場証</p>
@@ -296,6 +315,6 @@
 
   <script src="../js/config.js?v=20260724h"></script>
   <script src="../js/api.js?v=20260819a"></script>
-  <script src="../js/register-school.js?v=20260915a"></script>
+  <script src="../js/register-school.js?v=20260915b"></script>
 </body>
 </html>

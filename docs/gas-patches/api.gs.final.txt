@@ -36,6 +36,9 @@ const SCHOOL_ENTRY_COLS = [
   '発送先_名義','発送先_郵便番号','発送先_住所','発送先_電話',
   '車両入場証枚数','学校許可取得','事務局への連絡事項',
   '承諾書URL','承諾書履歴','規則同意','更新回数',
+  // ⚠ 2026-09-15 追加。必ず末尾に足すこと（既存シートの列位置がずれるため途中に挿入しない）。
+  //   既存シートには見出しが無いので actionRegisterSchoolEntry_ が書き込み前に補う。
+  'FGドライバー数','女子ドライバー数',
 ];
 
 // 事前登録シートのフル列（共通＋区分別＋同意＋ファイルURL）
@@ -1053,6 +1056,19 @@ function schoolEntryFormState_(cfg) {
   return 'open';
 }
 
+/**
+ * 出場校エントリーの出場選手数の上限（CONFIG: schoolEntryMaxFgDrivers / schoolEntryMaxWomenDrivers）。
+ * ⚠ 0 は「そのクラスは出場不可」という有効な設定なので || で既定値に倒さない。
+ *   空欄・不正値のときだけ既定値（FG 3名 / 女子 9名）。既定値は register-school.js / admin.js と一致させる。
+ */
+function schoolEntryDriverLimits_(cfg) {
+  const pick = (v, def) => /^\d+$/.test(String(v == null ? '' : v).trim()) ? Number(v) : def;
+  return {
+    fg:    pick(cfg.schoolEntryMaxFgDrivers,    3),
+    women: pick(cfg.schoolEntryMaxWomenDrivers, 9),
+  };
+}
+
 /** 出場校エントリー承諾書の保存フォルダ（イベント別） */
 function getSchoolEntryEventFolder_(eventId) {
   const root = getOrCreateChildFolder_(DriveApp.getRootFolder(), 'FG出場校エントリー書類');
@@ -1222,6 +1238,7 @@ function err_(code) {
     form_not_open:         '受付がまだ開始されていません',
     missing_approval:      '学校職員の参加承諾書をアップロードしてください',
     approval_save_failed:  '承諾書の保存に失敗しました。お手数ですが、もう一度送信してください',
+    invalid_driver_count:  '出場選手数の入力内容に誤りがあります。上限と合計（1名以上）をご確認ください',
     registration_closed:   '受付期間が終了しました',
     event_inactive:        'このイベントへの登録は受け付けていません',
     not_event_day:         'イベント開催日ではありません',
@@ -4577,8 +4594,11 @@ function actionGetSchoolEntryFormConfig_(p) {
   const cfg = getConfig_(p.event);
   const tz  = Session.getScriptTimeZone();
   const fmt = v => v ? Utilities.formatDate(new Date(v), tz, "yyyy/MM/dd HH:mm") : '';
+  const lim = schoolEntryDriverLimits_(cfg);
   return ok_({
     state:       schoolEntryFormState_(cfg),
+    maxFgDrivers:    lim.fg,
+    maxWomenDrivers: lim.women,
     eventName:   cfg.eventName || '',
     openAt:      fmt(cfg.schoolEntryFormOpenAt),
     deadline:    fmt(cfg.schoolEntryDeadline),
@@ -4652,6 +4672,13 @@ function actionRegisterSchoolEntry_(p) {
   for (const k of required) {
     if (!p[k] && p[k] !== 0) return err_('missing_' + k);
   }
+  // 出場選手数：各クラス 0〜上限の整数、合計1以上（フロントと同じ規則。0 は有効値なので required には入れない）
+  const lim = schoolEntryDriverLimits_(cfg);
+  const fgStr    = String(p.fgDriverCount    == null ? '' : p.fgDriverCount).trim();
+  const womenStr = String(p.womenDriverCount == null ? '' : p.womenDriverCount).trim();
+  if (!/^\d+$/.test(fgStr) || !/^\d+$/.test(womenStr)) return err_('invalid_driver_count');
+  const fgCount = Number(fgStr), womenCount = Number(womenStr);
+  if (fgCount > lim.fg || womenCount > lim.women || fgCount + womenCount < 1) return err_('invalid_driver_count');
   // ⚠ 承諾書はフロント(register-school.js)で必須にしているが、サーバー側でも必ず検証する。
   //   フォームを経由しない送信や、フロントの検証が抜けた場合に、承諾書の無い申込が
   //   「受付しました」として記録されるのを防ぐ。
@@ -4668,6 +4695,16 @@ function actionRegisterSchoolEntry_(p) {
   const lock = LockService.getScriptLock();
   try { lock.waitLock(10000); } catch (e) { return err_('lock_timeout'); }
   try {
+    // ⚠ 行は SCHOOL_ENTRY_COLS の並び順で書き込むが、一覧取得（actionAdminGetSchoolEntries_）は
+    //   シートの見出し行で読む。列追加前に作られたシートは見出しが足りず、追加列の値が
+    //   管理画面に出ないため、足りない見出しを補う（末尾に追加した列のみ対象）。
+    const curHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+    if (curHeaders.length < SCHOOL_ENTRY_COLS.length &&
+        curHeaders.every((h, i) => h === SCHOOL_ENTRY_COLS[i])) {
+      const missing = SCHOOL_ENTRY_COLS.slice(curHeaders.length);
+      sheet.getRange(1, curHeaders.length + 1, 1, missing.length).setValues([missing]);
+    }
+
     const data    = sheet.getDataRange().getValues();
     const headers = data[0].map(String);
     const idx     = n => headers.indexOf(n);
@@ -4732,6 +4769,8 @@ function actionRegisterSchoolEntry_(p) {
       '承諾書履歴':      historyStr,
       '規則同意':        p.ruleConsent === 'true' || p.ruleConsent === true ? 'true' : 'false',
       '更新回数':        updateCount,
+      'FGドライバー数':  fgCount,
+      '女子ドライバー数': womenCount,
     };
     const newRow = SCHOOL_ENTRY_COLS.map(h => rowMap[h] !== undefined ? rowMap[h] : '');
 
