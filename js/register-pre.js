@@ -257,9 +257,10 @@ async function readBranchFiles(cat) {
 
 // ── バリデーション ──────────────────────────────
 const NAME_RE  = /.+[ 　].+/;        // 姓と名の間にスペース
-const PHONE_RE = /^[0-9]{10,11}$/;
-const POSTAL_RE = /^[0-9]{7}$/;
-const stripHyphen_ = s => String(s || '').replace(/[-−ー－]/g, '');
+// ⚠ 電話番号・郵便番号はハイフン必須（company-entry.js と同じ規則）。
+//   ハイフン無しの数字だけだと、CSVをExcelで開いたときに先頭の0が落ちるため。
+const PHONE_RE = /^0\d{1,4}-\d{1,4}-\d{3,4}$/;
+const POSTAL_RE = /^\d{3}-\d{4}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SIM_RE   = /^[0-9]{1,2}:[0-5][0-9]\.[0-9]{3}$/;  // 1:15.001
 
@@ -397,8 +398,8 @@ function validate(d) {
     const acked = $('f-email-dup-ack')?.checked;
     fail('email-dup-ack', !acked);
   }
-  fail('phone',      !PHONE_RE.test(stripHyphen_(d.phone)));
-  fail('postal',     !POSTAL_RE.test(stripHyphen_(d.postal)));
+  fail('phone',      !PHONE_RE.test(d.phone));
+  fail('postal',     !POSTAL_RE.test(d.postal));
   fail('prefecture', !d.prefecture);
   fail('address',    !d.address);
 
