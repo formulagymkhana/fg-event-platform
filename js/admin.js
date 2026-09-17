@@ -2750,7 +2750,7 @@ function downloadEntryShippingCsv_() {
     const label = String(company || e['社名略称'] || '(企業名なし)').trim();
     cols.forEach((c, i) => {
       const len = [...String(values[i])].length;
-      if (LIMITS[c] && len > LIMITS[c]) overLimit.push(`${label}: ${c} ${len}文字（上限${LIMITS[c]}）`);
+      if (LIMITS[c] && len > LIMITS[c]) overLimit.push(`${label}: ${c} ${len}文字（上限${LIMITS[c]}文字）`);
     });
     return values.map(csvSafe_).join(',');
   });
