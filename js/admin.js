@@ -3175,14 +3175,19 @@ function activeWomenPairings_() {
 }
 
 // ── 走行順の計算 ────────────
-// 男子A: 1..N / 女子A: N+1..N+M / 男子B: N+M+1..2N+M / 女子B: 2N+M+1..2N+2M /
-// 男子C: 2N+2M+1..3N+2M / 女子C: 3N+2M+1..3N+2M+Mc
-// (Mc=Cヒートが選ばれているペア数。大会によって女子Cを使わない場合は0のままで、
-//  その場合は既存の男子C以前の計算式に一切影響しない)
+// 男子A: 1..N / 女子A: N+1..N+Ma / 男子B: N+Ma+1..2N+Ma / 女子B: 2N+Ma+1..2N+Ma+Mb /
+// 男子C: 2N+Ma+Mb+1..3N+Ma+Mb / 女子C: 3N+Ma+Mb+1..3N+Ma+Mb+Mc
+// Ma/Mb/Mc = A/B/Cヒートに実際に人が入っているペア数。
+// ⚠ 以前は A・B とも「ペア数 M」で枠を予約していたため、片側だけ埋めた編成
+//   （例: 女子2名をAだけに入れる）で女子Bの枠が欠番として残り、男子C以降が後ろへずれていた
+//   （2026-09-22 修正）。全ペアがA・B両方埋まっている従来編成では Ma=Mb=M となり、
+//   番号は一切変わらない（後方互換）。
+// ⚠ 区切り位置を再計算している renderOrderList_ も同じ式に合わせること。
 function computeRunningOrder_() {
   const N = schoolOrder_.length;
   const activePairs = activeWomenPairings_();
-  const M = activePairs.length;
+  const Ma = activePairs.filter(p => p.a).length;
+  const Mb = activePairs.filter(p => p.b).length;
   const byId = {};  // studentId → 走行順
   const menBySchoolAndClass = new Map();
 
@@ -3201,23 +3206,22 @@ function computeRunningOrder_() {
       if (!r) return;
       let order = 0;
       if (cls === 'A') order = i + 1;
-      else if (cls === 'B') order = N + M + i + 1;
-      else order = 2 * N + 2 * M + i + 1;
+      else if (cls === 'B') order = N + Ma + i + 1;
+      else order = 2 * N + Ma + Mb + i + 1;
       byId[r.studentId] = order;
     });
   });
 
-  activePairs.forEach((p, i) => {
-    if (p.a) byId[p.a] = N + i + 1;
-    if (p.b) byId[p.b] = 2 * N + M + i + 1;
-  });
-
-  // 女子Cヒート: Cが選ばれているペアだけ、男子Cの後ろに詰めて連番を振る
-  let cSeq = 0;
+  // 女子A/B/C: 各ヒートとも、そのヒートが選ばれているペアだけをペア順に詰めて連番を振る
+  let aSeq = 0, bSeq = 0, cSeq = 0;
   activePairs.forEach(p => {
-    if (!p.c) return;
-    cSeq++;
-    byId[p.c] = 3 * N + 2 * M + cSeq;
+    if (p.a) { aSeq++; byId[p.a] = N + aSeq; }
+  });
+  activePairs.forEach(p => {
+    if (p.b) { bSeq++; byId[p.b] = 2 * N + Ma + bSeq; }
+  });
+  activePairs.forEach(p => {
+    if (p.c) { cSeq++; byId[p.c] = 3 * N + Ma + Mb + cSeq; }
   });
 
   return byId;
@@ -3438,11 +3442,15 @@ function renderOrderList_() {
     .filter(r => r.order)
     .sort((a, b) => a.order - b.order);
 
+  // ⚠ 区切り位置は computeRunningOrder_ の式と必ず一致させること
+  //   （ずれると男子Cの選手がBドライバーの表に混ざる）。
   const N = schoolOrder_.length;
-  const M = activeWomenPairings_().length;
-  const heatA = rows.filter(r => r.order <= N + M);
-  const heatB = rows.filter(r => r.order > N + M && r.order <= 2 * N + 2 * M);
-  const heatC = rows.filter(r => r.order > 2 * N + 2 * M);
+  const activePairs = activeWomenPairings_();
+  const Ma = activePairs.filter(p => p.a).length;
+  const Mb = activePairs.filter(p => p.b).length;
+  const heatA = rows.filter(r => r.order <= N + Ma);
+  const heatB = rows.filter(r => r.order > N + Ma && r.order <= 2 * N + Ma + Mb);
+  const heatC = rows.filter(r => r.order > 2 * N + Ma + Mb);
 
   const row = r => `<tr>
     <td>${esc_(r.school)}</td>
