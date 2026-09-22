@@ -2159,9 +2159,10 @@ function downloadSchoolShippingCsv_() {
   const cols = ['学校名', '郵便番号', '住所', '宛名', '電話番号', '内容品'];
   const rows = schoolEntries_.map(e => {
     const name = String(e['発送先_名義'] || '').trim();
+    const postal = String(e['発送先_郵便番号'] || '').trim();
     return [
       e['学校名'] || '',
-      e['発送先_郵便番号'] || '',
+      postal ? '〒' + postal : '',
       e['発送先_住所'] || '',
       name ? name + '様' : '',
       e['発送先_電話'] || '',
