@@ -2060,7 +2060,8 @@ function renderSchoolEntries_(res) {
         <div class="entry-card-top">
           <span class="entry-card-name">${school}</span>
         </div>
-        <div class="entry-card-contact">${rep} / ${esc_(e['代表者電話'] || '—')}</div>
+        <div class="entry-card-contact">代表 ${rep} / ${esc_(e['代表者電話'] || '—')}</div>
+        <div class="entry-card-contact">発送先 ${esc_(e['発送先_名義'] || '—')}</div>
         <div class="entry-card-chips">
           <span class="entry-chip car-yes">車両入場証: ${carPass}</span>
           <span class="entry-chip car-yes">選手: ${drivers.total === null ? '未入力' : drivers.total + '名'}</span>
@@ -2093,7 +2094,7 @@ function showSchoolEntryDetail_(e) {
     grp('代表者電話', esc_(e['代表者電話'] || '')),
     grp('代表者メール', esc_(e['代表者メール'] || '')),
     grp('発送先 名義', esc_(e['発送先_名義'] || '')),
-    grp('発送先 郵便番号', esc_(e['発送先_郵便番号'] || '')),
+    grp('発送先 郵便番号', e['発送先_郵便番号'] ? '〒' + esc_(e['発送先_郵便番号']) : ''),
     grp('発送先 住所', esc_(e['発送先_住所'] || '')),
     grp('発送先 電話', esc_(e['発送先_電話'] || '')),
     grp('車両入場証枚数', esc_(e['車両入場証枚数'] || '')),
