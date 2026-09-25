@@ -3286,6 +3286,7 @@ function buildEntryListRows_(orders) {
         studentId: r.studentId,
         name:      r['氏名'] || '',
         furigana:  r['ふりがな'] || '',
+        grade:     r['学年'] || '',
         clubYears: r['自動車部在籍年数'] || '',
       });
     });
@@ -3306,6 +3307,7 @@ function buildEntryListRows_(orders) {
         studentId: r.studentId,
         name:      r['氏名'] || '',
         furigana:  r['ふりがな'] || '',
+        grade:     r['学年'] || '',
         clubYears: r['自動車部在籍年数'] || '',
       });
     });
@@ -3325,16 +3327,17 @@ function renderReceptionList_() {
   const women = rows.filter(r => r.section === 'women');
 
   const header = `<thead><tr>
-        <th>大学名</th><th>ドライバー</th><th>選手名</th><th>よみがな</th>
+        <th>大学名</th><th>ドライバー</th><th>選手名</th><th>よみがな</th><th>学年</th>
         <th>受付(土)</th><th>受付(日)</th><th>紹介カード</th><th>リストバンド</th>
         <th>必要書類</th><th>ID</th>
       </tr></thead>`;
-  const emptyBody = `<tr><td colspan="10" style="text-align:center;color:var(--gray);padding:12px 0">該当なし</td></tr>`;
+  const emptyBody = `<tr><td colspan="11" style="text-align:center;color:var(--gray);padding:12px 0">該当なし</td></tr>`;
   const row = r => `<tr>
     <td>${esc_(r.school)}</td>
     <td class="center cls-${r.cls}">${r.cls}</td>
     <td>${esc_(r.name)}</td>
     <td>${esc_(r.furigana)}</td>
+    <td class="center">${esc_(r.grade)}</td>
     <td class="center"></td><td class="center"></td>
     <td class="center"></td><td class="center"></td>
     <td></td>
@@ -3396,6 +3399,7 @@ function buildSupportRows_() {
       school:    String(r['大学名'] || '').trim(),
       name:      r['氏名'] || '',
       furigana:  r['ふりがな'] || '',
+      grade:     r['学年'] || '',
       studentId: r.studentId,
       backup, mech,
       lunchSat: r['弁当_土'] || '',
@@ -3413,6 +3417,7 @@ function renderSupportList_() {
     <td>${esc_(r.school)}</td>
     <td>${esc_(r.name)}</td>
     <td>${esc_(r.furigana)}</td>
+    <td class="center">${esc_(r.grade)}</td>
     <td class="center"></td>
     <td class="center">${esc_(r.backup)}</td>
     <td class="center">${esc_(r.mech)}</td>
@@ -3421,11 +3426,11 @@ function renderSupportList_() {
     <td>${esc_(r.needDoc)}</td>
     <td class="num">${esc_(r.studentId)}</td>
   </tr>`).join('');
-  const emptyBody = `<tr><td colspan="10" style="text-align:center;color:var(--gray);padding:16px 0">応援学生の事前登録がありません</td></tr>`;
+  const emptyBody = `<tr><td colspan="11" style="text-align:center;color:var(--gray);padding:16px 0">応援学生の事前登録がありません</td></tr>`;
   wrap.innerHTML = `
     <div class="list-scroll"><table class="list-tbl">
       <thead><tr>
-        <th>大学名</th><th>氏名</th><th>よみがな</th>
+        <th>大学名</th><th>氏名</th><th>よみがな</th><th>学年</th>
         <th>受付</th><th>補欠選手登録</th><th>メカニック登録</th>
         <th>土曜昼食</th><th>日曜昼食</th><th>必要書類</th><th>ID</th>
       </tr></thead>
@@ -3498,19 +3503,19 @@ function downloadEntryListCsv_() {
 function downloadReceptionCsv_() {
   const orders = computeRunningOrder_();
   const rows   = buildEntryListRows_(orders);
-  const headers = ['大学名', 'ドライバー', '選手名', 'よみがな',
+  const headers = ['大学名', 'ドライバー', '選手名', 'よみがな', '学年',
     '受付(土曜日)', '受付(日曜日)', '紹介カード', 'リストバンド', '必要書類', 'クラス', 'ID'];
-  const data = rows.map(r => [r.school, r.cls, r.name, r.furigana, '', '', '', '', '',
+  const data = rows.map(r => [r.school, r.cls, r.name, r.furigana, r.grade, '', '', '', '', '',
     r.section === 'men' ? 'Formula Gymkhana' : 'Formula Gymkhana 女子', r.studentId]);
   downloadCsv_(`選手受付リスト_${curEvent_}.csv`, toCsv_(headers, data));
 }
 
 function downloadSupportCsv_() {
   const rows = buildSupportRows_();
-  const headers = ['大学名', '氏名', 'よみがな', '受付', '補欠選手登録', 'メカニック登録',
+  const headers = ['大学名', '氏名', 'よみがな', '学年', '受付', '補欠選手登録', 'メカニック登録',
     '土曜昼食', '日曜昼食', '必要書類', 'ID'];
   const data = rows.map(r => [
-    r.school, r.name, r.furigana, '', r.backup, r.mech, r.lunchSat, r.lunchSun, r.needDoc, r.studentId,
+    r.school, r.name, r.furigana, r.grade, '', r.backup, r.mech, r.lunchSat, r.lunchSun, r.needDoc, r.studentId,
   ]);
   downloadCsv_(`応援学生受付リスト_${curEvent_}.csv`, toCsv_(headers, data));
 }
