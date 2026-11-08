@@ -73,8 +73,12 @@ let pageEvent_ = null;
   if (eventRes.ok && eventRes.data) {
     const d = eventRes.data;
     pageEvent_ = d.eventId || null;
-    const label = formatEventDate_(d.startDate, d.eventName);
-    setText('event-date-label', label);
+    // ⚠ 「来場日」は本日の日付を出す。イベントの開始日を出してはいけない。
+    //   土日2日間の大会では開始日＝土曜日のため、日曜に開いても「土曜日」と
+    //   表示されてしまっていた（2026-09-26 に会場で発覚）。
+    //   このページは GAS が本日開催のイベントを解決できたときだけ表示される
+    //   （解決できなければ no_active_event でエラー画面）ため、本日＝開催日。
+    setText('event-date-label', formatToday_());
     // 書類URL上書き（設定があればアンカーの href を差し替え）
     const du = d.docUrls || {};
     if (du.rulebook) { const a = document.getElementById('link-doc-rulebook'); if (a) a.href = du.rulebook; }
@@ -348,16 +352,6 @@ function renderSuccess_(d) {
 }
 
 // ── 日付フォーマット ──────────────────────────────
-function formatEventDate_(dateStr, eventName) {
-  if (!dateStr) return formatToday_();
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d)) return formatToday_();
-    const days = ['日', '月', '火', '水', '木', '金', '土'];
-    return `${d.getMonth() + 1}月${d.getDate()}日（${days[d.getDay()]}）`;
-  } catch (e) { return formatToday_(); }
-}
-
 function formatToday_() {
   const d = new Date();
   const days = ['日', '月', '火', '水', '木', '金', '土'];
